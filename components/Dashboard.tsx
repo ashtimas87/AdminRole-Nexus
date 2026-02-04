@@ -118,9 +118,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             </button>
             <button 
               onClick={() => { setView('deployment'); setSelectedOverviewUser(null); }}
-              className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'deployment' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+              className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'deployment' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
             >
-              Deployment
+              Cloud Hub
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
             </button>
           </div>
@@ -250,40 +250,95 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const renderDeployment = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <button onClick={() => { setView('overview'); setSelectedOverviewUser(null); }} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 transition mb-4">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-          Back to Overview
-        </button>
-        <h2 className="text-3xl font-black text-slate-900 tracking-tight">Netlify Deployment Hub</h2>
+      <div className="flex justify-between items-end">
+        <div>
+          <button onClick={() => { setView('overview'); setSelectedOverviewUser(null); }} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 transition mb-4">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+            Back to Overview
+          </button>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Cloud Integration Hub</h2>
+          <p className="text-slate-500 text-sm mt-1">Manage infrastructure, environment variables, and external connections.</p>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+          <span className="text-xs font-black uppercase tracking-widest">Systems Online</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8 flex flex-col justify-between overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <svg className="w-32 h-32" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/></svg>
+        {/* Bolt.new Section */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8 flex flex-col justify-between overflow-hidden relative border-t-4 border-t-orange-500">
+          <div className="absolute top-0 right-0 p-4 opacity-5">
+            <svg className="w-40 h-40 rotate-12" viewBox="0 0 24 24" fill="currentColor"><path d="M13 10V3L4 14H11V21L20 10H13Z"/></svg>
           </div>
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-teal-500 rounded-xl flex items-center justify-center text-white">
+              <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-200">
+                <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14H11V21L20 10H13Z"/></svg>
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 leading-tight">Bolt.new Integration</h3>
+                <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest bg-orange-50 px-2 py-0.5 rounded">Development Environment</span>
+              </div>
+            </div>
+            <p className="text-slate-600 mb-8 leading-relaxed text-sm">Nexus Admin is optimized for the Bolt runtime. Your development cycle is synchronized with real-time editing and live preview capabilities.</p>
+            
+            <div className="space-y-4 mb-10">
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                <span className="text-xs font-bold text-slate-500">Live Preview</span>
+                <span className="text-xs font-black text-emerald-600">ACTIVE</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                <span className="text-xs font-bold text-slate-500">Hot Module Replacement</span>
+                <span className="text-xs font-black text-emerald-600">ENABLED</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                <span className="text-xs font-bold text-slate-500">GitHub Sync</span>
+                <span className="text-xs font-black text-slate-400">WAITING</span>
+              </div>
+            </div>
+          </div>
+
+          <a 
+            href="https://bolt.new/" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black py-4 rounded-xl transition-all shadow-lg hover:shadow-orange-200/50 flex items-center justify-center gap-3 text-lg"
+          >
+            Open in Bolt.new
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+          </a>
+        </div>
+
+        {/* Netlify Section */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8 flex flex-col justify-between overflow-hidden relative border-t-4 border-t-teal-500">
+          <div className="absolute top-0 right-0 p-4 opacity-5">
+            <svg className="w-40 h-40 -rotate-12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          </div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-[#25c2a0] rounded-xl flex items-center justify-center text-white shadow-lg shadow-teal-200">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
               </div>
-              <h3 className="text-xl font-bold text-slate-900">Netlify Configuration</h3>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 leading-tight">Netlify Production</h3>
+                <span className="text-[10px] font-black text-teal-600 uppercase tracking-widest bg-teal-50 px-2 py-0.5 rounded">Hosting & CDN</span>
+              </div>
             </div>
-            <p className="text-slate-600 mb-8 leading-relaxed">Your project is pre-configured for Netlify with custom SPA routing and optimized static asset delivery.</p>
+            <p className="text-slate-600 mb-8 leading-relaxed text-sm">Your project is production-ready with Netlify. Automatic SSL, custom domain mapping, and lightning-fast edge delivery are available.</p>
             
             <div className="space-y-4 mb-10">
               <div className="flex items-center gap-3 text-sm font-semibold text-slate-700">
                 <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                <span>SPA Routing: index.html Fallback Active</span>
+                <span className="text-xs">SPA Routing (netlify.toml) Configured</span>
               </div>
               <div className="flex items-center gap-3 text-sm font-semibold text-slate-700">
                 <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                <span>Node Version: 20 (Production Optimized)</span>
+                <span className="text-xs">Node.js v20 Runtime Optimized</span>
               </div>
               <div className="flex items-center gap-3 text-sm font-semibold text-slate-700">
-                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                <span>Continuous Deployment Ready</span>
+                <div className="w-2 h-2 rounded-full bg-slate-300"></div>
+                <span className="text-xs text-slate-400">Custom Domain Pending</span>
               </div>
             </div>
           </div>
@@ -294,46 +349,64 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             rel="noopener noreferrer" 
             className="w-full bg-[#25c2a0] hover:bg-[#1f9e83] text-white font-black py-4 rounded-xl transition-all shadow-lg hover:shadow-teal-200/50 flex items-center justify-center gap-3 text-lg"
           >
-            Connect to Netlify Console
+            Deploy to Netlify
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
           </a>
         </div>
+      </div>
 
-        <div className="bg-slate-900 rounded-2xl shadow-xl p-8 text-white">
-          <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
-            <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            Deployment Prerequisites
-          </h3>
-          <p className="text-slate-400 mb-8 text-sm">To ensure the Nexus intelligence protocols and dashboards function correctly in production, please configure these environment variables in your Netlify Site Settings.</p>
-          
-          <div className="space-y-6">
-            <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-black text-blue-400 uppercase tracking-widest">Variable Key</span>
-                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-[10px] font-bold">REQUIRED</span>
+      {/* Global Config Card */}
+      <div className="bg-slate-900 rounded-3xl shadow-2xl p-10 text-white relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 relative z-10">
+          <div>
+            <h3 className="text-2xl font-black mb-6 flex items-center gap-3">
+              <svg className="w-8 h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              Core Configuration
+            </h3>
+            <p className="text-slate-400 mb-8 leading-relaxed">To activate Nexus Intelligence and secure data processing across both Bolt.new and Netlify, the following environment variables are mandatory.</p>
+            
+            <div className="space-y-4">
+              <div className="p-5 bg-white/5 border border-white/10 rounded-2xl group hover:border-blue-500/50 transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Environment Variable</span>
+                  <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded-md text-[9px] font-black uppercase tracking-widest">Crucial</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <code className="text-xl font-mono font-bold text-white tracking-tight">API_KEY</code>
+                  <div className="px-2 py-1 bg-emerald-500/10 text-emerald-500 text-[10px] font-bold rounded border border-emerald-500/20">READY</div>
+                </div>
+                <p className="mt-3 text-xs text-slate-500 font-medium">Google Gemini Pro credentials for real-time strategic insights.</p>
               </div>
-              <code className="text-lg font-mono font-bold text-white">API_KEY</code>
-              <p className="mt-2 text-xs text-slate-500 font-medium">Your Google Gemini Pro API Key for role-based strategic insights.</p>
-            </div>
 
-            <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Variable Key</span>
-                <span className="px-2 py-0.5 bg-slate-500/20 text-slate-500 rounded text-[10px] font-bold">OPTIONAL</span>
+              <div className="p-5 bg-white/5 border border-white/10 rounded-2xl opacity-60">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Optional Param</span>
+                  <span className="px-2 py-0.5 bg-slate-500/20 text-slate-500 rounded-md text-[9px] font-black uppercase tracking-widest">Internal</span>
+                </div>
+                <code className="text-lg font-mono font-bold text-slate-300">NODE_ENV</code>
+                <p className="mt-3 text-xs text-slate-600 font-medium">Automatic detection based on current platform context.</p>
               </div>
-              <code className="text-lg font-mono font-bold text-slate-300">NODE_VERSION</code>
-              <p className="mt-2 text-xs text-slate-500 font-medium">Default set to 20 in netlify.toml</p>
             </div>
+          </div>
 
-            <div className="pt-6 border-t border-white/10">
-              <h4 className="text-sm font-bold mb-3 uppercase tracking-tighter text-slate-400">Step-by-Step Connection:</h4>
-              <ol className="space-y-3 text-sm text-slate-500 list-decimal pl-4 font-medium">
-                <li>Log in to <a href="https://app.netlify.com" target="_blank" className="text-blue-400 underline">Netlify</a>.</li>
-                <li>Click <strong>"Add new site"</strong> and select <strong>"Import an existing project"</strong>.</li>
-                <li>Connect your Git provider and select this repository.</li>
-                <li>Ensure build settings are default (Build command: blank, Publish directory: <code>.</code>).</li>
-                <li>Go to <strong>Site configuration > Environment variables</strong> and add <code>API_KEY</code>.</li>
-              </ol>
+          <div className="bg-white/5 backdrop-blur-md rounded-2xl p-8 border border-white/10">
+            <h4 className="text-sm font-black mb-6 uppercase tracking-widest text-slate-400">Integration Checklist:</h4>
+            <div className="space-y-6">
+              {[
+                { step: "01", title: "Git Push", desc: "Sync your Bolt.new workspace with a remote repository." },
+                { step: "02", title: "Site Link", desc: "Connect Netlify to your Git repository for auto-deploy." },
+                { step: "03", title: "Variable Sync", desc: "Inject API_KEY into Netlify Site Settings / Bolt Secrets." },
+                { step: "04", title: "Verification", desc: "Validate routing by visiting any non-root path." }
+              ].map((item, idx) => (
+                <div key={idx} className="flex gap-4 items-start">
+                  <span className="text-xs font-black text-blue-500 bg-blue-500/10 w-8 h-8 rounded-lg flex items-center justify-center shrink-0">{item.step}</span>
+                  <div>
+                    <p className="text-sm font-bold text-slate-200">{item.title}</p>
+                    <p className="text-xs text-slate-500 leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
