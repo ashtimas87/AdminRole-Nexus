@@ -1,10 +1,13 @@
 [build]
-  publish = "."
+publish = "dist"
+command = "npx vite build"
 
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+from = "/*"
+to = "/index.html"
+status = 200
 
+[context]
+[context.production]
 [context.production.environment]
-  NODE_VERSION = "20"
+NODE_VERSION = "20"
