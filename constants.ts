@@ -1,4 +1,3 @@
-
 import { User, UserRole } from './types';
 
 const CHQ_NAMES = [
@@ -10,7 +9,7 @@ const CHQ_NAMES = [
   'CHQ CIDMU',
   'CHQ TPU',
   'CHQ WCPD',
-  'CHQ R&D'
+  'CHQ CICTMU'
 ];
 
 export const MOCK_USERS: User[] = [
@@ -32,10 +31,10 @@ export const MOCK_USERS: User[] = [
     role: UserRole.SUB_ADMIN,
     avatar: 'https://picsum.photos/seed/sub1/100/100'
   },
-  // CHQ Users (9 users now)
+  // CHQ Users
   ...CHQ_NAMES.map((name, i) => ({
     id: `chq-${i + 1}`,
-    email: `${name.replace('CHQ ', '').replace('&', 'and').replace(' ', '').toLowerCase()}@gmail.com`,
+    email: `${name.replace('CHQ ', '').replace('&', 'and').replace(/\s+/g, '').toLowerCase()}@gmail.com`,
     password: 'admin123',
     name: name,
     role: UserRole.CHQ,

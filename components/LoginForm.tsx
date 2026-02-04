@@ -49,7 +49,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                placeholder="superadmin@gmail.com"
+                placeholder="Email Address"
                 required
               />
             </div>
@@ -81,10 +81,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
               ) : 'Sign In'}
             </button>
           </form>
-          
-          <div className="mt-6 text-xs text-slate-400">
-            <p>Demo Super Admin email: superadmin@gmail.com</p>
-          </div>
         </div>
 
         {/* Right Side: Visual/Context */}
@@ -99,7 +95,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
               </svg>
             </div>
             <h2 className="text-4xl font-bold mb-4 leading-tight">Secure Multi-Role Infrastructure.</h2>
-            <p className="text-slate-400 text-lg">Managing 22 distinct user accounts across 4 organizational tiers with granular permissions.</p>
+            <p className="text-slate-400 text-lg">Managing 21 distinct user accounts across 4 organizational tiers with granular permissions.</p>
           </div>
 
           <div className="relative z-10 space-y-4">
