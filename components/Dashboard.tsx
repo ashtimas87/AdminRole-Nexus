@@ -13,6 +13,7 @@ interface DashboardProps {
 type ViewType = 
   | 'overview' 
   | 'accounts' 
+  | 'deployment'
   | 'operational-dashboard' 
   | 'chq-operational-dashboard' 
   | 'tactical-dashboard'
@@ -107,13 +108,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Navigation</p>
         
         {user.role === UserRole.SUPER_ADMIN && (
-          <button 
-            onClick={() => { setView('accounts'); setSelectedOverviewUser(null); }}
-            className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'accounts' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-          >
-            Accounts
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-          </button>
+          <div className="space-y-2">
+            <button 
+              onClick={() => { setView('accounts'); setSelectedOverviewUser(null); }}
+              className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'accounts' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+            >
+              Accounts
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+            </button>
+            <button 
+              onClick={() => { setView('deployment'); setSelectedOverviewUser(null); }}
+              className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'deployment' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+            >
+              Deployment
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+            </button>
+          </div>
         )}
 
         {['2026', '2025', '2024', '2023'].map(year => (
@@ -238,6 +248,99 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     </div>
   );
 
+  const renderDeployment = () => (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div>
+        <button onClick={() => { setView('overview'); setSelectedOverviewUser(null); }} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 transition mb-4">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+          Back to Overview
+        </button>
+        <h2 className="text-3xl font-black text-slate-900 tracking-tight">Netlify Deployment Hub</h2>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8 flex flex-col justify-between overflow-hidden relative">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <svg className="w-32 h-32" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/></svg>
+          </div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-teal-500 rounded-xl flex items-center justify-center text-white">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900">Netlify Configuration</h3>
+            </div>
+            <p className="text-slate-600 mb-8 leading-relaxed">Your project is pre-configured for Netlify with custom SPA routing and optimized static asset delivery.</p>
+            
+            <div className="space-y-4 mb-10">
+              <div className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                <span>SPA Routing: index.html Fallback Active</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                <span>Node Version: 20 (Production Optimized)</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                <span>Continuous Deployment Ready</span>
+              </div>
+            </div>
+          </div>
+
+          <a 
+            href="https://app.netlify.com/" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="w-full bg-[#25c2a0] hover:bg-[#1f9e83] text-white font-black py-4 rounded-xl transition-all shadow-lg hover:shadow-teal-200/50 flex items-center justify-center gap-3 text-lg"
+          >
+            Connect to Netlify Console
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+          </a>
+        </div>
+
+        <div className="bg-slate-900 rounded-2xl shadow-xl p-8 text-white">
+          <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
+            <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Deployment Prerequisites
+          </h3>
+          <p className="text-slate-400 mb-8 text-sm">To ensure the Nexus intelligence protocols and dashboards function correctly in production, please configure these environment variables in your Netlify Site Settings.</p>
+          
+          <div className="space-y-6">
+            <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black text-blue-400 uppercase tracking-widest">Variable Key</span>
+                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-[10px] font-bold">REQUIRED</span>
+              </div>
+              <code className="text-lg font-mono font-bold text-white">API_KEY</code>
+              <p className="mt-2 text-xs text-slate-500 font-medium">Your Google Gemini Pro API Key for role-based strategic insights.</p>
+            </div>
+
+            <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Variable Key</span>
+                <span className="px-2 py-0.5 bg-slate-500/20 text-slate-500 rounded text-[10px] font-bold">OPTIONAL</span>
+              </div>
+              <code className="text-lg font-mono font-bold text-slate-300">NODE_VERSION</code>
+              <p className="mt-2 text-xs text-slate-500 font-medium">Default set to 20 in netlify.toml</p>
+            </div>
+
+            <div className="pt-6 border-t border-white/10">
+              <h4 className="text-sm font-bold mb-3 uppercase tracking-tighter text-slate-400">Step-by-Step Connection:</h4>
+              <ol className="space-y-3 text-sm text-slate-500 list-decimal pl-4 font-medium">
+                <li>Log in to <a href="https://app.netlify.com" target="_blank" className="text-blue-400 underline">Netlify</a>.</li>
+                <li>Click <strong>"Add new site"</strong> and select <strong>"Import an existing project"</strong>.</li>
+                <li>Connect your Git provider and select this repository.</li>
+                <li>Ensure build settings are default (Build command: blank, Publish directory: <code>.</code>).</li>
+                <li>Go to <strong>Site configuration > Environment variables</strong> and add <code>API_KEY</code>.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderUserSelection = () => {
     const chqUsers = usersList.filter(u => u.role === UserRole.CHQ);
     const stationUsers = usersList.filter(u => u.role === UserRole.STATION);
@@ -293,6 +396,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         <div className="lg:col-span-2 space-y-6">
           {view === 'overview' && renderOverview()}
           {view === 'accounts' && renderAccountManagement()}
+          {view === 'deployment' && renderDeployment()}
           {view === 'user-selection' && renderUserSelection()}
           {view === 'operational-dashboard' && <OperationalDashboard title={`OPERATIONAL DASHBOARD ${selectedYear}`} onBack={() => { setView('overview'); setSelectedOverviewUser(null); }} currentUser={user} subjectUser={selectedOverviewUser || user} />}
           {view === 'chq-operational-dashboard' && <OperationalDashboard title={`CHQ OPERATIONAL DASHBOARD ${selectedYear}`} onBack={() => { setView('overview'); setSelectedOverviewUser(null); }} currentUser={user} subjectUser={selectedOverviewUser || user} />}
