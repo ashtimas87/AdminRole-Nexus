@@ -5,19 +5,19 @@ import pptxgen from "pptxgenjs";
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// Helper to get shared definitions
-const getSharedActivityName = (piId: string, activityId: string, defaultName: string): string => {
-  const stored = localStorage.getItem(`pi_activity_name_${piId}_${activityId}`);
+// Helper to get shared definitions with year scoping
+const getSharedActivityName = (year: string, piId: string, activityId: string, defaultName: string): string => {
+  const stored = localStorage.getItem(`pi_activity_name_${year}_${piId}_${activityId}`);
   return stored || defaultName;
 };
 
-const getSharedIndicatorName = (piId: string, activityId: string, defaultIndicator: string): string => {
-  const stored = localStorage.getItem(`pi_indicator_name_${piId}_${activityId}`);
+const getSharedIndicatorName = (year: string, piId: string, activityId: string, defaultIndicator: string): string => {
+  const stored = localStorage.getItem(`pi_indicator_name_${year}_${piId}_${activityId}`);
   return stored || defaultIndicator;
 };
 
-const getSharedPITitle = (piId: string, defaultTitle: string): string => {
-  const stored = localStorage.getItem(`pi_title_${piId}`);
+const getSharedPITitle = (year: string, piId: string, defaultTitle: string): string => {
+  const stored = localStorage.getItem(`pi_title_${year}_${piId}`);
   return stored || defaultTitle;
 };
 
@@ -49,9 +49,13 @@ const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
       id: "PI1",
       title: "Number of Community Awareness/Information Activities Initiated",
       activities: [
-        { id: "pi1_a1", name: "Formulation of Stratcom Snapshots", indicator: "No. of stratcom snapshot formulated", defaults: Array(12).fill(1) },
-        { id: "pi1_a2", name: "Social Media Analysis", indicator: "No. of Social Media Analysis conducted", defaults: [13, 13, 13, 12, 9, 13, 13, 13, 13, 13, 13, 13] },
-        { id: "pi1_a3", name: "Implementation of IO", indicator: "No. of activities conducted", defaults: [10, 9, 9, 9, 9, 9, 9, 10, 9, 9, 10, 11] }
+        { id: "pi1_a1", name: "Formulation of Stratcom Snapshots", indicator: "No. of stratcom snaphot formulated", defaults: Array(12).fill(1) },
+        { id: "pi1_a2", name: "Social Media Analysis", indicator: "No. of Social Media Analysis conducted", defaults: Array(12).fill(13) },
+        { id: "pi1_a3", name: "Implementation of IO", indicator: "No. of activities conducted", defaults: Array(12).fill(10) },
+        { id: "pi1_a4", name: "Conduct of P.I.C.E.", indicator: "No. of PICE conducted", defaults: Array(12).fill(55) },
+        { id: "pi1_a5", name: "Production of Leaflets as IEC Materials", indicator: "No. of Printed copies", defaults: Array(12).fill(700) },
+        { id: "pi1_a6", name: "Production of Outdoor IEC Materials", indicator: "No. of Streamers/Tarpaulins Displayed", defaults: Array(12).fill(25) },
+        { id: "pi1_a7", name: "Face-to-face Awareness Activities", indicator: "No. of activities conducted", defaults: Array(12).fill(50) }
       ]
     },
     {
@@ -66,210 +70,236 @@ const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
       title: "Number of participating respondents",
       activities: [
         { id: "pi3_a1", name: "Secretariat Meetings", indicator: "No. Secretariat Meetings conducted", defaults: Array(12).fill(5) },
-        { id: "pi3_a2", name: "Convening of IO Working Group", indicator: "No. of activities conducted", defaults: [5, 6, 6, 6, 6, 6, 5, 6, 6, 6, 6, 6] }
+        { id: "pi3_a2", name: "Convening of IO Working Group", indicator: "No. of activities conducted", defaults: Array(12).fill(6) },
+        { id: "pi3_a3", name: "Activation of SyncCom", indicator: "No. of activities conducted", defaults: Array(12).fill(8) },
+        { id: "pi3_a4", name: "PNP Good Deeds", indicator: "No. of PNP Good Deeds", defaults: Array(12).fill(15) }
       ]
     },
     {
       id: "PI4",
-      title: "Percentage of Personnel Attendance in Training",
+      title: "Percentage of accounted loose firearms against the estimated baseline data",
       activities: [
-        { id: "pi4_a1", name: "Basic Skills Training", indicator: "% of personnel trained", defaults: [85, 88, 90, 92, 95, 94, 91, 89, 92, 93, 95, 96] }
+        { id: "pi4_a1", name: "JAPIC", indicator: "JAPIC conducted", defaults: [0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0] },
+        { id: "pi4_a2", name: "Operations on loose firearms", indicator: "Operations conducted", defaults: [3, 4, 5, 3, 2, 2, 4, 0, 8, 3, 7, 3] },
+        { id: "pi4_a3", name: "Bakal/Sita", indicator: "Bakal/Sita conducted", defaults: Array(12).fill(750) }
       ]
     },
     {
       id: "PI5",
-      title: "Number of Logistical Reports Submitted",
+      title: "Number of functional LACAP",
       activities: [
-        { id: "pi5_a1", name: "Inventory Audit Reports", indicator: "No. of reports submitted", defaults: Array(12).fill(2) }
+        { id: "pi5_a1", name: "P/CPOC meetings", indicator: "# P/CPOC meetings participated", defaults: Array(12).fill(10) },
+        { id: "pi5_a2", name: "Oversight Committee Meetings", indicator: "# of Oversight Committee Meetings conducted", defaults: Array(12).fill(45) },
+        { id: "pi5_a3", name: "Operations against highway robbery", indicator: "# of opns against highway robbery conducted", defaults: Array(12).fill(1) },
+        { id: "pi5_a4", name: "Operations on anti-illegal drugs", indicator: "# of operations on anti-illegal drugs conducted", defaults: Array(12).fill(55) }
       ]
     },
     {
       id: "PI6",
-      title: "Number of Intelligence Briefings Conducted",
+      title: "Number of police stations utilizing PIPS",
       activities: [
-        { id: "pi6_a1", name: "Weekly Intelligence Review", indicator: "No. of briefings", defaults: [4, 4, 4, 5, 4, 4, 4, 4, 4, 5, 4, 4] }
+        { id: "pi6_a1", name: "EMPO Assessment and Evaluations", indicator: "No. of EMPO Assessment and Evaluations conducted", defaults: Array(12).fill(53) },
+        { id: "pi6_a2", name: "Field/sector inspection", indicator: "No. of Field/sector inspection conducted", defaults: Array(12).fill(138) }
       ]
     },
     {
       id: "PI7",
-      title: "Public Information Dissemination Efficiency",
+      title: "Number of Internal Security Operations conducted",
       activities: [
-        { id: "pi7_a1", name: "Press Release Distribution", indicator: "No. of releases dispatched", defaults: [12, 10, 15, 14, 11, 13, 12, 15, 14, 13, 12, 16] }
+        { id: "pi7_a1", name: "JPSCC meetings", indicator: "JPSCC meetings conducted", defaults: Array(12).fill(4) },
+        { id: "pi7_a2", name: "PPSP", indicator: "PPSP conducted", defaults: Array(12).fill(30) }
       ]
     },
     {
       id: "PI8",
-      title: "Unit Operational Readiness Inspection",
+      title: "Number of target hardening measures conducted",
       activities: [
-        { id: "pi8_a1", name: "Facility Readiness Audit", indicator: "No. of audits performed", defaults: Array(12).fill(1) }
+        { id: "pi8_a1", name: "Security Survey/Inspection", indicator: "# of Security Survey conducted", defaults: Array(12).fill(2) },
+        { id: "pi8_a2", name: "CI check/validation", indicator: "# of CI check conducted", defaults: Array(12).fill(20) },
+        { id: "pi8_a3", name: "Clearances issued to civilians", indicator: "# of Clearances issued", defaults: Array(12).fill(3500) }
       ]
     },
     {
       id: "PI9",
-      title: "Community Outreach Program Reach",
+      title: "Percentage reduction of crimes involving foreign and domestic tourists",
       activities: [
-        { id: "pi9_a1", name: "Barangay Consultation Meetings", indicator: "No. of participants (thousands)", defaults: [2, 3, 2, 4, 3, 2, 3, 3, 4, 2, 3, 5] }
+        { id: "pi9_a1", name: "Maintenance of TPU", indicator: "# of TPU maintained", defaults: Array(12).fill(1) },
+        { id: "pi9_a2", name: "Maintenance of TAC", indicator: "# of TAC maintained", defaults: Array(12).fill(1) },
+        { id: "pi9_a3", name: "Maintenance of TAD", indicator: "# of TAD maintained", defaults: Array(12).fill(3) }
       ]
     },
     {
       id: "PI10",
-      title: "Case Resolution and Documentation",
+      title: "Number of Police stations using COMPSTAT for crime prevention",
       activities: [
-        { id: "pi10_a1", name: "Final Investigation Reports", indicator: "No. of cases resolved", defaults: [22, 19, 25, 30, 24, 21, 23, 26, 28, 25, 22, 31] }
+        { id: "pi10_a1", name: "Crime Information Reporting and Analysis", indicator: "No. of data recorded", defaults: Array(12).fill(300) },
+        { id: "pi10_a2", name: "e-Wanted Persons Info System", indicator: "No. of Wanted Persons recorded", defaults: Array(12).fill(100) },
+        { id: "pi10_a3", name: "e-Rogues' Gallery System", indicator: "No. of eRogues recorded", defaults: Array(12).fill(180) }
       ]
     },
     {
       id: "PI11",
-      title: "Conduct of Police-Community Relations Activities",
+      title: "Number of threat group neutralized",
       activities: [
-        { id: "pi11_a1", name: "PCR Seminars and Workshops", indicator: "No. of activities conducted", defaults: Array(12).fill(3) }
+        { id: "pi11_a1", name: "COPLANs formulated", indicator: "No. formulated", defaults: [0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0] },
+        { id: "pi11_a2", name: "HVTs neutralized", indicator: "No. neutralized", defaults: Array(12).fill(4) }
       ]
     },
     {
       id: "PI12",
-      title: "Implementation of Anti-Criminality Operations",
+      title: "Number of utilized BINs",
       activities: [
-        { id: "pi12_a1", name: "Target Hardening Operations", indicator: "No. of operations conducted", defaults: [5, 5, 6, 4, 7, 5, 6, 5, 6, 8, 5, 7] }
+        { id: "pi12_a1", name: "Inventory made", indicator: "# of inventory made", defaults: Array(12).fill(40) },
+        { id: "pi12_a2", name: "BINs documented/registered", indicator: "# documented", defaults: Array(12).fill(40) }
       ]
     },
     {
       id: "PI13",
-      title: "Success Rate of Operational Missions",
+      title: "Number of criminal cases filed",
       activities: [
-        { id: "pi13_a1", name: "Mission Objective Completion", indicator: "% success rate", defaults: Array(12).fill(95) }
+        { id: "pi13_a1", name: "Coordination with counterparts", indicator: "# of coordination conducted", defaults: Array(12).fill(0) }
       ]
     },
     {
       id: "PI14",
-      title: "Number of Suspects Apprehended",
+      title: "Number of cases resulting to conviction/dismissal",
       activities: [
-        { id: "pi14_a1", name: "Arrest Warrant Execution", indicator: "No. of individuals apprehended", defaults: [12, 15, 10, 18, 14, 11, 13, 16, 12, 14, 15, 19] }
+        { id: "pi14_a1", name: "Monitoring Cases Against Threat Group", indicator: "# monitored", defaults: Array(12).fill(0) }
       ]
     },
     {
       id: "PI15",
-      title: "Completion rate of specialized training",
+      title: "Percentage of Trained investigative personnel",
       activities: [
-        { id: "pi15_a1", name: "Advanced Tactical Training", indicator: "% completion rate", defaults: [80, 82, 85, 88, 90, 92, 95, 93, 91, 89, 92, 94] }
+        { id: "pi15_a1", name: "CIC Inventory", indicator: "# in inventory", defaults: Array(12).fill(90) },
+        { id: "pi15_a2", name: "IOBC Inventory", indicator: "# in inventory", defaults: Array(12).fill(13) }
       ]
     },
     {
       id: "PI16",
-      title: "Customer Satisfaction Index",
+      title: "Percentage of investigative positions filled up with trained investigators",
       activities: [
-        { id: "pi16_a1", name: "Public Trust Survey", indicator: "% satisfaction score", defaults: [88, 89, 90, 91, 92, 91, 90, 89, 90, 91, 92, 93] }
+        { id: "pi16_a1", name: "Screening and evaluation", indicator: "# of screenings conducted", defaults: Array(12).fill(0) }
       ]
     },
     {
       id: "PI17",
-      title: "Number of Press Conferences Held",
+      title: "Improvement in response time",
       activities: [
-        { id: "pi17_a1", name: "Strategic Media Briefings", indicator: "No. of media events", defaults: Array(12).fill(2) }
+        { id: "pi17_a1", name: "Sports supervision", indicator: "No. of sessions", defaults: Array(12).fill(0) },
+        { id: "pi17_a2", name: "Repair of patrol vehicles", indicator: "# repaired", defaults: Array(12).fill(0) }
       ]
     },
     {
       id: "PI18",
-      title: "Efficiency of Resource Allocation",
+      title: "Percentage of dedicated investigators assigned to handle specific cases",
       activities: [
-        { id: "pi18_a1", name: "Budget Utilization Monitoring", indicator: "% of budget utilized", defaults: [75, 78, 80, 82, 85, 88, 90, 92, 94, 96, 98, 100] }
+        { id: "pi18_a1", name: "Case build up and investigation", indicator: "% of cases handled", defaults: Array(12).fill(100) }
       ]
     },
     {
       id: "PI19",
-      title: "Number of Security Surveys and Inspections",
+      title: "Number of recipients of a. awards b. punished",
       activities: [
-        { id: "pi19_a1", name: "Facility Vulnerability Assessment", indicator: "No. of inspections", defaults: Array(12).fill(4) }
+        { id: "pi19_a1", name: "Monday Flag Raising/Awarding", indicator: "# of ceremonies", defaults: Array(12).fill(4) },
+        { id: "pi19_a2", name: "Issuing commendations", indicator: "# issued", defaults: Array(12).fill(150) }
       ]
     },
     {
       id: "PI20",
-      title: "Adherence to Standard Operating Procedures",
+      title: "Percentage of investigative personnel equipped with standard systems",
       activities: [
-        { id: "pi20_a1", name: "Internal Compliance Audit", indicator: "% adherence rate", defaults: [98, 99, 98, 97, 99, 99, 98, 98, 99, 99, 100, 100] }
+        { id: "pi20_a1", name: "Attendance in specialized training", indicator: "% attended", defaults: Array(12).fill(100) }
       ]
     },
     {
       id: "PI21",
-      title: "Data Privacy Compliance Rate",
+      title: "Percentage of Police Stations using e-based system",
       activities: [
-        { id: "pi21_a1", name: "Data Security Review", indicator: "% compliance rate", defaults: Array(12).fill(100) }
+        { id: "pi21_a1", name: "Crime Information Reporting and Analysis", indicator: "No. recorded", defaults: Array(12).fill(300) }
       ]
     },
     {
       id: "PI22",
-      title: "Number of Technical Support Requests Resolved",
+      title: "Number of cases filed in court/total # of cases investigated",
       activities: [
-        { id: "pi22_a1", name: "IT Helpdesk Resolution", indicator: "No. of requests resolved", defaults: [45, 42, 50, 48, 55, 60, 52, 50, 48, 53, 58, 62] }
+        { id: "pi22_a1", name: "Index Crime Investigated", indicator: "No. investigated", defaults: Array(12).fill(30) },
+        { id: "pi22_a2", name: "Non-Index crime investigated", indicator: "No. investigated", defaults: Array(12).fill(25) }
       ]
     },
     {
       id: "PI23",
-      title: "Intelligence Networking Activities",
+      title: "Number of investigative infrastructure/equipment identified/accounted",
       activities: [
-        { id: "pi23_a1", name: "Liaison with External Agencies", indicator: "No. of networking sessions", defaults: Array(12).fill(3) }
+        { id: "pi23_a1", name: "Inventory, inspection & Accounting", indicator: "# conducted", defaults: Array(12).fill(1) }
       ]
     },
     {
       id: "PI24",
-      title: "Strategic Communications Impact",
+      title: "Percentage of fill-up of investigative equipment and infrastructure",
       activities: [
-        { id: "pi24_a1", name: "Message Resonance Analysis", indicator: "% positive sentiment", defaults: [70, 72, 75, 74, 76, 78, 80, 79, 77, 75, 78, 82] }
+        { id: "pi24_a1", name: "Field investigative crime scene kit", indicator: "# accounted", defaults: Array(12).fill(21) },
+        { id: "pi24_a2", name: "Police line", indicator: "# accounted", defaults: Array(12).fill(45) }
       ]
     },
     {
       id: "PI25",
-      title: "Infrastructure Availability",
+      title: "Percentage of IT-compliant stations",
       activities: [
-        { id: "pi25_a1", name: "System Uptime Tracking", indicator: "% availability", defaults: Array(12).fill(99) }
+        { id: "pi25_a1", name: "Computer preventive maintenance", indicator: "# conducted", defaults: Array(12).fill(210) },
+        { id: "pi25_a2", name: "Maintenance of printers", indicator: "# maintained", defaults: Array(12).fill(95) }
       ]
     },
     {
       id: "PI26",
-      title: "Crisis Management Exercises Conducted",
+      title: "Number of linkages established",
       activities: [
-        { id: "pi26_a1", name: "Simulated Disaster Response", indicator: "No. of drills", defaults: [1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 2] }
+        { id: "pi26_a1", name: "JSCC meetings", indicator: "# conducted", defaults: Array(12).fill(1) },
+        { id: "pi26_a2", name: "Liaising", indicator: "# conducted", defaults: Array(12).fill(15) }
       ]
     },
     {
       id: "PI27",
-      title: "Legal Assistance Documentation",
+      title: "Number of community/stakeholders support generated",
       activities: [
-        { id: "pi27_a1", name: "Personnel Legal Support", indicator: "No. of cases documented", defaults: Array(12).fill(2) }
+        { id: "pi27_a1", name: "MOA/MOU signing", indicator: "# signing initiated", defaults: Array(12).fill(9) },
+        { id: "pi27_a2", name: "Support to Makakalikasan", indicator: "# activities conducted", defaults: Array(12).fill(7) }
       ]
     },
     {
       id: "PI28",
-      title: "Number of Community Service Projects",
+      title: "Number of investigative activities funded",
       activities: [
-        { id: "pi28_a1", name: "Local Development Initiatives", indicator: "No. of projects completed", defaults: [2, 1, 2, 2, 3, 2, 2, 3, 2, 2, 1, 4] }
+        { id: "pi28_a1", name: "Monitoring of Sensational Crimes", indicator: "# monitored", defaults: Array(12).fill(3) },
+        { id: "pi28_a2", name: "Filing of Specials laws", indicator: "# cases filed", defaults: Array(12).fill(100) }
       ]
     },
     {
       id: "PI29",
-      title: "Administrative Oversight Inspections",
+      title: "Number of special investigation cases requested for fund support",
       activities: [
-        { id: "pi29_a1", name: "Unit Management Audit", indicator: "No. of inspections conducted", defaults: Array(12).fill(1) }
+        { id: "pi29_a1", name: "Creation and activation of SITG Cases", indicator: "# created", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0] }
       ]
     }
   ];
 
   return baseDefinitions.map(pi => {
-    const storedIds = localStorage.getItem(`pi_activity_ids_${pi.id}`);
+    const storedIds = localStorage.getItem(`pi_activity_ids_${year}_${pi.id}`);
     let activityIds = storedIds ? JSON.parse(storedIds) : pi.activities.map(a => a.id);
 
     const fullActivities = activityIds.map((aid: string) => {
       const baseAct = pi.activities.find(a => a.id === aid);
       return {
         id: aid,
-        activity: getSharedActivityName(pi.id, aid, baseAct?.name || "New Activity"),
-        indicator: getSharedIndicatorName(pi.id, aid, baseAct?.indicator || "New Indicator"),
+        activity: getSharedActivityName(year, pi.id, aid, baseAct?.name || "New Activity"),
+        indicator: getSharedIndicatorName(year, pi.id, aid, baseAct?.indicator || "New Indicator"),
         months: createMonthsForActivity(year, userId, role, pi.id, aid, baseAct?.defaults || Array(12).fill(0))
       };
     });
 
     return {
       id: pi.id,
-      title: getSharedPITitle(pi.id, pi.title),
+      title: getSharedPITitle(year, pi.id, pi.title),
       activities: fullActivities
     };
   });
@@ -298,7 +328,6 @@ const generateStructuredPIs = (
         if (mode === 'consolidated') {
           monthsData = MONTHS.map((_, mIdx) => {
             let totalValue = 0;
-            // Operational consolidates ALL. Tactical consolidates ONLY STATIONS. CHQ consolidates ONLY CHQS.
             let targetIds: string[] = [];
             if (dashboardType === 'OPERATIONAL') targetIds = [...allStationIds, ...allChqIds];
             else if (dashboardType === 'CHQ') targetIds = allChqIds;
@@ -349,8 +378,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
   const [editingHeader, setEditingHeader] = useState<boolean>(false);
   const [editingLabel, setEditingLabel] = useState<{ rowIdx: number; field: 'activity' | 'indicator' } | null>(null);
   const [textEditValue, setTextEditValue] = useState<string>('');
-  const [fileViewerCell, setFileViewerCell] = useState<{ rowIdx: number; monthIdx: number } | null>(null);
-
+  
   const dashboardYear = useMemo(() => title.match(/\d{4}/)?.[0] || '2026', [title]);
   const dashboardType = useMemo(() => {
     if (title.toUpperCase().includes("CHQ")) return 'CHQ';
@@ -360,11 +388,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
 
   const isSuperAdmin = currentUser.role === UserRole.SUPER_ADMIN;
   const isAdmin = currentUser.role === UserRole.SUPER_ADMIN || currentUser.role === UserRole.SUB_ADMIN;
-  const is2026 = dashboardYear === '2026';
-  const isOperational2026 = is2026 && dashboardType === 'OPERATIONAL';
 
   const refreshData = () => {
-    // If an Admin is viewing their OWN view (via the Quick Actions), it should be consolidated
     const isMainView = subjectUser.id === currentUser.id;
     let mode: 'normal' | 'zero' | 'consolidated' = 'normal';
 
@@ -400,24 +425,27 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
   const handleAddActivity = () => {
     if (!isSuperAdmin || !currentPI) return;
     const newId = `custom_${Date.now()}`;
-    const storedIds = localStorage.getItem(`pi_activity_ids_${activeTab}`);
+    const storedIds = localStorage.getItem(`pi_activity_ids_${dashboardYear}_${activeTab}`);
     const activityIds = storedIds ? JSON.parse(storedIds) : currentPI.activities.map(a => a.id);
     
-    activityIds.push(newId);
-    localStorage.setItem(`pi_activity_ids_${activeTab}`, JSON.stringify(activityIds));
-    localStorage.setItem(`pi_activity_name_${activeTab}_${newId}`, "New Activity");
-    localStorage.setItem(`pi_indicator_name_${activeTab}_${newId}`, "New Indicator");
+    const updatedIds = [...activityIds, newId];
+    localStorage.setItem(`pi_activity_ids_${dashboardYear}_${activeTab}`, JSON.stringify(updatedIds));
+    localStorage.setItem(`pi_activity_name_${dashboardYear}_${activeTab}_${newId}`, "New Activity");
+    localStorage.setItem(`pi_indicator_name_${dashboardYear}_${activeTab}_${newId}`, "New Indicator");
     
     refreshData();
   };
 
   const handleDeleteActivity = (activityId: string) => {
     if (!isSuperAdmin || !window.confirm("Are you sure you want to delete this activity? This will remove it for ALL accounts.")) return;
-    const storedIds = localStorage.getItem(`pi_activity_ids_${activeTab}`);
+    const storedIds = localStorage.getItem(`pi_activity_ids_${dashboardYear}_${activeTab}`);
     const activityIds = storedIds ? JSON.parse(storedIds) : currentPI.activities.map(a => a.id);
     
     const newIds = activityIds.filter((id: string) => id !== activityId);
-    localStorage.setItem(`pi_activity_ids_${activeTab}`, JSON.stringify(newIds));
+    localStorage.setItem(`pi_activity_ids_${dashboardYear}_${activeTab}`, JSON.stringify(newIds));
+    localStorage.removeItem(`pi_activity_name_${dashboardYear}_${activeTab}_${activityId}`);
+    localStorage.removeItem(`pi_indicator_name_${dashboardYear}_${activeTab}_${activityId}`);
+    
     refreshData();
   };
 
@@ -430,7 +458,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
   const saveLabel = () => {
     if (!editingLabel || !currentPI) return;
     const activityId = currentPI.activities[editingLabel.rowIdx].id;
-    localStorage.setItem(`pi_${editingLabel.field}_name_${activeTab}_${activityId}`, textEditValue);
+    localStorage.setItem(`pi_${editingLabel.field}_name_${dashboardYear}_${activeTab}_${activityId}`, textEditValue);
     refreshData();
     setEditingLabel(null);
   };
@@ -443,7 +471,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
 
   const saveHeader = () => {
     if (!editingHeader) return;
-    localStorage.setItem(`pi_title_${activeTab}`, textEditValue);
+    localStorage.setItem(`pi_title_${dashboardYear}_${activeTab}`, textEditValue);
     refreshData();
     setEditingHeader(false);
   };
@@ -498,18 +526,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
                 <span className="px-3 py-1 bg-slate-900 text-white text-[10px] font-black rounded uppercase tracking-widest">
                   {dataMode === 'consolidated' ? 'CONSOLIDATED VIEW' : `UNIT: ${subjectUser.name}`}
                 </span>
-                {dataMode === 'consolidated' && (
-                  <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded uppercase tracking-widest border border-emerald-200">
-                    Live Data Aggregation
-                  </span>
-                )}
              </div>
           </div>
         </div>
         <div className="flex gap-2">
-          {isSuperAdmin && isOperational2026 && (
-            <button onClick={handleAddActivity} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-100">+ Add Activity</button>
-          )}
           <button onClick={handleExportPPT} disabled={exporting} className="px-5 py-2.5 bg-orange-600 text-white rounded-xl text-sm font-bold hover:bg-orange-700 transition">PPT Export</button>
         </div>
       </div>
@@ -536,11 +556,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
           <table className="w-full border-collapse text-[11px] leading-tight">
             <thead>
               <tr>
-                {isSuperAdmin && isOperational2026 && <th rowSpan={2} className="border border-slate-300 bg-slate-900 p-2 text-white w-12 font-bold uppercase">Action</th>}
                 <th rowSpan={2} className="border border-slate-300 bg-[#FFFF00] p-2 text-center w-72 font-bold uppercase text-slate-900">Activity</th>
                 <th rowSpan={2} className="border border-slate-300 bg-[#FFFF00] p-2 text-center w-72 font-bold uppercase text-slate-900">Performance Indicator</th>
                 <th colSpan={12} className="border border-slate-300 bg-[#00B0F0] p-2 text-center text-white font-extrabold uppercase text-sm">{dashboardYear} Accomplishment</th>
                 <th rowSpan={2} className="border border-slate-300 bg-[#FFFF00] p-2 text-center w-16 font-bold uppercase text-slate-900">Total</th>
+                {isSuperAdmin && <th rowSpan={2} className="border border-slate-300 bg-slate-900 p-2 text-white w-24 font-bold uppercase">Action</th>}
               </tr>
               <tr>
                 {MONTHS.map(m => (
@@ -553,13 +573,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
                 const isPercent = ["PI4", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(activeTab);
                 return (
                   <tr key={row.id} className="hover:bg-blue-50/30 group">
-                    {isSuperAdmin && isOperational2026 && (
-                      <td className="border border-slate-300 p-2 text-center">
-                        <button onClick={() => handleDeleteActivity(row.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" title="Delete Row">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
-                      </td>
-                    )}
                     <td className={`border border-slate-300 p-2 text-slate-800 ${isSuperAdmin ? 'hover:bg-blue-50 cursor-pointer font-semibold' : ''}`} onClick={() => handleLabelEdit(rIdx, 'activity', row.activity)}>
                        {editingLabel?.rowIdx === rIdx && editingLabel.field === 'activity' ? (
                          <input autoFocus className="w-full bg-white border border-blue-500 rounded px-1 outline-none" value={textEditValue} onChange={(e) => setTextEditValue(e.target.value)} onBlur={saveLabel} onKeyDown={(e) => e.key === 'Enter' && saveLabel()} />
@@ -573,21 +586,42 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
                     {row.months.map((m, mIdx) => (
                       <td key={mIdx} className="border border-slate-300 p-1.5 text-center text-blue-700 font-bold group relative cursor-pointer hover:bg-blue-100" onClick={() => handleCellClick(rIdx, mIdx, m.value)}>
                         {editingCell?.rowIdx === rIdx && editingCell?.monthIdx === mIdx ? (
-                          <input autoFocus className="w-center bg-white border border-blue-500 rounded px-0.5 outline-none font-black" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={saveEditValue} onKeyDown={(e) => e.key === 'Enter' && saveEditValue()} onClick={(e) => e.stopPropagation()} />
+                          <input autoFocus className="w-center bg-white border border-blue-500 rounded px-0.5 outline-none font-black text-center" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={saveEditValue} onKeyDown={(e) => e.key === 'Enter' && saveEditValue()} onClick={(e) => e.stopPropagation()} />
                         ) : (
                           <div className="flex flex-col items-center">
                             <span>{m.value}{isPercent ? '%' : ''}</span>
-                            {dataMode !== 'consolidated' && (currentUser.role === UserRole.STATION || isSuperAdmin) && (
-                              <button onClick={(e) => { e.stopPropagation(); setFileViewerCell({ rowIdx: rIdx, monthIdx: mIdx }); }} className="mt-1 text-[8px] opacity-0 group-hover:opacity-100 text-blue-500 font-black">{m.files.length > 0 ? `(${m.files.length} 📄)` : '+'}</button>
-                            )}
                           </div>
                         )}
                       </td>
                     ))}
                     <td className="border border-slate-300 p-1.5 text-center font-black text-slate-900 bg-slate-100">{isPercent ? `${Math.round(row.total / 12)}%` : row.total}</td>
+                    {isSuperAdmin && (
+                      <td className="border border-slate-300 p-2 text-center bg-slate-50">
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => handleLabelEdit(rIdx, 'activity', row.activity)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition" title="Edit Activity">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                          </button>
+                          <button onClick={() => handleDeleteActivity(row.id)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition" title="Delete Activity">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
+              {isSuperAdmin && (
+                <tr className="bg-slate-50/50">
+                  <td colSpan={isSuperAdmin ? 16 : 15} className="border border-slate-300 p-4 text-center">
+                    <button onClick={handleAddActivity} className="inline-flex items-center gap-2 text-blue-600 font-bold hover:text-blue-800 transition text-xs uppercase tracking-wider group">
+                      <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition shadow-sm">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+                      </div>
+                      Add New Activity Row
+                    </button>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
