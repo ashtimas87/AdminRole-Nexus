@@ -166,12 +166,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             <div className="flex items-start gap-3 text-slate-300 max-w-2xl bg-white/5 border border-white/10 p-4 rounded-xl mt-4 min-h-[80px]">
               {insight ? (
                 <p className="text-sm italic font-medium leading-relaxed animate-in fade-in duration-700">
-                  <span className="text-blue-400 font-bold mr-2">NEXUS INSIGHT:</span> {insight}
+                  <span className="text-blue-400 font-bold mr-2">INSIGHT:</span> {insight}
                 </p>
               ) : (
                 <div className="flex items-center gap-3 w-full">
                   <div className="w-4 h-4 border-2 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
-                  <p className="text-sm text-slate-400">Consulting Nexus intelligence protocols...</p>
+                  <p className="text-sm text-slate-400">Consulting system intelligence protocols...</p>
                 </div>
               )}
             </div>
@@ -298,7 +298,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               <svg className="w-8 h-8 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               Core Configuration
             </h3>
-            <p className="text-slate-400 mb-8 leading-relaxed">To activate Nexus Intelligence and secure data processing in production, the following environment variables are mandatory.</p>
+            <p className="text-slate-400 mb-8 leading-relaxed">To activate System Intelligence and secure data processing in production, the following environment variables are mandatory.</p>
             
             <div className="space-y-4">
               <div className="p-5 bg-white/5 border border-white/10 rounded-2xl group hover:border-teal-500/50 transition-colors">
@@ -379,7 +379,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <nav className="sticky top-0 z-30 bg-white border-b px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg">N</div>
+          <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg">A</div>
           <h1 className="font-bold text-slate-900 leading-none">AdminRole</h1>
         </div>
         <div className="flex items-center gap-6">

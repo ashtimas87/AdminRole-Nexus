@@ -711,7 +711,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
         background: { color: "FFFFFF" },
         objects: [
           { text: { text: title, options: { x: 0.5, y: 0.2, w: 12.3, fontSize: 28, bold: true, color: "0f172a", align: "center" } } },
-          { text: { text: `Nexus Admin - Performance Monitoring System - ${subjectUser.name}`, options: { x: 0.5, y: 0.6, w: 12.3, fontSize: 10, color: "64748b", align: "center" } } }
+          { text: { text: `AdminRole - Performance Monitoring System - ${subjectUser.name}`, options: { x: 0.5, y: 0.6, w: 12.3, fontSize: 10, color: "64748b", align: "center" } } }
         ],
       });
       displayedPiData.forEach((pi) => {

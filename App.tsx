@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User } from './types';
 import LoginForm from './components/LoginForm';
@@ -10,12 +9,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // Check local storage for persistent login session
-    const storedUser = localStorage.getItem('nexus_session');
+    const storedUser = localStorage.getItem('adminrole_session');
     if (storedUser) {
       try {
         setUser(JSON.parse(storedUser));
       } catch (e) {
-        localStorage.removeItem('nexus_session');
+        localStorage.removeItem('adminrole_session');
       }
     }
     setIsInitializing(false);
@@ -23,12 +22,12 @@ const App: React.FC = () => {
 
   const handleLogin = (newUser: User) => {
     setUser(newUser);
-    localStorage.setItem('nexus_session', JSON.stringify(newUser));
+    localStorage.setItem('adminrole_session', JSON.stringify(newUser));
   };
 
   const handleLogout = () => {
     setUser(null);
-    localStorage.removeItem('nexus_session');
+    localStorage.removeItem('adminrole_session');
   };
 
   if (isInitializing) {
