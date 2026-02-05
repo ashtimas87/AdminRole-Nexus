@@ -16,7 +16,16 @@ type ViewType =
   | 'operational-dashboard' 
   | 'chq-operational-dashboard' 
   | 'tactical-dashboard'
+  | 'chq-landing'
+  | 'tactical-landing'
   | 'user-selection';
+
+const YEAR_CONFIG = [
+  { year: '2026', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+  { year: '2025', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+  { year: '2024', icon: 'M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2' },
+  { year: '2023', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' }
+];
 
 const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, onLogout }) => {
   const [view, setView] = useState<ViewType>('overview');
@@ -105,7 +114,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
       </div>
       
       <div className="space-y-8">
-        {/* Core Management Section (Moved Above Monitoring) */}
+        {/* Core Management Section */}
         {user.role === UserRole.SUPER_ADMIN && (
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Management</p>
@@ -132,45 +141,33 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
         <div>
           <button 
             onClick={() => { setView('overview'); setSelectedOverviewUser(null); }}
-            className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1 hover:text-slate-900 transition-colors flex items-center gap-2 group"
+            className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'overview' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
           >
             Monitoring
-            <svg className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+            <svg className={`w-4 h-4 ${view === 'overview' ? 'text-white' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
           </button>
-          
-          <div className="space-y-1.5">
-            <button 
-              onClick={() => { setView('overview'); setSelectedOverviewUser(null); }}
-              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'overview' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
-            >
-              Operational Dashboards
-              <svg className={`w-4 h-4 ${view === 'overview' ? 'text-white' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-            </button>
-          </div>
         </div>
 
         {/* Units Breakdown */}
         {user.role !== UserRole.STATION && (
-          <div className="space-y-6">
+          <div className="space-y-3">
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Administrative Units</p>
               <button 
-                onClick={() => setDashboardView('chq-operational-dashboard', selectedYear)}
-                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'chq-operational-dashboard' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                onClick={() => setView('chq-landing')}
+                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'chq-landing' || view === 'chq-operational-dashboard' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
               >
-                CHQ Dashboard
-                <svg className={`w-4 h-4 ${view === 'chq-operational-dashboard' ? 'text-white' : 'text-emerald-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m-1 4h1m5-8h1m-1 4h1m-1 4h1" /></svg>
+                Administrative Units
+                <svg className={`w-4 h-4 ${view === 'chq-landing' || view === 'chq-operational-dashboard' ? 'text-white' : 'text-emerald-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m-1 4h1m5-8h1m-1 4h1m-1 4h1" /></svg>
               </button>
             </div>
 
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Tactical Units</p>
               <button 
-                onClick={() => setDashboardView('tactical-dashboard', selectedYear)}
-                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'tactical-dashboard' ? 'bg-orange-600 text-white shadow-lg shadow-orange-100' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'}`}
+                onClick={() => setView('tactical-landing')}
+                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'tactical-landing' || view === 'tactical-dashboard' ? 'bg-orange-600 text-white shadow-lg shadow-orange-100' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'}`}
               >
-                Tactical Dashboard
-                <svg className={`w-4 h-4 ${view === 'tactical-dashboard' ? 'text-white' : 'text-orange-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                Tactical Units
+                <svg className={`w-4 h-4 ${view === 'tactical-landing' || view === 'tactical-dashboard' ? 'text-white' : 'text-orange-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
               </button>
             </div>
           </div>
@@ -193,7 +190,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
 
   const renderOverview = () => {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="bg-slate-900 rounded-2xl p-8 text-white relative overflow-hidden shadow-2xl">
           <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
           <div className="relative z-10">
@@ -203,38 +200,23 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           </div>
         </div>
 
-        {/* Main Grid for Yearly Dashboards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[
-            { year: '2026', color: 'indigo', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-            { year: '2025', color: 'indigo', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
-            { year: '2024', color: 'slate', icon: 'M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2' },
-            { year: '2023', color: 'slate', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' }
-          ].map((item) => (
+          {YEAR_CONFIG.map((item) => (
             <button 
               key={item.year}
               onClick={() => setDashboardView('operational-dashboard', item.year)}
-              className={`group p-8 rounded-3xl border-2 transition-all duration-300 text-left relative overflow-hidden bg-white hover:shadow-2xl hover:shadow-${item.color}-100 border-slate-100 hover:border-${item.color}-500`}
+              className="group p-8 rounded-3xl border-2 transition-all duration-300 text-left relative overflow-hidden bg-white hover:shadow-2xl hover:shadow-indigo-100 border-slate-100 hover:border-indigo-500"
             >
-              <div className={`absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-500`}>
-                <svg className={`w-24 h-24 text-${item.color}-600`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
-                </svg>
+              <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-500">
+                <svg className="w-24 h-24 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} /></svg>
               </div>
-              
-              <div className={`w-12 h-12 bg-${item.color}-50 text-${item.color}-600 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-${item.color}-100 group-hover:bg-${item.color}-600 group-hover:text-white transition-colors`}>
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={item.icon} />
-                </svg>
+              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={item.icon} /></svg>
               </div>
-              
-              <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2 group-hover:text-slate-900">
-                Operational Dashboard {item.year}
-              </h3>
+              <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2 group-hover:text-slate-900">Operational Dashboard {item.year}</h3>
               <p className="text-slate-500 font-medium text-sm">View and manage performance indicators for the fiscal year {item.year}.</p>
-              
               <div className="mt-6 flex items-center gap-2">
-                <span className={`text-[10px] font-black uppercase tracking-widest text-${item.color}-600 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1`}>
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
                   Access Report
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
                 </span>
@@ -246,36 +228,102 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
         {/* AI Insight Section */}
         <div className="bg-white rounded-2xl border-2 border-indigo-50 shadow-sm p-6 relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
-            <svg className="w-16 h-16 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+            <svg className="w-16 h-16 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           </div>
           <div className="flex items-center gap-3 mb-4">
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-indigo-100">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-7.714 2.143L11 21l-2.286-6.857L1 12l7.714-2.143L11 3z" />
-              </svg>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-7.714 2.143L11 21l-2.286-6.857L1 12l7.714-2.143L11 3z" /></svg>
             </div>
             <h3 className="text-lg font-black text-slate-800 tracking-tight">AI Strategic Intelligence</h3>
           </div>
-          
           {isInsightLoading ? (
-            <div className="space-y-3 animate-pulse">
-              <div className="h-4 bg-slate-100 rounded w-3/4"></div>
-              <div className="h-4 bg-slate-100 rounded w-5/6"></div>
-              <div className="h-4 bg-slate-100 rounded w-1/2"></div>
-            </div>
+            <div className="space-y-3 animate-pulse"><div className="h-4 bg-slate-100 rounded w-3/4"></div><div className="h-4 bg-slate-100 rounded w-5/6"></div></div>
           ) : (
             <div className="relative">
-              <p className="text-slate-600 leading-relaxed font-medium italic">
-                "{insight}"
-              </p>
-              <div className="mt-4 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Live Optimization Active</span>
-              </div>
+              <p className="text-slate-600 leading-relaxed font-medium italic">"{insight}"</p>
+              <div className="mt-4 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500"></span><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Live Optimization Active</span></div>
             </div>
           )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderChqLanding = () => {
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-emerald-600 rounded-2xl p-8 text-white relative overflow-hidden shadow-2xl">
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
+          <div className="relative z-10">
+            <div className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 bg-white/20">Administrative Sector</div>
+            <h2 className="text-4xl font-black mb-1 tracking-tight">CHQ Dashboards</h2>
+            <p className="text-emerald-100 font-medium">Yearly Consolidated Administrative Reports</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {YEAR_CONFIG.map((item) => (
+            <button 
+              key={item.year}
+              onClick={() => setDashboardView('chq-operational-dashboard', item.year)}
+              className="group p-8 rounded-3xl border-2 transition-all duration-300 text-left relative overflow-hidden bg-white hover:shadow-2xl hover:shadow-emerald-100 border-slate-100 hover:border-emerald-500"
+            >
+              <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-500">
+                <svg className="w-24 h-24 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} /></svg>
+              </div>
+              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={item.icon} /></svg>
+              </div>
+              <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2 group-hover:text-slate-900">CHQ Dashboard {item.year}</h3>
+              <p className="text-slate-500 font-medium text-sm">Consolidated administrative performance indicators for {item.year}.</p>
+              <div className="mt-6 flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+                  View Analytics
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderTacticalLanding = () => {
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-orange-600 rounded-2xl p-8 text-white relative overflow-hidden shadow-2xl">
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
+          <div className="relative z-10">
+            <div className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 bg-white/20">Tactical Operations</div>
+            <h2 className="text-4xl font-black mb-1 tracking-tight">Tactical Dashboards</h2>
+            <p className="text-orange-100 font-medium">Yearly Tactical Performance Monitoring</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {YEAR_CONFIG.map((item) => (
+            <button 
+              key={item.year}
+              onClick={() => setDashboardView('tactical-dashboard', item.year)}
+              className="group p-8 rounded-3xl border-2 transition-all duration-300 text-left relative overflow-hidden bg-white hover:shadow-2xl hover:shadow-orange-100 border-slate-100 hover:border-orange-500"
+            >
+              <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-500">
+                <svg className="w-24 h-24 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} /></svg>
+              </div>
+              <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-orange-100 group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={item.icon} /></svg>
+              </div>
+              <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2 group-hover:text-slate-900">Tactical Dashboard {item.year}</h3>
+              <p className="text-slate-500 font-medium text-sm">Station-level tactical operations performance monitoring for {item.year}.</p>
+              <div className="mt-6 flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+                  View Operations
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+                </span>
+              </div>
+            </button>
+          ))}
         </div>
       </div>
     );
@@ -457,9 +505,11 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           {view === 'accounts' && renderAccountManagement()}
           {view === 'deployment' && renderDeployment()}
           {view === 'user-selection' && renderUserSelection()}
+          {view === 'chq-landing' && renderChqLanding()}
+          {view === 'tactical-landing' && renderTacticalLanding()}
           {view === 'operational-dashboard' && <OperationalDashboard title={`OPERATIONAL DASHBOARD ${selectedYear}`} onBack={() => { setView('overview'); setSelectedOverviewUser(null); }} currentUser={user} subjectUser={selectedOverviewUser || user} />}
-          {view === 'chq-operational-dashboard' && <OperationalDashboard title={`CHQ DASHBOARD ${selectedYear}`} onBack={() => { setView('overview'); setSelectedOverviewUser(null); }} currentUser={user} subjectUser={selectedOverviewUser || user} />}
-          {view === 'tactical-dashboard' && <OperationalDashboard title={`TACTICAL DASHBOARD ${selectedYear}`} onBack={() => { setView('overview'); setSelectedOverviewUser(null); }} currentUser={user} subjectUser={selectedOverviewUser || user} />}
+          {view === 'chq-operational-dashboard' && <OperationalDashboard title={`CHQ DASHBOARD ${selectedYear}`} onBack={() => { setView('chq-landing'); setSelectedOverviewUser(null); }} currentUser={user} subjectUser={selectedOverviewUser || user} />}
+          {view === 'tactical-dashboard' && <OperationalDashboard title={`TACTICAL DASHBOARD ${selectedYear}`} onBack={() => { setView('tactical-landing'); setSelectedOverviewUser(null); }} currentUser={user} subjectUser={selectedOverviewUser || user} />}
         </div>
         <div className="lg:col-span-1">{renderSidebar()}</div>
       </div>
