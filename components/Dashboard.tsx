@@ -212,7 +212,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
             <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center mb-4 group-hover:bg-slate-900 group-hover:text-white transition">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={cfg.icon} /></svg>
             </div>
-            <h3 className="text-xl font-bold text-slate-900">{cfg.year} Performance</h3>
+            <h3 className="text-xl font-bold text-slate-900">Operational Dashboard {cfg.year}</h3>
             <p className="text-slate-500 text-sm mt-1">Review full year data logs</p>
           </button>
         ))}
@@ -382,7 +382,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
               onClick={() => { setView('overview'); setSelectedOverviewUser(null); }}
               className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'overview' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
             >
-              Overview
+              Operational Dashboards
               <svg className={`w-4 h-4 ${view === 'overview' ? 'text-white' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
             </button>
           </div>
@@ -390,7 +390,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
 
         {(user.role !== UserRole.STATION) && (
           <div className="space-y-3">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Regional Units</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">City Headquarters & Tactical Units</p>
             {!deletedCategories.includes('CHQ') && (
               <button 
                 onClick={() => setView('chq-landing')}
