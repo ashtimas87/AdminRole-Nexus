@@ -40,6 +40,8 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
     return saved ? JSON.parse(saved) : [];
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBatchPIModalOpen, setIsBatchPIModalOpen] = useState(false);
+  const [batchTarget, setBatchTarget] = useState<'CHQ' | 'STATION_1_10' | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [insight, setInsight] = useState<string>('');
   const [isInsightLoading, setIsInsightLoading] = useState<boolean>(true);
@@ -96,6 +98,11 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
     setIsModalOpen(true);
   };
 
+  const handleOpenBatchPIModal = (target: 'CHQ' | 'STATION_1_10') => {
+    setBatchTarget(target);
+    setIsBatchPIModalOpen(true);
+  };
+
   const handleSaveUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingUser) {
@@ -137,7 +144,6 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
     e.stopPropagation();
     e.preventDefault();
     if (confirm(`WIPE ALL DATA: Are you sure you want to delete all accomplishment records for ${targetUser.name}? This cannot be undone.`)) {
-      // Iterate through localStorage and remove keys related to this user's accomplishments
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -165,6 +171,15 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
     if (confirm('Restore all hidden dashboard categories?')) {
       setDeletedCategories([]);
     }
+  };
+
+  const handleToggleBatchPI = (piId: string) => {
+    if (!batchTarget) return;
+    const storageKey = `hidden_pis_${batchTarget}`;
+    const hidden = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const newHidden = hidden.includes(piId) ? hidden.filter((id: string) => id !== piId) : [...hidden, piId];
+    localStorage.setItem(storageKey, JSON.stringify(newHidden));
+    window.dispatchEvent(new Event('storage')); // Trigger refresh in children if any
   };
 
   const renderSidebar = () => (
@@ -462,7 +477,17 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
           {!deletedCategories.includes('CHQ') && (
             <div className="space-y-6">
-              <h3 className="text-xl font-black border-b pb-2">Administrative Units</h3>
+              <div className="flex items-center justify-between border-b pb-2">
+                <h3 className="text-xl font-black">Administrative Units</h3>
+                {isSuperAdmin && (
+                  <button 
+                    onClick={() => handleOpenBatchPIModal('CHQ')}
+                    className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-1 rounded hover:bg-emerald-200 transition"
+                  >
+                    BATCH PI MGMT
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-1 gap-3">
                 {chqUsers.map(u => (
                   <div key={u.id} className="relative group">
@@ -505,7 +530,17 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           )}
           {!deletedCategories.includes('TACTICAL') && (
             <div className="space-y-6">
-              <h3 className="text-xl font-black border-b pb-2">Station Accounts</h3>
+              <div className="flex items-center justify-between border-b pb-2">
+                <h3 className="text-xl font-black">Station Accounts</h3>
+                {isSuperAdmin && (
+                  <button 
+                    onClick={() => handleOpenBatchPIModal('STATION_1_10')}
+                    className="text-[9px] font-black bg-orange-100 text-orange-700 px-2 py-1 rounded hover:bg-orange-200 transition"
+                  >
+                    BATCH PI (ST 1-10)
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-1 gap-3">
                 {stationUsers.map(u => (
                   <div key={u.id} className="relative group">
@@ -514,7 +549,12 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                       className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-orange-500 transition-all text-left cursor-pointer shadow-sm group-hover:shadow-md"
                     >
                       <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
-                      <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-slate-400">STATION UNIT</p></div>
+                      <div>
+                        <p className="font-black text-slate-800">{u.name}</p>
+                        <p className="text-[10px] font-black uppercase text-slate-400">
+                          {u.name === 'City Mobile Force Company' ? 'SPECIAL UNIT' : 'STATION UNIT'}
+                        </p>
+                      </div>
                     </div>
                     {isSuperAdmin && (
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
@@ -580,9 +620,11 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
         </div>
         <div className="lg:col-span-1">{renderSidebar()}</div>
       </div>
+      
+      {/* Account Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 animate-in zoom-in-95 duration-200">
             <h3 className="text-xl font-bold mb-6">{editingUser ? 'Edit Unit Account' : 'New Unit Account'}</h3>
             <form onSubmit={handleSaveUser} className="space-y-4">
               <div>
@@ -613,6 +655,75 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                 <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-slate-900 text-white font-bold">Save Changes</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Batch PI Management Modal */}
+      {isBatchPIModalOpen && batchTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-8 my-8 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Batch PI Management</h3>
+                <p className="text-sm font-medium text-slate-500 mt-1">
+                  Targeting: <span className="font-bold text-blue-600">{batchTarget === 'CHQ' ? 'All CHQ Units' : 'Stations 1-10 (Excluding Station 11)'}</span>
+                </p>
+              </div>
+              <button onClick={() => setIsBatchPIModalOpen(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="bg-blue-50 p-4 rounded-2xl mb-8 border border-blue-100 flex gap-3 items-start">
+              <svg className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <p className="text-xs text-blue-800 font-medium leading-relaxed">
+                Toggling these will show/hide PI tabs for all units in this group. 
+                {batchTarget === 'STATION_1_10' && " Note: City Mobile Force Company (Station 11) will remain unaffected."}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {Array.from({ length: 29 }).map((_, i) => {
+                const piId = `PI${i + 1}`;
+                const storageKey = `hidden_pis_${batchTarget}`;
+                const hidden = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                const isHidden = hidden.includes(piId);
+                
+                return (
+                  <button 
+                    key={piId}
+                    onClick={() => handleToggleBatchPI(piId)}
+                    className={`flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all font-black text-[10px] uppercase tracking-wider ${isHidden ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-white border-blue-500 text-blue-600 shadow-sm'}`}
+                  >
+                    <span>PI {i + 1}</span>
+                    <div className={`w-4 h-4 rounded flex items-center justify-center border ${isHidden ? 'border-slate-300' : 'bg-blue-600 border-blue-600 text-white'}`}>
+                       {!isHidden && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              <button 
+                onClick={() => {
+                  if (confirm(`Show ALL PIs for ${batchTarget === 'CHQ' ? 'CHQ' : 'Stations 1-10'}?`)) {
+                    localStorage.setItem(`hidden_pis_${batchTarget}`, JSON.stringify([]));
+                    window.dispatchEvent(new Event('storage'));
+                  }
+                }}
+                className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-2xl text-xs font-black hover:bg-slate-200 transition"
+              >
+                RESTORE ALL
+              </button>
+              <button 
+                onClick={() => setIsBatchPIModalOpen(false)} 
+                className="flex-[2] px-4 py-3 bg-slate-900 text-white rounded-2xl text-xs font-black shadow-lg shadow-slate-100 hover:bg-slate-800 transition"
+              >
+                DONE
+              </button>
+            </div>
           </div>
         </div>
       )}

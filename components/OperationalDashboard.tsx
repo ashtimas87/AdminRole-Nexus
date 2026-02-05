@@ -411,10 +411,23 @@ const generateStructuredPIs = (
   const allChqIds = ['chq-1', 'chq-2', 'chq-3', 'chq-4', 'chq-5', 'chq-6', 'chq-7', 'chq-8', 'chq-9'];
 
   const definitions = getPIDefinitions(year, subjectUser.id, subjectUser.role);
+  
+  // Visibility Filtering
   const deletedPIs = JSON.parse(localStorage.getItem('deleted_pi_ids') || '[]');
+  let batchHidden: string[] = [];
+  
+  if (subjectUser.role === UserRole.CHQ) {
+    batchHidden = JSON.parse(localStorage.getItem('hidden_pis_CHQ') || '[]');
+  } else if (subjectUser.role === UserRole.STATION) {
+    const stationNum = parseInt(subjectUser.id.split('-')[1]);
+    // Targeted: Stations 1-10 (ID 'st-1' to 'st-10'). City Mobile Force is 'st-11'.
+    if (stationNum >= 1 && stationNum <= 10 && subjectUser.name !== 'City Mobile Force Company') {
+      batchHidden = JSON.parse(localStorage.getItem('hidden_pis_STATION_1_10') || '[]');
+    }
+  }
 
   return definitions
-    .filter(def => !deletedPIs.includes(def.id))
+    .filter(def => !deletedPIs.includes(def.id) && !batchHidden.includes(def.id))
     .map((def) => {
       const isPercentagePI = ["PI4", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(def.id);
       
@@ -507,6 +520,13 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
   };
 
   useEffect(() => { refreshData(); }, [title, currentUser, subjectUser, dashboardYear, dashboardType, activeTab]);
+
+  // Listen for batch management changes in localStorage
+  useEffect(() => {
+    const handleStorageChange = () => refreshData();
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   const currentPI = useMemo(() => {
     return piData.find(pi => pi.id === activeTab) || piData[0];
