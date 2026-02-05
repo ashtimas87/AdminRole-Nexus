@@ -98,11 +98,6 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
     setIsModalOpen(true);
   };
 
-  const handleOpenBatchPIModal = (target: 'CHQ' | 'STATION_1_10') => {
-    setBatchTarget(target);
-    setIsBatchPIModalOpen(true);
-  };
-
   const handleSaveUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingUser) {
@@ -179,7 +174,173 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
     const hidden = JSON.parse(localStorage.getItem(storageKey) || '[]');
     const newHidden = hidden.includes(piId) ? hidden.filter((id: string) => id !== piId) : [...hidden, piId];
     localStorage.setItem(storageKey, JSON.stringify(newHidden));
-    window.dispatchEvent(new Event('storage')); // Trigger refresh in children if any
+    window.dispatchEvent(new Event('storage'));
+  };
+
+  const renderOverview = () => (
+    <div className="space-y-6">
+      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-slate-900/5 rounded-full blur-3xl"></div>
+        <h2 className="text-4xl font-black text-slate-900 mb-2">Welcome back, {user.name}</h2>
+        <p className="text-slate-500 font-medium">Monitoring Unit Accomplishment & Performance Metrics</p>
+        
+        <div className="mt-8 p-6 bg-slate-900 rounded-2xl text-white shadow-xl shadow-slate-200">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            </div>
+            <h4 className="font-bold text-sm uppercase tracking-widest text-slate-400">Gemini AI Strategic Insight</h4>
+          </div>
+          {isInsightLoading ? (
+            <div className="flex items-center gap-3">
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              <p className="text-slate-400 italic text-sm">Consulting tactical engine...</p>
+            </div>
+          ) : (
+            <p className="text-lg font-medium leading-relaxed opacity-90">{insight}</p>
+          )}
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {YEAR_CONFIG.map(cfg => (
+          <button 
+            key={cfg.year}
+            onClick={() => { setSelectedOverviewUser(user); setDashboardView('operational-dashboard', cfg.year); }}
+            className="p-6 bg-white border border-slate-200 rounded-2xl hover:border-slate-900 hover:shadow-md transition group text-left"
+          >
+            <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center mb-4 group-hover:bg-slate-900 group-hover:text-white transition">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={cfg.icon} /></svg>
+            </div>
+            <h3 className="text-xl font-bold text-slate-900">{cfg.year} Performance</h3>
+            <p className="text-slate-500 text-sm mt-1">Review full year data logs</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderAccountManagement = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-black text-slate-900">Account Management</h2>
+        <button onClick={() => handleOpenModal()} className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-black shadow-lg">New Unit Account</button>
+      </div>
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <table className="w-full text-left">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Unit Name</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Role</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Email</th>
+              <th className="px-6 py-4 text-right"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {managedUsers.map(u => (
+              <tr key={u.id} className="hover:bg-slate-50/50 transition">
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <img src={u.avatar} className="w-8 h-8 rounded-lg" />
+                    <span className="font-bold text-slate-900">{u.name}</span>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`px-2 py-1 rounded text-[9px] font-black text-white uppercase ${ROLE_LABELS[u.role].color}`}>
+                    {ROLE_LABELS[u.role].label}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-slate-500 text-sm">{u.email}</td>
+                <td className="px-6 py-4 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <button onClick={() => handleOpenModal(u)} className="p-2 text-slate-400 hover:text-blue-600 transition"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
+                    <button onClick={() => handleDeleteUser(u.id)} className="p-2 text-slate-400 hover:text-red-600 transition"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const renderDeployment = () => (
+    <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-4">
+      <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+      </div>
+      <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Resource Deployment</h2>
+      <p className="text-slate-500 max-w-sm mx-auto">This module manages the strategic allocation of units and logistics across the region.</p>
+      <div className="pt-8 grid grid-cols-2 gap-4">
+        <div className="p-4 bg-slate-50 rounded-2xl border text-left">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Units</p>
+          <p className="text-2xl font-black text-slate-900">21</p>
+        </div>
+        <div className="p-4 bg-slate-50 rounded-2xl border text-left">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Assets</p>
+          <p className="text-2xl font-black text-slate-900">142</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderChqLanding = () => {
+    const chqUsers = usersList.filter(u => u.role === UserRole.CHQ);
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">CHQ Units Overview</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {chqUsers.map(u => (
+            <div 
+              key={u.id}
+              onClick={() => { setSelectedOverviewUser(u); setDashboardView('chq-operational-dashboard', selectedYear); }}
+              className="p-5 bg-white border border-slate-200 rounded-2xl hover:border-emerald-500 cursor-pointer transition shadow-sm group"
+            >
+              <div className="flex items-center gap-4">
+                <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
+                <div>
+                  <h4 className="font-black text-slate-800">{u.name}</h4>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Administrative Unit</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderTacticalLanding = () => {
+    const stationUsers = usersList.filter(u => u.role === UserRole.STATION);
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Tactical Units (Stations)</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {stationUsers.map(u => (
+            <div 
+              key={u.id}
+              onClick={() => { setSelectedOverviewUser(u); setDashboardView('tactical-dashboard', selectedYear); }}
+              className="p-5 bg-white border border-slate-200 rounded-2xl hover:border-orange-500 cursor-pointer transition shadow-sm group"
+            >
+              <div className="flex items-center gap-4">
+                <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
+                <div>
+                  <h4 className="font-black text-slate-800">{u.name}</h4>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    {u.name === 'City Mobile Force Company' ? 'Special Unit' : 'Police Station'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   const renderSidebar = () => (
@@ -289,174 +450,6 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
     </div>
   );
 
-  const renderOverview = () => (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-slate-900 rounded-2xl p-8 text-white relative overflow-hidden shadow-2xl">
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
-        <div className="relative z-10">
-          <div className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 ${roleConfig.color}`}>{roleConfig.label} Access</div>
-          <h2 className="text-4xl font-black mb-1 tracking-tight">COCPO Operational Dashboards</h2>
-          <p className="text-slate-400 font-medium">Welcome back, {user.name}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {YEAR_CONFIG.map((item) => (
-          <button 
-            key={item.year}
-            onClick={() => setDashboardView('operational-dashboard', item.year)}
-            className="group p-8 rounded-3xl border-2 transition-all duration-300 text-left relative overflow-hidden bg-white hover:shadow-2xl hover:shadow-indigo-100 border-slate-100 hover:border-indigo-500"
-          >
-            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-500">
-              <svg className="w-24 h-24 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} /></svg>
-            </div>
-            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={item.icon} /></svg>
-            </div>
-            <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2 group-hover:text-slate-900">Operational Dashboard {item.year}</h3>
-            <p className="text-slate-500 font-medium text-sm">Review performance metrics for the fiscal year {item.year}.</p>
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-white rounded-2xl border-2 border-indigo-50 shadow-sm p-6 relative overflow-hidden group">
-        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
-          <svg className="w-16 h-16 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-        </div>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-indigo-100">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-7.714 2.143L11 21l-2.286-6.857L1 12l7.714-2.143L11 3z" /></svg>
-          </div>
-          <h3 className="text-lg font-black text-slate-800 tracking-tight">Strategic Intelligence</h3>
-        </div>
-        {isInsightLoading ? (
-          <div className="space-y-3 animate-pulse"><div className="h-4 bg-slate-100 rounded w-3/4"></div><div className="h-4 bg-slate-100 rounded w-5/6"></div></div>
-        ) : (
-          <p className="text-slate-600 leading-relaxed font-medium italic">"{insight}"</p>
-        )}
-      </div>
-    </div>
-  );
-
-  const renderChqLanding = () => (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-emerald-600 rounded-2xl p-8 text-white relative overflow-hidden shadow-2xl">
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
-        <div className="relative z-10">
-          <div className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 bg-white/20">Administrative Sector</div>
-          <h2 className="text-4xl font-black mb-1 tracking-tight">CHQ Dashboards</h2>
-          <p className="text-emerald-100 font-medium">Yearly Consolidated Administrative Reports</p>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {YEAR_CONFIG.map((item) => (
-          <button 
-            key={item.year}
-            onClick={() => setDashboardView('chq-operational-dashboard', item.year)}
-            className="group p-8 rounded-3xl border-2 transition-all duration-300 text-left relative overflow-hidden bg-white hover:shadow-2xl hover:shadow-emerald-100 border-slate-100 hover:border-emerald-500"
-          >
-            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={item.icon} /></svg>
-            </div>
-            <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2 group-hover:text-slate-900">CHQ Dashboard {item.year}</h3>
-            <p className="text-slate-500 font-medium text-sm">Consolidated administrative indicators for {item.year}.</p>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderTacticalLanding = () => (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-orange-600 rounded-2xl p-8 text-white relative overflow-hidden shadow-2xl">
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
-        <div className="relative z-10">
-          <div className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 bg-white/20">Tactical Operations</div>
-          <h2 className="text-4xl font-black mb-1 tracking-tight">Tactical Dashboards</h2>
-          <p className="text-orange-100 font-medium">Yearly Tactical Performance Monitoring</p>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {YEAR_CONFIG.map((item) => (
-          <button 
-            key={item.year}
-            onClick={() => setDashboardView('tactical-dashboard', item.year)}
-            className="group p-8 rounded-3xl border-2 transition-all duration-300 text-left relative overflow-hidden bg-white hover:shadow-2xl hover:shadow-orange-100 border-slate-100 hover:border-orange-500"
-          >
-            <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-orange-100 group-hover:bg-orange-600 group-hover:text-white transition-colors">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={item.icon} /></svg>
-            </div>
-            <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2 group-hover:text-slate-900">Tactical Dashboard {item.year}</h3>
-            <p className="text-slate-500 font-medium text-sm">Station-level performance monitoring for {item.year}.</p>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderAccountManagement = () => (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <button onClick={() => setView('overview')} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 transition mb-2">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-            Back
-          </button>
-          <h2 className="text-2xl font-bold text-slate-900">Account Management</h2>
-        </div>
-        <button onClick={() => handleOpenModal()} className="bg-slate-900 text-white font-bold px-5 py-2.5 rounded-xl">Add New User</button>
-      </div>
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-slate-50 border-b">
-            <tr><th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">User</th><th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Role</th><th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-right">Actions</th></tr>
-          </thead>
-          <tbody className="divide-y">
-            {managedUsers.map((u) => (
-              <tr key={u.id} className="hover:bg-slate-50 group">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <img src={u.avatar} className="w-8 h-8 rounded-full" />
-                    <span className="font-semibold text-slate-900">{u.name}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4"><span className={`inline-block px-2 py-0.5 text-[10px] font-black rounded uppercase ${ROLE_LABELS[u.role].color} text-white`}>{ROLE_LABELS[u.role].label}</span></td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100">
-                    <button onClick={() => handleOpenModal(u)} className="p-2 text-slate-400 hover:text-blue-600 font-bold">Edit</button>
-                    <button onClick={(e) => handleDeleteUser(u.id, e)} className="p-2 text-slate-400 hover:text-red-600 font-bold">Delete</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
-  const renderDeployment = () => (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex justify-between items-end">
-        <button onClick={() => setView('overview')} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 transition">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-          Back
-        </button>
-        <h2 className="text-3xl font-black text-slate-900">Deployment Hub</h2>
-      </div>
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8 border-t-4 border-t-teal-500">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 bg-[#25c2a0] rounded-xl flex items-center justify-center text-white shadow-lg">
-            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-          </div>
-          <h3 className="text-xl font-black">Netlify Production</h3>
-        </div>
-        <p className="text-slate-600 mb-8 max-w-2xl">Manage your production environment on Netlify.</p>
-        <a href="https://app.netlify.com/" target="_blank" rel="noopener noreferrer" className="inline-block bg-[#25c2a0] text-white font-black py-4 px-8 rounded-xl shadow-lg">Open Console</a>
-      </div>
-    </div>
-  );
-
   const renderUserSelection = () => {
     const chqUsers = usersList.filter(u => u.role === UserRole.CHQ);
     const stationUsers = usersList.filter(u => u.role === UserRole.STATION);
@@ -481,10 +474,10 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                 <h3 className="text-xl font-black">Administrative Units</h3>
                 {isSuperAdmin && (
                   <button 
-                    onClick={() => handleOpenBatchPIModal('CHQ')}
+                    onClick={() => { setBatchTarget('CHQ'); setIsBatchPIModalOpen(true); }}
                     className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-2 py-1 rounded hover:bg-emerald-200 transition"
                   >
-                    BATCH PI MGMT
+                    CHQ PI MGMT
                   </button>
                 )}
               </div>
@@ -534,10 +527,10 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                 <h3 className="text-xl font-black">Station Accounts</h3>
                 {isSuperAdmin && (
                   <button 
-                    onClick={() => handleOpenBatchPIModal('STATION_1_10')}
+                    onClick={() => { setBatchTarget('STATION_1_10'); setIsBatchPIModalOpen(true); }}
                     className="text-[9px] font-black bg-orange-100 text-orange-700 px-2 py-1 rounded hover:bg-orange-200 transition"
                   >
-                    BATCH PI (ST 1-10)
+                    STATION PI MGMT
                   </button>
                 )}
               </div>
@@ -659,15 +652,15 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
         </div>
       )}
 
-      {/* Batch PI Management Modal */}
+      {/* PI Tabbing Management Modal */}
       {isBatchPIModalOpen && batchTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-8 my-8 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Batch PI Management</h3>
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">PI Tabbing Management</h3>
                 <p className="text-sm font-medium text-slate-500 mt-1">
-                  Targeting: <span className="font-bold text-blue-600">{batchTarget === 'CHQ' ? 'All CHQ Units' : 'Stations 1-10 (Excluding Station 11)'}</span>
+                  Affecting: <span className="font-bold text-indigo-600">{batchTarget === 'CHQ' ? 'Administrative (CHQ) Units' : 'Station Units (1-10)'}</span>
                 </p>
               </div>
               <button onClick={() => setIsBatchPIModalOpen(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition">
@@ -675,29 +668,29 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
               </button>
             </div>
 
-            <div className="bg-blue-50 p-4 rounded-2xl mb-8 border border-blue-100 flex gap-3 items-start">
-              <svg className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              <p className="text-xs text-blue-800 font-medium leading-relaxed">
-                Toggling these will show/hide PI tabs for all units in this group. 
-                {batchTarget === 'STATION_1_10' && " Note: City Mobile Force Company (Station 11) will remain unaffected."}
+            <div className="bg-indigo-50 p-4 rounded-2xl mb-8 border border-indigo-100 flex gap-3 items-start shadow-inner">
+              <svg className="w-5 h-5 text-indigo-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <p className="text-xs text-indigo-800 font-bold leading-relaxed">
+                Changes applied here will ONLY affect {batchTarget === 'CHQ' ? 'CHQ Units' : 'Stations 1-10'}. 
+                <br/>
+                Station 11 (Special Unit) remains unaffected.
               </p>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
               {Array.from({ length: 29 }).map((_, i) => {
                 const piId = `PI${i + 1}`;
-                const storageKey = `hidden_pis_${batchTarget}`;
-                const hidden = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                const hidden = JSON.parse(localStorage.getItem(`hidden_pis_${batchTarget}`) || '[]');
                 const isHidden = hidden.includes(piId);
                 
                 return (
                   <button 
                     key={piId}
                     onClick={() => handleToggleBatchPI(piId)}
-                    className={`flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all font-black text-[10px] uppercase tracking-wider ${isHidden ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-white border-blue-500 text-blue-600 shadow-sm'}`}
+                    className={`flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all font-black text-[10px] uppercase tracking-wider ${isHidden ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-white border-indigo-500 text-indigo-600 shadow-sm'}`}
                   >
                     <span>PI {i + 1}</span>
-                    <div className={`w-4 h-4 rounded flex items-center justify-center border ${isHidden ? 'border-slate-300' : 'bg-blue-600 border-blue-600 text-white'}`}>
+                    <div className={`w-4 h-4 rounded flex items-center justify-center border ${isHidden ? 'border-slate-300' : 'bg-indigo-600 border-indigo-600 text-white'}`}>
                        {!isHidden && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg>}
                     </div>
                   </button>
@@ -715,13 +708,13 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                 }}
                 className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-2xl text-xs font-black hover:bg-slate-200 transition"
               >
-                RESTORE ALL
+                RESTORE ALL TABS
               </button>
               <button 
                 onClick={() => setIsBatchPIModalOpen(false)} 
                 className="flex-[2] px-4 py-3 bg-slate-900 text-white rounded-2xl text-xs font-black shadow-lg shadow-slate-100 hover:bg-slate-800 transition"
               >
-                DONE
+                SAVE CONFIGURATION
               </button>
             </div>
           </div>
