@@ -1,16 +1,18 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { UserRole } from "../types";
 
-// Lazy-initialize the AI client to handle environments where process.env might be shimmed later
+/**
+ * Initialize the Google GenAI client following strict guidelines.
+ * Always use process.env.API_KEY exclusively.
+ */
 const getAIClient = () => {
-  const apiKey = (typeof process !== 'undefined' && process.env?.API_KEY) ? process.env.API_KEY : '';
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 };
 
 // Local fallbacks to maintain the "AI insight" experience when quota is exhausted
 const LOCAL_INSIGHTS: Record<UserRole, string[]> = {
   [UserRole.SUPER_ADMIN]: [
-    "Global operational efficiency is up 12% this quarter. Focus on optimizing cross-departmental data sharing protocols.",
     "User engagement metrics suggest a need for simplified onboarding for Station-level operators.",
     "System security audit complete. All 21 nodes are reporting healthy status and synchronized logs."
   ],
@@ -38,10 +40,14 @@ const getRandomLocalInsight = (role: UserRole) => {
 
 const insightCache: Record<string, string> = {};
 
-async function callWithRetry(fn: (ai: any) => Promise<any>, role: UserRole, maxRetries = 2, baseDelay = 1000) {
-  const ai = getAIClient();
+/**
+ * Executes an AI call with retry logic and fallback to local insights.
+ */
+async function callWithRetry(fn: (ai: GoogleGenAI) => Promise<string | undefined>, role: UserRole, maxRetries = 2, baseDelay = 1000) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
+      // Create a fresh instance for each attempt as per best practices
+      const ai = getAIClient();
       return await fn(ai);
     } catch (error: any) {
       const errorMsg = error?.message || "";
@@ -62,6 +68,9 @@ async function callWithRetry(fn: (ai: any) => Promise<any>, role: UserRole, maxR
   return getRandomLocalInsight(role);
 }
 
+/**
+ * Fetches strategic insights based on user role using Gemini.
+ */
 export const getRoleInsight = async (role: UserRole) => {
   if (insightCache[role]) {
     return insightCache[role];
@@ -69,6 +78,7 @@ export const getRoleInsight = async (role: UserRole) => {
 
   try {
     const text = await callWithRetry(async (aiClient) => {
+      // Use gemini-3-flash-preview for basic text task
       const response = await aiClient.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Provide a professional, concise 2-sentence morning greeting and a strategic tip for a ${role} user in a logistics and operations management platform. Do not use markdown formatting.`,
@@ -76,6 +86,7 @@ export const getRoleInsight = async (role: UserRole) => {
           temperature: 0.8,
         }
       });
+      // Correctly access .text property from response
       return response.text;
     }, role);
 

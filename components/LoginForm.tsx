@@ -36,7 +36,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
         {/* Left Side: Form */}
         <div className="w-full md:w-1/2 p-8 lg:p-12">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-slate-900">AdminRole</h1>
+            <h1 className="text-3xl font-bold text-slate-900">Login</h1>
             <p className="text-slate-500 mt-2">Sign in to access your dashboard.</p>
           </div>
 

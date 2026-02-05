@@ -34,6 +34,8 @@ export interface MonthData {
 }
 
 export interface PIActivity {
+  /** Unique identifier for the activity */
+  id: string;
   activity: string;
   indicator: string;
   months: MonthData[];
