@@ -1,3 +1,4 @@
+
 import { User, UserRole } from './types';
 
 const CHQ_NAMES = [
@@ -65,7 +66,7 @@ export const ROLE_LABELS: Record<UserRole, { label: string; color: string; desc:
   [UserRole.CHQ]: { 
     label: 'CHQ User', 
     color: 'bg-emerald-600', 
-    desc: 'Centralized data monitoring and strategic reporting.' 
+    desc: 'Centralized data monitoring and administrative reporting.' 
   },
   [UserRole.STATION]: { 
     label: 'Station User', 

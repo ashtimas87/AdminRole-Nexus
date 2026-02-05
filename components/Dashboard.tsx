@@ -7,7 +7,6 @@ import { getRoleInsight } from '../services/geminiService';
 
 interface DashboardProps {
   user: User;
-  onLogout: () => void;
 }
 
 type ViewType = 
@@ -19,7 +18,7 @@ type ViewType =
   | 'tactical-dashboard'
   | 'user-selection';
 
-const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
+const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, onLogout }) => {
   const [view, setView] = useState<ViewType>('overview');
   const [selectedYear, setSelectedYear] = useState<string>('2026');
   const [selectedOverviewUser, setSelectedOverviewUser] = useState<User | null>(null);
@@ -186,7 +185,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         {user.role !== UserRole.STATION && (
           <div className="space-y-6">
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Strategic Units</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Administrative Units</p>
               <button 
                 onClick={() => setDashboardView('chq-operational-dashboard', '2026')}
                 className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'chq-operational-dashboard' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
@@ -197,7 +196,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             </div>
 
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Field Operations</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Tactical Units</p>
               <button 
                 onClick={() => setDashboardView('tactical-dashboard', '2026')}
                 className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'tactical-dashboard' ? 'bg-orange-600 text-white shadow-lg shadow-orange-100' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'}`}
@@ -379,9 +378,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          {/* CHQ Column */}
+          {/* Administrative Column */}
           <div className="space-y-6">
-            <h3 className="text-xl font-black text-[#1e293b] tracking-wide border-b border-slate-200 pb-2">CHQ Accounts</h3>
+            <h3 className="text-xl font-black text-[#1e293b] tracking-wide border-b border-slate-200 pb-2">Administrative Units</h3>
             <div className="grid grid-cols-1 gap-3">
               {chqUsers.map(u => (
                 <button 
