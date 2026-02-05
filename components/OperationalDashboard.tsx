@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { PIData, UserRole, User, MonthFile, MonthData, PIActivity } from '../types';
 import pptxgen from "pptxgenjs";
@@ -412,22 +411,25 @@ const generateStructuredPIs = (
 
   const definitions = getPIDefinitions(year, subjectUser.id, subjectUser.role);
   
-  // Visibility Filtering - Use group-specific keys exclusively to ensure isolation
-  let batchHidden: string[] = [];
+  // Visibility Filtering
+  let groupHidden: string[] = [];
+  const unitHidden: string[] = JSON.parse(localStorage.getItem(`hidden_pis_${subjectUser.id}`) || '[]');
   
-  // Determine isolation group based on subjectUser role or the dashboard type being viewed
+  // Determine isolation group
   if (subjectUser.role === UserRole.CHQ || dashboardType === 'CHQ') {
-    batchHidden = JSON.parse(localStorage.getItem('hidden_pis_CHQ') || '[]');
+    groupHidden = JSON.parse(localStorage.getItem('hidden_pis_CHQ') || '[]');
   } else if (subjectUser.role === UserRole.STATION || dashboardType === 'TACTICAL') {
     if (subjectUser.name === 'City Mobile Force Company') {
-      batchHidden = JSON.parse(localStorage.getItem('hidden_pis_SPECIAL') || '[]');
+      groupHidden = JSON.parse(localStorage.getItem('hidden_pis_SPECIAL') || '[]');
     } else {
-      batchHidden = JSON.parse(localStorage.getItem('hidden_pis_STATION_1_10') || '[]');
+      groupHidden = JSON.parse(localStorage.getItem('hidden_pis_STATION_1_10') || '[]');
     }
   }
 
+  const allHidden = Array.from(new Set([...unitHidden, ...groupHidden]));
+
   return definitions
-    .filter(def => !batchHidden.includes(def.id))
+    .filter(def => !allHidden.includes(def.id))
     .map((def) => {
       const isPercentagePI = ["PI4", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(def.id);
       
@@ -651,30 +653,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
     
     if (!isSuperAdmin) return;
 
-    // Use subjectUser context and dashboard context to determine which isolated hidden list to update
-    let storageKey = '';
-    let groupName = '';
+    // Visibility management logic - now granular by unit
+    const storageKey = `hidden_pis_${subjectUser.id}`;
+    const groupName = subjectUser.name;
 
-    // Fixed isolation logic: use dashboardType for consolidated views, or subjectUser role for individual views
-    if (subjectUser.role === UserRole.CHQ || dashboardType === 'CHQ') {
-      storageKey = 'hidden_pis_CHQ';
-      groupName = 'all CHQ Units';
-    } else if (subjectUser.role === UserRole.STATION || dashboardType === 'TACTICAL') {
-      if (subjectUser.name === 'City Mobile Force Company') {
-        storageKey = 'hidden_pis_SPECIAL';
-        groupName = 'Special Unit (CMFC)';
-      } else {
-        storageKey = 'hidden_pis_STATION_1_10';
-        groupName = 'all Stations 1-10';
-      }
-    }
-
-    if (!storageKey) {
-        alert("Action not allowed in Global Operational View. Switch to CHQ or Tactical dashboards to manage tab visibility.");
-        return;
-    }
-
-    if (!window.confirm(`Hide tab ${piId} for ${groupName}? This will NOT hide it for other categories.`)) return;
+    if (!window.confirm(`Hide tab ${piId} for ${groupName} ONLY? This will NOT hide it for other units.`)) return;
     
     const hidden = JSON.parse(localStorage.getItem(storageKey) || '[]');
     if (!hidden.includes(piId)) {
@@ -752,13 +735,17 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
             <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
         </div>
         <p className="text-slate-900 text-xl font-black uppercase mb-2">No Performance Indicators Active</p>
-        <p className="text-slate-500 font-medium mb-6">All tabs for this specific unit category have been hidden by a Super Admin.</p>
+        <p className="text-slate-500 font-medium mb-6">Tabs for this specific unit have been hidden by a Super Admin.</p>
         {isSuperAdmin && (
             <button 
                 onClick={() => { 
-                    localStorage.removeItem('hidden_pis_CHQ'); 
-                    localStorage.removeItem('hidden_pis_STATION_1_10'); 
-                    localStorage.removeItem('hidden_pis_SPECIAL'); 
+                    // Clear all possible hidden PI keys
+                    for (let i = 0; i < localStorage.length; i++) {
+                      const key = localStorage.key(i);
+                      if (key && key.startsWith('hidden_pis_')) {
+                        localStorage.removeItem(key);
+                      }
+                    }
                     window.location.reload(); 
                 }} 
                 className="px-6 py-3 bg-blue-600 text-white font-black rounded-2xl shadow-lg hover:bg-blue-700 transition active:scale-95"
@@ -813,7 +800,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
                   <span 
                     onClick={(e) => handleDeletePI(pi.id, e)} 
                     className="ml-1 opacity-60 hover:opacity-100 hover:text-red-400 transition-all p-0.5 rounded-full hover:bg-white/10"
-                    title={`Hide PI tab for ${dashboardType === 'CHQ' ? 'CHQ' : 'Tactical'}`}
+                    title={`Hide PI tab for ${subjectUser.name} ONLY`}
                   >
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                   </span>
