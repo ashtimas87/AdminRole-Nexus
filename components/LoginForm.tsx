@@ -94,13 +94,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
               </svg>
             </div>
             <h2 className="text-4xl font-bold mb-4 leading-tight">Real-Time Monitoring System</h2>
-            <p className="text-slate-400 text-lg">Managing 21 distinct user accounts across 4 organizational tiers with granular permissions.</p>
+            <p className="text-slate-400 text-lg">Managing of Unit Dashboard Accomplishment</p>
           </div>
 
           <div className="relative z-10 space-y-4">
             <div className="flex items-center gap-4 text-sm bg-white/5 border border-white/10 p-4 rounded-xl backdrop-blur-sm">
               <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-              <span>Platform Status: Healthy</span>
+              <span>Status: Healthy</span>
             </div>
             <div className="text-slate-500 text-xs">
               © 2025 AdminRole System
