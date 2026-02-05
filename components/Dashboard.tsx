@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { User, UserRole } from '../types';
 import { ROLE_LABELS, MOCK_USERS } from '../constants';
 import { getRoleInsight } from '../services/geminiService';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import OperationalDashboard from './OperationalDashboard';
 
 interface DashboardProps {
@@ -186,22 +185,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               <h3 className="text-2xl font-bold text-slate-900">88%</h3>
             </div>
           ))}
-        </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-800 mb-6">Organizational Flow</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={[{ name: 'Jan', value: 400 }, { name: 'Feb', value: 300 }, { name: 'Mar', value: 600 }, { name: 'Apr', value: 800 }, { name: 'May', value: 500 }, { name: 'Jun', value: 200 }]}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
-                <YAxis hide />
-                <Tooltip cursor={{fill: '#f8fafc'}} />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                  {[400,300,600,800,500,200].map((_, index) => (<Cell key={`cell-${index}`} fill={index === 3 ? '#0f172a' : '#cbd5e1'} />))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
         </div>
       </div>
     );
