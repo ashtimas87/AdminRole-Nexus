@@ -429,7 +429,11 @@ const generateStructuredPIs = (
   const allHidden = Array.from(new Set([...unitHidden, ...groupHidden]));
 
   return definitions
-    .filter(def => !allHidden.includes(def.id))
+    .filter(def => {
+      // Unhide all PI tabs for CHQ users/units as per request
+      if (subjectUser.role === UserRole.CHQ) return true;
+      return !allHidden.includes(def.id);
+    })
     .map((def) => {
       const isPercentagePI = ["PI4", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(def.id);
       

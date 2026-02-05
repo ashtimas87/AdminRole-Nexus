@@ -481,7 +481,10 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
 
         {user.role !== UserRole.STATION && !(user.role === UserRole.CHQ && view === 'chq-landing') && (
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">System</p>
+            {/* Hiding the label 'System' for SUPER_ADMIN and SUB_ADMIN as requested */}
+            {!(user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN) && (
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">System</p>
+            )}
             <div className="space-y-1.5">
               <button 
                 onClick={() => { setView('user-selection'); setSelectedOverviewUser(null); }} 
