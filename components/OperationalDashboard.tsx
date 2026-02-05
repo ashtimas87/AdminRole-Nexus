@@ -412,22 +412,21 @@ const generateStructuredPIs = (
 
   const definitions = getPIDefinitions(year, subjectUser.id, subjectUser.role);
   
-  // Visibility Filtering
-  const deletedPIs = JSON.parse(localStorage.getItem('deleted_pi_ids') || '[]');
+  // Visibility Filtering - Use group-specific keys exclusively to ensure isolation
   let batchHidden: string[] = [];
   
   if (subjectUser.role === UserRole.CHQ) {
     batchHidden = JSON.parse(localStorage.getItem('hidden_pis_CHQ') || '[]');
   } else if (subjectUser.role === UserRole.STATION) {
-    const stationNum = parseInt(subjectUser.id.split('-')[1]);
-    // Targeted: Stations 1-10 (ID 'st-1' to 'st-10'). City Mobile Force is 'st-11'.
-    if (stationNum >= 1 && stationNum <= 10 && subjectUser.name !== 'City Mobile Force Company') {
+    if (subjectUser.name === 'City Mobile Force Company') {
+      batchHidden = JSON.parse(localStorage.getItem('hidden_pis_SPECIAL') || '[]');
+    } else {
       batchHidden = JSON.parse(localStorage.getItem('hidden_pis_STATION_1_10') || '[]');
     }
   }
 
   return definitions
-    .filter(def => !deletedPIs.includes(def.id) && !batchHidden.includes(def.id))
+    .filter(def => !batchHidden.includes(def.id))
     .map((def) => {
       const isPercentagePI = ["PI4", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(def.id);
       
@@ -649,11 +648,31 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
     e.stopPropagation();
     e.preventDefault();
     
-    if (!isSuperAdmin || !window.confirm(`Are you sure you want to delete the tab ${piId}? This will hide it for all users.`)) return;
+    if (!isSuperAdmin) return;
+
+    // Use subjectUser context to determine which isolated hidden list to update
+    let storageKey = '';
+    let groupName = '';
+
+    if (subjectUser.role === UserRole.CHQ) {
+      storageKey = 'hidden_pis_CHQ';
+      groupName = 'all CHQ Units';
+    } else if (subjectUser.role === UserRole.STATION) {
+      if (subjectUser.name === 'City Mobile Force Company') {
+        storageKey = 'hidden_pis_SPECIAL';
+        groupName = 'Special Unit (CMFC)';
+      } else {
+        storageKey = 'hidden_pis_STATION_1_10';
+        groupName = 'all Stations 1-10';
+      }
+    }
+
+    if (!storageKey || !window.confirm(`Hide tab ${piId} for ${groupName}? This will NOT affect other categories.`)) return;
     
-    const deletedPIs = JSON.parse(localStorage.getItem('deleted_pi_ids') || '[]');
-    const newDeleted = [...deletedPIs, piId];
-    localStorage.setItem('deleted_pi_ids', JSON.stringify(newDeleted));
+    const hidden = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    if (!hidden.includes(piId)) {
+        localStorage.setItem(storageKey, JSON.stringify([...hidden, piId]));
+    }
     
     refreshData();
   };
@@ -722,8 +741,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
   if (!currentPI && piData.length === 0) {
     return (
       <div className="p-12 text-center bg-white rounded-3xl border border-slate-200">
-        <p className="text-slate-500 font-bold">All performance indicators have been deleted.</p>
-        <button onClick={() => { localStorage.removeItem('deleted_pi_ids'); localStorage.removeItem(`custom_pi_definitions_${dashboardYear}`); window.location.reload(); }} className="mt-4 text-blue-600 font-bold underline">Restore Defaults</button>
+        <p className="text-slate-500 font-bold">All performance indicators have been hidden for this unit group.</p>
+        <button onClick={() => { localStorage.removeItem('hidden_pis_CHQ'); localStorage.removeItem('hidden_pis_STATION_1_10'); localStorage.removeItem('hidden_pis_SPECIAL'); window.location.reload(); }} className="mt-4 text-blue-600 font-bold underline">Restore All Tab Visibility</button>
       </div>
     );
   }
@@ -768,7 +787,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
                   <span 
                     onClick={(e) => handleDeletePI(pi.id, e)} 
                     className="ml-1 opacity-60 hover:opacity-100 hover:text-red-400 transition-all p-0.5 rounded-full hover:bg-white/10"
-                    title="Delete PI tab"
+                    title="Hide PI tab for this group"
                   >
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                   </span>

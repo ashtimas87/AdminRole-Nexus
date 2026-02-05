@@ -41,7 +41,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBatchPIModalOpen, setIsBatchPIModalOpen] = useState(false);
-  const [batchTarget, setBatchTarget] = useState<'CHQ' | 'STATION_1_10' | null>(null);
+  const [batchTarget, setBatchTarget] = useState<'CHQ' | 'STATION_1_10' | 'SPECIAL' | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [insight, setInsight] = useState<string>('');
   const [isInsightLoading, setIsInsightLoading] = useState<boolean>(true);
@@ -526,12 +526,20 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
               <div className="flex items-center justify-between border-b pb-2">
                 <h3 className="text-xl font-black">Station Accounts</h3>
                 {isSuperAdmin && (
-                  <button 
-                    onClick={() => { setBatchTarget('STATION_1_10'); setIsBatchPIModalOpen(true); }}
-                    className="text-[9px] font-black bg-orange-100 text-orange-700 px-2 py-1 rounded hover:bg-orange-200 transition"
-                  >
-                    STATION PI MGMT
-                  </button>
+                  <div className="flex gap-1.5">
+                    <button 
+                      onClick={() => { setBatchTarget('STATION_1_10'); setIsBatchPIModalOpen(true); }}
+                      className="text-[9px] font-black bg-orange-100 text-orange-700 px-2 py-1 rounded hover:bg-orange-200 transition"
+                    >
+                      STATION PI MGMT
+                    </button>
+                    <button 
+                      onClick={() => { setBatchTarget('SPECIAL'); setIsBatchPIModalOpen(true); }}
+                      className="text-[9px] font-black bg-purple-100 text-purple-700 px-2 py-1 rounded hover:bg-purple-200 transition"
+                    >
+                      SPECIAL PI MGMT
+                    </button>
+                  </div>
                 )}
               </div>
               <div className="grid grid-cols-1 gap-3">
@@ -660,7 +668,11 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
               <div>
                 <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">PI Tabbing Management</h3>
                 <p className="text-sm font-medium text-slate-500 mt-1">
-                  Affecting: <span className="font-bold text-indigo-600">{batchTarget === 'CHQ' ? 'Administrative (CHQ) Units' : 'Station Units (1-10)'}</span>
+                  Affecting: <span className="font-bold text-indigo-600">
+                    {batchTarget === 'CHQ' ? 'Administrative (CHQ) Units' : 
+                     batchTarget === 'STATION_1_10' ? 'Station Units (1-10)' : 
+                     'Special Unit (CMFC)'}
+                  </span>
                 </p>
               </div>
               <button onClick={() => setIsBatchPIModalOpen(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition">
@@ -671,9 +683,11 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
             <div className="bg-indigo-50 p-4 rounded-2xl mb-8 border border-indigo-100 flex gap-3 items-start shadow-inner">
               <svg className="w-5 h-5 text-indigo-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               <p className="text-xs text-indigo-800 font-bold leading-relaxed">
-                Changes applied here will ONLY affect {batchTarget === 'CHQ' ? 'CHQ Units' : 'Stations 1-10'}. 
+                Changes applied here will ONLY affect the selected unit group. 
                 <br/>
-                Station 11 (Special Unit) remains unaffected.
+                {batchTarget === 'CHQ' ? 'Stations and Special Unit remain unaffected.' : 
+                 batchTarget === 'STATION_1_10' ? 'CHQ and Special Unit remain unaffected.' : 
+                 'CHQ and Stations 1-10 remain unaffected.'}
               </p>
             </div>
 
@@ -701,7 +715,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
             <div className="flex gap-3 mt-8">
               <button 
                 onClick={() => {
-                  if (confirm(`Show ALL PIs for ${batchTarget === 'CHQ' ? 'CHQ' : 'Stations 1-10'}?`)) {
+                  if (confirm(`Show ALL PIs for this group?`)) {
                     localStorage.setItem(`hidden_pis_${batchTarget}`, JSON.stringify([]));
                     window.dispatchEvent(new Event('storage'));
                   }
