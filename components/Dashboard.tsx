@@ -21,14 +21,14 @@ type ViewType =
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [view, setView] = useState<ViewType>('overview');
-  const [selectedYear, setSelectedYear] = useState<string>('2025');
+  const [selectedYear, setSelectedYear] = useState<string>('2026');
   const [selectedOverviewUser, setSelectedOverviewUser] = useState<User | null>(null);
   const [usersList, setUsersList] = useState<User[]>(MOCK_USERS);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [insight, setInsight] = useState<string>('');
   const [isInsightLoading, setIsInsightLoading] = useState<boolean>(true);
-  const [isOperationalOpen, setIsOperationalOpen] = useState<boolean>(true); // Hide/unhide state
+  const [isArchiveOpen, setIsArchiveOpen] = useState<boolean>(false);
   
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
 
@@ -99,92 +99,126 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const renderSidebar = () => (
     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-fit sticky top-24">
-      <h3 className="text-lg font-bold text-slate-800 mb-2">Control Panel</h3>
-      <p className="text-xs text-slate-500 mb-6">{selectedOverviewUser ? `Currently viewing: ${selectedOverviewUser.name}` : roleConfig.desc}</p>
+      <div className="mb-6">
+        <h3 className="text-lg font-black text-slate-800 tracking-tight">Control Panel</h3>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+          {selectedOverviewUser ? `Unit: ${selectedOverviewUser.name}` : `Role: ${roleConfig.label}`}
+        </p>
+      </div>
       
-      <div className="space-y-6">
+      <div className="space-y-8">
+        {/* Navigation Section */}
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Main</p>
+          <div className="space-y-1.5">
+            <button 
+              onClick={() => { setView('overview'); setSelectedOverviewUser(null); }}
+              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'overview' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+            >
+              Overview
+              <svg className={`w-4 h-4 ${view === 'overview' ? 'text-white' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Core Management Section */}
         {user.role === UserRole.SUPER_ADMIN && (
           <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Core Functions</p>
-            <div className="space-y-2">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Management</p>
+            <div className="space-y-1.5">
               <button 
                 onClick={() => { setView('accounts'); setSelectedOverviewUser(null); }}
-                className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'accounts' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'accounts' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
               >
                 Accounts
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                <svg className={`w-4 h-4 ${view === 'accounts' ? 'text-white' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
               </button>
               <button 
                 onClick={() => { setView('deployment'); setSelectedOverviewUser(null); }}
-                className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'deployment' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'deployment' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
               >
                 Deployment
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                <svg className={`w-4 h-4 ${view === 'deployment' ? 'text-white' : 'text-blue-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
               </button>
             </div>
           </div>
         )}
 
+        {/* Operational Hub */}
         <div>
-          <button 
-            onClick={() => setIsOperationalOpen(!isOperationalOpen)}
-            className="w-full flex items-center justify-between group mb-3 focus:outline-none"
-          >
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest group-hover:text-slate-600 transition">Operational Dashboards</p>
-            <div className="flex items-center gap-2">
-               <svg className={`w-3 h-3 text-slate-400 transition-transform duration-300 ${isOperationalOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-               </svg>
-            </div>
-          </button>
-          
-          <div className={`space-y-3 overflow-hidden transition-all duration-300 ${isOperationalOpen ? 'max-h-[600px] opacity-100 pb-2' : 'max-h-0 opacity-0'}`}>
-            {user.role !== UserRole.STATION && (
-              <>
-                <div className="grid grid-cols-2 gap-2">
-                  {['2026', '2025', '2024', '2023'].map((year) => (
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Monitoring</p>
+          <div className="space-y-1.5">
+            <button 
+              onClick={() => setDashboardView('operational-dashboard', '2026')}
+              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'operational-dashboard' && selectedYear === '2026' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}`}
+            >
+              Operational Dashboard
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-black ${view === 'operational-dashboard' && selectedYear === '2026' ? 'bg-white text-indigo-600' : 'bg-indigo-200 text-indigo-700'}`}>2026</span>
+            </button>
+            
+            <div className="pt-1">
+              <button 
+                onClick={() => setIsArchiveOpen(!isArchiveOpen)}
+                className="w-full flex items-center justify-between px-4 py-2 hover:bg-slate-50 rounded-lg transition group"
+              >
+                <span className="text-[11px] font-black text-slate-500 uppercase tracking-tighter">Year Archives</span>
+                <svg className={`w-3 h-3 text-slate-400 transition-transform ${isArchiveOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              
+              <div className={`overflow-hidden transition-all duration-300 ${isArchiveOpen ? 'max-h-40 mt-2 opacity-100' : 'max-h-0 opacity-0'}`}>
+                <div className="grid grid-cols-3 gap-1 px-1">
+                  {['2025', '2024', '2023'].map(year => (
                     <button 
                       key={year}
                       onClick={() => setDashboardView('operational-dashboard', year)}
-                      className={`relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-300 active:scale-95 ${view === 'operational-dashboard' && selectedYear === year ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/50'}`}
+                      className={`py-2 rounded-lg text-[11px] font-black border transition-all ${view === 'operational-dashboard' && selectedYear === year ? 'bg-indigo-900 border-indigo-900 text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300 hover:text-indigo-600'}`}
                     >
-                      <span className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-70">Ops Year</span>
-                      <span className="text-base font-black tracking-tight">{year}</span>
+                      {year}
                     </button>
                   ))}
                 </div>
-                
-                <button 
-                  onClick={() => setDashboardView('chq-operational-dashboard', '2025')}
-                  className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'chq-operational-dashboard' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
-                >
-                  CHQ Dashboard
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m-1 4h1m5-8h1m-1 4h1m-1 4h1" /></svg>
-                </button>
-              </>
-            )}
-
-            <button 
-              onClick={() => setDashboardView('tactical-dashboard', '2025')}
-              className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'tactical-dashboard' ? 'bg-slate-700 text-white shadow-lg shadow-slate-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-            >
-              Tactical Dashboard
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-            </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="pt-2 border-t border-slate-100">
-          <div className="space-y-1.5">
-            {user.role !== UserRole.STATION && (
+        {/* Units Breakdown */}
+        {user.role !== UserRole.STATION && (
+          <div className="space-y-6">
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Strategic Units</p>
               <button 
-                onClick={() => { setView('user-selection'); setSelectedYear('2025'); setSelectedOverviewUser(null); }} 
-                className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition ${view === 'user-selection' ? 'bg-orange-600 text-white shadow-md' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'}`}
+                onClick={() => setDashboardView('chq-operational-dashboard', '2026')}
+                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'chq-operational-dashboard' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
               >
-                Account Overview
+                CHQ Dashboard
+                <svg className={`w-4 h-4 ${view === 'chq-operational-dashboard' ? 'text-white' : 'text-emerald-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m-1 4h1m5-8h1m-1 4h1m-1 4h1" /></svg>
               </button>
-            )}
+            </div>
+
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Field Operations</p>
+              <button 
+                onClick={() => setDashboardView('tactical-dashboard', '2026')}
+                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'tactical-dashboard' ? 'bg-orange-600 text-white shadow-lg shadow-orange-100' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'}`}
+              >
+                Tactical Dashboard
+                <svg className={`w-4 h-4 ${view === 'tactical-dashboard' ? 'text-white' : 'text-orange-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              </button>
+            </div>
           </div>
+        )}
+
+        {/* Administration */}
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">System</p>
+          <button 
+            onClick={() => { setView('user-selection'); setSelectedOverviewUser(null); }} 
+            className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'user-selection' ? 'bg-slate-700 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+          >
+            Account Overview
+            <span className="text-[9px] font-black bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded uppercase">Inspect</span>
+          </button>
         </div>
       </div>
     </div>
