@@ -380,7 +380,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       <nav className="sticky top-0 z-30 bg-white border-b px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg">N</div>
-          <h1 className="font-bold text-slate-900 leading-none">AdminRole Nexus</h1>
+          <h1 className="font-bold text-slate-900 leading-none">AdminRole</h1>
         </div>
         <div className="flex items-center gap-6">
           <div className="hidden md:block text-right">

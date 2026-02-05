@@ -1,5 +1,5 @@
 {
-  "name": "Copy of AdminRole Nexus",
+  "name": "Copy of AdminRole",
   "description": "A professional role-based access control (RBAC) demonstration featuring Super Admin, Sub-Admin, CHQ, and Station user tiers with integrated Gemini-powered insights for each dashboard.",
   "requestFramePermissions": []
 }
