@@ -379,8 +379,11 @@ const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
   const allDefinitions = [...baseDefinitions, ...customPIs];
 
   return allDefinitions.map(pi => {
-    const storedIds = localStorage.getItem(`pi_activity_ids_${year}_${pi.id}`);
-    let activityIds = storedIds ? JSON.parse(storedIds) : pi.activities.map(a => a.id);
+    // Try unit-specific IDs first, then fall back to global
+    const unitSpecificIds = localStorage.getItem(`pi_activity_ids_${year}_${userId}_${pi.id}`);
+    const globalIds = localStorage.getItem(`pi_activity_ids_${year}_${pi.id}`);
+    
+    let activityIds = unitSpecificIds ? JSON.parse(unitSpecificIds) : (globalIds ? JSON.parse(globalIds) : pi.activities.map(a => a.id));
 
     const fullActivities = activityIds.map((aid: string) => {
       const baseAct = pi.activities.find(a => a.id === aid);
@@ -426,13 +429,18 @@ const generateStructuredPIs = (
     }
   }
 
-  const allHidden = Array.from(new Set([...unitHidden, ...groupHidden]));
-
   return definitions
     .filter(def => {
-      // Unhide all PI tabs for CHQ users/units as per request
+      // Logic for isolation:
+      // Unit-specific hiding always takes precedence.
+      if (unitHidden.includes(def.id)) return false;
+      
+      // For CHQ users, we ignore the group-level batch hiding (satisfying the unhide request),
+      // but if the unit specifically had its own tab hidden, that's respected.
       if (subjectUser.role === UserRole.CHQ) return true;
-      return !allHidden.includes(def.id);
+      
+      // For others, we check both levels.
+      return !groupHidden.includes(def.id);
     })
     .map((def) => {
       const isPercentagePI = ["PI4", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(def.id);
@@ -610,11 +618,15 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
   const handleAddActivity = () => {
     if (!isSuperAdmin || !currentPI) return;
     const newId = `custom_row_${Date.now()}`;
-    const storedIds = localStorage.getItem(`pi_activity_ids_${dashboardYear}_${activeTab}`);
+    // Use unit-specific activity ID key
+    const unitStorageKey = `pi_activity_ids_${dashboardYear}_${subjectUser.id}_${activeTab}`;
+    const globalStorageKey = `pi_activity_ids_${dashboardYear}_${activeTab}`;
+    
+    const storedIds = localStorage.getItem(unitStorageKey) || localStorage.getItem(globalStorageKey);
     const activityIds = storedIds ? JSON.parse(storedIds) : currentPI.activities.map(a => a.id);
     
     const updatedIds = [...activityIds, newId];
-    localStorage.setItem(`pi_activity_ids_${dashboardYear}_${activeTab}`, JSON.stringify(updatedIds));
+    localStorage.setItem(unitStorageKey, JSON.stringify(updatedIds));
     localStorage.setItem(`pi_activity_name_${dashboardYear}_${activeTab}_${newId}`, "New Activity");
     localStorage.setItem(`pi_indicator_name_${dashboardYear}_${activeTab}_${newId}`, "New Indicator");
     
@@ -627,14 +639,16 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
       e.preventDefault();
     }
     
-    if (!isSuperAdmin || !window.confirm("Are you sure you want to delete this activity? This will remove it for ALL accounts.")) return;
-    const storedIds = localStorage.getItem(`pi_activity_ids_${dashboardYear}_${activeTab}`);
+    if (!isSuperAdmin || !window.confirm(`Are you sure you want to delete this activity row for ${subjectUser.name} ONLY? This will not affect other units.`)) return;
+    
+    const unitStorageKey = `pi_activity_ids_${dashboardYear}_${subjectUser.id}_${activeTab}`;
+    const globalStorageKey = `pi_activity_ids_${dashboardYear}_${activeTab}`;
+    
+    const storedIds = localStorage.getItem(unitStorageKey) || localStorage.getItem(globalStorageKey);
     const activityIds = storedIds ? JSON.parse(storedIds) : currentPI.activities.map(a => a.id);
     
     const newIds = activityIds.filter((id: string) => id !== activityId);
-    localStorage.setItem(`pi_activity_ids_${dashboardYear}_${activeTab}`, JSON.stringify(newIds));
-    localStorage.removeItem(`pi_activity_name_${dashboardYear}_${activeTab}_${activityId}`);
-    localStorage.removeItem(`pi_indicator_name_${dashboardYear}_${activeTab}_${activityId}`);
+    localStorage.setItem(unitStorageKey, JSON.stringify(newIds));
     
     refreshData();
   };
@@ -657,16 +671,16 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
     
     if (!isSuperAdmin) return;
 
-    // Visibility management logic - now granular by unit
+    // Visibility management logic - now strictly unit-granular
     const storageKey = `hidden_pis_${subjectUser.id}`;
     const groupName = subjectUser.name;
 
-    if (!window.confirm(`Hide tab ${piId} for ${groupName} ONLY? This will NOT hide it for other units.`)) return;
+    if (!window.confirm(`Hide tab ${piId} for ${groupName} ONLY? This will NOT hide it for other CHQ or Station users.`)) return;
     
     const hidden = JSON.parse(localStorage.getItem(storageKey) || '[]');
     if (!hidden.includes(piId)) {
         localStorage.setItem(storageKey, JSON.stringify([...hidden, piId]));
-        // Trigger a global refresh
+        // Trigger a global refresh to update sidebar logic if needed
         window.dispatchEvent(new Event('storage'));
     }
   };
@@ -743,18 +757,13 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
         {isSuperAdmin && (
             <button 
                 onClick={() => { 
-                    // Clear all possible hidden PI keys
-                    for (let i = 0; i < localStorage.length; i++) {
-                      const key = localStorage.key(i);
-                      if (key && key.startsWith('hidden_pis_')) {
-                        localStorage.removeItem(key);
-                      }
-                    }
+                    // Restore only for this specific unit
+                    localStorage.removeItem(`hidden_pis_${subjectUser.id}`);
                     window.location.reload(); 
                 }} 
                 className="px-6 py-3 bg-blue-600 text-white font-black rounded-2xl shadow-lg hover:bg-blue-700 transition active:scale-95"
             >
-                Restore All System Tabs
+                Restore Unit Tabs
             </button>
         )}
       </div>
@@ -883,7 +892,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
                           <button onClick={() => handleLabelEdit(rIdx, 'activity', row.activity)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition" title="Edit Activity">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                           </button>
-                          <button onClick={(e) => handleDeleteActivity(row.id, e)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition" title="Delete Activity">
+                          <button onClick={(e) => handleDeleteActivity(row.id, e)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition" title="Delete Activity row locally">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                           </button>
                         </div>
@@ -912,7 +921,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
                       <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition shadow-sm">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
                       </div>
-                      Add New Activity Row
+                      Add New Activity Row (Local to this Unit)
                     </button>
                   </td>
                 </tr>
