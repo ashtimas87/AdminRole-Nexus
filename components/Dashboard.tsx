@@ -479,7 +479,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           )}
         </div>
 
-        {user.role !== UserRole.STATION && (
+        {user.role !== UserRole.STATION && !(user.role === UserRole.CHQ && view === 'chq-landing') && (
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">System</p>
             <div className="space-y-1.5">
