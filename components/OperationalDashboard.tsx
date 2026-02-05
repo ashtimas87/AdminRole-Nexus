@@ -373,7 +373,13 @@ const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
     }
   ];
 
-  return baseDefinitions.map(pi => {
+  // Fetch custom PIs from localStorage
+  const storedCustomPIsStr = localStorage.getItem(`custom_pi_definitions_${year}`);
+  const customPIs = storedCustomPIsStr ? JSON.parse(storedCustomPIsStr) : [];
+  
+  const allDefinitions = [...baseDefinitions, ...customPIs];
+
+  return allDefinitions.map(pi => {
     const storedIds = localStorage.getItem(`pi_activity_ids_${year}_${pi.id}`);
     let activityIds = storedIds ? JSON.parse(storedIds) : pi.activities.map(a => a.id);
 
@@ -506,6 +512,31 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
     return piData.find(pi => pi.id === activeTab) || piData[0];
   }, [piData, activeTab]);
 
+  // Calculate Column Totals
+  const columnTotals = useMemo(() => {
+    if (!currentPI) return { monthly: Array(12).fill(0), grand: 0 };
+    const monthlyTotals = Array(12).fill(0);
+    let grandTotal = 0;
+    
+    const isPercent = ["PI4", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(activeTab);
+
+    currentPI.activities.forEach(act => {
+      act.months.forEach((m, mIdx) => {
+        monthlyTotals[mIdx] += m.value;
+      });
+      grandTotal += isPercent ? Math.round(act.total / 12) : act.total;
+    });
+
+    if (isPercent) {
+      // For percentage PIs, the bottom total row should ideally be an average of activity percentages
+      const averagedMonthly = monthlyTotals.map(v => currentPI.activities.length > 0 ? Math.round(v / currentPI.activities.length) : 0);
+      const averagedGrand = currentPI.activities.length > 0 ? Math.round(grandTotal / currentPI.activities.length) : 0;
+      return { monthly: averagedMonthly, grand: averagedGrand, isPercent: true };
+    }
+
+    return { monthly: monthlyTotals, grand: grandTotal, isPercent: false };
+  }, [currentPI, activeTab]);
+
   const handleCellClick = (rowIdx: number, monthIdx: number, val: number) => {
     const canEdit = (isSuperAdmin && dataMode !== 'consolidated') || (currentUser.role === UserRole.STATION && currentUser.id === subjectUser.id);
     if (canEdit) {
@@ -523,9 +554,36 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
     setEditingCell(null);
   };
 
+  const handleAddPI = () => {
+    if (!isSuperAdmin) return;
+    const newPIId = `PI_CUSTOM_${Date.now()}`;
+    const newTitle = "New Performance Indicator";
+    const activityId = `act_${Date.now()}`;
+    
+    const newPIDef = {
+      id: newPIId,
+      title: newTitle,
+      activities: [
+        { 
+          id: activityId, 
+          name: "New Activity Template", 
+          indicator: "New Indicator Template", 
+          defaults: Array(12).fill(0) 
+        }
+      ]
+    };
+
+    const storedCustomPIsStr = localStorage.getItem(`custom_pi_definitions_${dashboardYear}`);
+    const customPIs = storedCustomPIsStr ? JSON.parse(storedCustomPIsStr) : [];
+    
+    localStorage.setItem(`custom_pi_definitions_${dashboardYear}`, JSON.stringify([...customPIs, newPIDef]));
+    setActiveTab(newPIId);
+    refreshData();
+  };
+
   const handleAddActivity = () => {
     if (!isSuperAdmin || !currentPI) return;
-    const newId = `custom_${Date.now()}`;
+    const newId = `custom_row_${Date.now()}`;
     const storedIds = localStorage.getItem(`pi_activity_ids_${dashboardYear}_${activeTab}`);
     const activityIds = storedIds ? JSON.parse(storedIds) : currentPI.activities.map(a => a.id);
     
@@ -645,7 +703,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
     return (
       <div className="p-12 text-center bg-white rounded-3xl border border-slate-200">
         <p className="text-slate-500 font-bold">All performance indicators have been deleted.</p>
-        <button onClick={() => { localStorage.removeItem('deleted_pi_ids'); window.location.reload(); }} className="mt-4 text-blue-600 font-bold underline">Restore Defaults</button>
+        <button onClick={() => { localStorage.removeItem('deleted_pi_ids'); localStorage.removeItem(`custom_pi_definitions_${dashboardYear}`); window.location.reload(); }} className="mt-4 text-blue-600 font-bold underline">Restore Defaults</button>
       </div>
     );
   }
@@ -678,14 +736,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
       </div>
 
       <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
-        <div className="flex gap-1.5 whitespace-nowrap">
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
           {piData.map((pi) => (
             <div key={pi.id} className="relative group/tab">
               <button 
                 onClick={() => setActiveTab(pi.id)} 
                 className={`px-4 py-2 rounded-lg text-xs font-black transition-all border flex items-center gap-2 ${activeTab === pi.id ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
               >
-                PI {pi.id.replace('PI', '')}
+                {pi.id.includes('CUSTOM') ? 'NEW PI' : `PI ${pi.id.replace('PI', '')}`}
                 {isSuperAdmin && (
                   <span 
                     onClick={(e) => handleDeletePI(pi.id, e)} 
@@ -698,6 +756,15 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
               </button>
             </div>
           ))}
+          {isSuperAdmin && (
+            <button 
+              onClick={handleAddPI}
+              className="px-4 py-2 rounded-lg text-xs font-black bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition shadow-sm"
+              title="Add New PI Tab"
+            >
+              + Add PI
+            </button>
+          )}
         </div>
       </div>
 
@@ -707,7 +774,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
                <input autoFocus className="max-w-xl flex-1 font-black text-slate-800 text-center uppercase border-b-2 border-blue-500 outline-none" value={textEditValue} onChange={(e) => setTextEditValue(e.target.value)} onBlur={saveHeader} onKeyDown={(e) => e.key === 'Enter' && saveHeader()} />
              ) : (
                <h3 onClick={handleHeaderEdit} className={`inline-block font-black text-slate-800 text-base uppercase ${isSuperAdmin ? 'cursor-pointer hover:bg-blue-50 px-2 rounded transition' : ''}`}>
-                 PI # {activeTab.replace('PI', '')} – {currentPI.title}
+                 PI {activeTab.replace('PI', '')} – {currentPI.title}
                </h3>
              )}
         </div>
@@ -769,6 +836,19 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
                   </tr>
                 );
               })}
+              {/* Grand Total Row */}
+              <tr className="bg-slate-100/80 font-black border-t-2 border-slate-400">
+                <td colSpan={2} className="border border-slate-300 p-2 text-right uppercase text-slate-900 tracking-tight">Grand Total</td>
+                {columnTotals.monthly.map((total, idx) => (
+                  <td key={idx} className="border border-slate-300 p-1.5 text-center text-slate-900 bg-white/50">
+                    {total}{columnTotals.isPercent ? '%' : ''}
+                  </td>
+                ))}
+                <td className="border border-slate-300 p-1.5 text-center text-white bg-slate-900">
+                  {columnTotals.grand}{columnTotals.isPercent ? '%' : ''}
+                </td>
+                {isSuperAdmin && <td className="border border-slate-300 bg-slate-200"></td>}
+              </tr>
               {isSuperAdmin && (
                 <tr className="bg-slate-50/50">
                   <td colSpan={isSuperAdmin ? 16 : 15} className="border border-slate-300 p-4 text-center">
