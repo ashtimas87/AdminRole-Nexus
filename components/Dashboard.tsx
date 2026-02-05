@@ -17,6 +17,7 @@ type ViewType =
   | 'tactical-dashboard'
   | 'chq-landing'
   | 'tactical-landing'
+  | 'unit-landing'
   | 'user-selection';
 
 const YEAR_CONFIG = [
@@ -27,7 +28,7 @@ const YEAR_CONFIG = [
 ];
 
 const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, onLogout }) => {
-  const [view, setView] = useState<ViewType>('overview');
+  const [view, setView] = useState<ViewType>(user.role === UserRole.CHQ ? 'chq-landing' : (user.role === UserRole.STATION ? 'tactical-landing' : 'overview'));
   const [selectedYear, setSelectedYear] = useState<string>('2026');
   const [selectedOverviewUser, setSelectedOverviewUser] = useState<User | null>(null);
   const [usersList, setUsersList] = useState<User[]>(() => {
@@ -285,7 +286,11 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
   );
 
   const renderChqLanding = () => {
-    const chqUsers = usersList.filter(u => u.role === UserRole.CHQ);
+    let chqUsers = usersList.filter(u => u.role === UserRole.CHQ);
+    // Filter to only show the logged-in user's own CHQ dashboard if they have the CHQ role
+    if (user.role === UserRole.CHQ) {
+      chqUsers = chqUsers.filter(u => u.id === user.id);
+    }
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -295,7 +300,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           {chqUsers.map(u => (
             <div 
               key={u.id}
-              onClick={() => { setSelectedOverviewUser(u); setDashboardView('chq-operational-dashboard', selectedYear); }}
+              onClick={() => { setSelectedOverviewUser(u); setView('unit-landing'); }}
               className="p-5 bg-white border border-slate-200 rounded-2xl hover:border-emerald-500 cursor-pointer transition shadow-sm group"
             >
               <div className="flex items-center gap-4">
@@ -313,7 +318,11 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
   };
 
   const renderTacticalLanding = () => {
-    const stationUsers = usersList.filter(u => u.role === UserRole.STATION);
+    let stationUsers = usersList.filter(u => u.role === UserRole.STATION);
+    // Filter to only show the logged-in user's own Station dashboard if they have the STATION role
+    if (user.role === UserRole.STATION) {
+      stationUsers = stationUsers.filter(u => u.id === user.id);
+    }
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -323,7 +332,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           {stationUsers.map(u => (
             <div 
               key={u.id}
-              onClick={() => { setSelectedOverviewUser(u); setDashboardView('tactical-dashboard', selectedYear); }}
+              onClick={() => { setSelectedOverviewUser(u); setView('unit-landing'); }}
               className="p-5 bg-white border border-slate-200 rounded-2xl hover:border-orange-500 cursor-pointer transition shadow-sm group"
             >
               <div className="flex items-center gap-4">
@@ -336,6 +345,49 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                 </div>
               </div>
             </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderUnitLanding = () => {
+    if (!selectedOverviewUser) return null;
+    const isChq = selectedOverviewUser.role === UserRole.CHQ;
+    const dashboardType = isChq ? 'chq-operational-dashboard' : 'tactical-dashboard';
+    const backView = isChq ? 'chq-landing' : 'tactical-landing';
+
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <button onClick={() => setView(backView)} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 transition">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+          Back to Units
+        </button>
+
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-6">
+          <img src={selectedOverviewUser.avatar} className="w-20 h-20 rounded-2xl border-2 border-slate-100" />
+          <div>
+            <h2 className="text-4xl font-black text-slate-900">
+              {selectedOverviewUser.name} {isChq ? 'CHQ Dashboard' : 'Tactical Dashboard'}
+            </h2>
+            <p className="text-slate-500 font-medium uppercase tracking-widest text-xs mt-1">Select operational year to review unit performance</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {YEAR_CONFIG.map(cfg => (
+            <button 
+              key={cfg.year}
+              onClick={() => { setDashboardView(dashboardType, cfg.year); }}
+              className={`p-6 bg-white border border-slate-200 rounded-2xl hover:shadow-lg transition group text-left relative overflow-hidden ${isChq ? 'hover:border-emerald-500' : 'hover:border-orange-500'}`}
+            >
+              <div className={`absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 rounded-full blur-3xl opacity-5 group-hover:opacity-10 transition ${isChq ? 'bg-emerald-500' : 'bg-orange-500'}`}></div>
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition group-hover:text-white ${isChq ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600' : 'bg-orange-50 text-orange-600 group-hover:bg-orange-600'}`}>
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={cfg.icon} /></svg>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900">{selectedOverviewUser.name} Dashboard {cfg.year}</h3>
+              <p className="text-slate-500 text-sm mt-1">Unit specific data for fiscal year {cfg.year}</p>
+            </button>
           ))}
         </div>
       </div>
@@ -374,90 +426,101 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           </div>
         )}
 
-        <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Monitoring</p>
-          <div className="space-y-1.5">
-            <button 
-              onClick={() => { setView('overview'); setSelectedOverviewUser(null); }}
-              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'overview' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
-            >
-              COCPO Operational Dashboards
-              <svg className={`w-4 h-4 ${view === 'overview' ? 'text-white' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-            </button>
-          </div>
-        </div>
-
-        {(user.role !== UserRole.STATION) && (
-          <div className="space-y-3">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">City Headquarters & Tactical Units</p>
-            {!deletedCategories.includes('CHQ') && (
+        {user.role !== UserRole.STATION && (
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Monitoring</p>
+            <div className="space-y-1.5">
               <button 
-                onClick={() => setView('chq-landing')}
-                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group relative ${view === 'chq-landing' || view === 'chq-operational-dashboard' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                onClick={() => { setView('overview'); setSelectedOverviewUser(null); }}
+                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'overview' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
               >
-                CHQ Dashboards
-                <div className="flex items-center gap-2">
-                  {user.role === UserRole.SUPER_ADMIN && (
-                    <span onClick={(e) => handleDeleteCategory('CHQ', e)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </span>
-                  )}
-                  <svg className={`w-4 h-4 ${view === 'chq-landing' || view === 'chq-operational-dashboard' ? 'text-white' : 'text-emerald-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m-1 4h1m5-8h1m-1 4h1m-1 4h1" /></svg>
-                </div>
+                COCPO Operational Dashboards
+                <svg className={`w-4 h-4 ${view === 'overview' ? 'text-white' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
               </button>
-            )}
-            {!deletedCategories.includes('TACTICAL') && (
-              <button 
-                onClick={() => setView('tactical-landing')}
-                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group relative ${view === 'tactical-landing' || view === 'tactical-dashboard' ? 'bg-orange-600 text-white shadow-lg' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'}`}
-              >
-                Tactical Dashboards
-                <div className="flex items-center gap-2">
-                  {user.role === UserRole.SUPER_ADMIN && (
-                    <span onClick={(e) => handleDeleteCategory('TACTICAL', e)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </span>
-                  )}
-                  <svg className={`w-4 h-4 ${view === 'tactical-landing' || view === 'tactical-dashboard' ? 'text-white' : 'text-orange-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                </div>
-              </button>
-            )}
+            </div>
           </div>
         )}
 
-        <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">System</p>
-          <div className="space-y-1.5">
+        <div className="space-y-3">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+            {user.role === UserRole.STATION ? 'Tactical Units' : 'City Headquarters & Tactical Units'}
+          </p>
+          {!deletedCategories.includes('CHQ') && user.role !== UserRole.STATION && (
             <button 
-              onClick={() => { setView('user-selection'); setSelectedOverviewUser(null); }} 
-              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'user-selection' ? 'bg-slate-700 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              onClick={() => { setView('chq-landing'); setSelectedOverviewUser(null); }}
+              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group relative ${view === 'chq-landing' || (selectedOverviewUser?.role === UserRole.CHQ && (view === 'chq-operational-dashboard' || view === 'unit-landing')) ? 'bg-emerald-600 text-white shadow-lg' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
             >
-              Unit Select
-              <span className="text-[9px] font-black bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded uppercase">Inspect</span>
+              CHQ Dashboards
+              <div className="flex items-center gap-2">
+                {user.role === UserRole.SUPER_ADMIN && (
+                  <span onClick={(e) => handleDeleteCategory('CHQ', e)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </span>
+                )}
+                <svg className={`w-4 h-4 ${view === 'chq-landing' || (selectedOverviewUser?.role === UserRole.CHQ && (view === 'chq-operational-dashboard' || view === 'unit-landing')) ? 'text-white' : 'text-emerald-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m-1 4h1m5-8h1m-1 4h1m-1 4h1" /></svg>
+              </div>
             </button>
-            {user.role === UserRole.SUPER_ADMIN && deletedCategories.length > 0 && (
-              <button 
-                onClick={restoreSystemTabs}
-                className="w-full text-left px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wider text-blue-600 hover:bg-blue-50 transition"
-              >
-                Restore System Tabs
-              </button>
-            )}
-          </div>
+          )}
+          {!deletedCategories.includes('TACTICAL') && (
+            <button 
+              onClick={() => { setView('tactical-landing'); setSelectedOverviewUser(null); }}
+              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group relative ${view === 'tactical-landing' || (selectedOverviewUser?.role === UserRole.STATION && (view === 'tactical-dashboard' || view === 'unit-landing')) ? 'bg-orange-600 text-white shadow-lg' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'}`}
+            >
+              Tactical Dashboards
+              <div className="flex items-center gap-2">
+                {user.role === UserRole.SUPER_ADMIN && (
+                  <span onClick={(e) => handleDeleteCategory('TACTICAL', e)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </span>
+                )}
+                <svg className={`w-4 h-4 ${view === 'tactical-landing' || (selectedOverviewUser?.role === UserRole.STATION && (view === 'tactical-dashboard' || view === 'unit-landing')) ? 'text-white' : 'text-orange-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              </div>
+            </button>
+          )}
         </div>
+
+        {user.role !== UserRole.STATION && (
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">System</p>
+            <div className="space-y-1.5">
+              <button 
+                onClick={() => { setView('user-selection'); setSelectedOverviewUser(null); }} 
+                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'user-selection' ? 'bg-slate-700 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              >
+                Unit Select
+                <span className="text-[9px] font-black bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded uppercase">Inspect</span>
+              </button>
+              {user.role === UserRole.SUPER_ADMIN && deletedCategories.length > 0 && (
+                <button 
+                  onClick={restoreSystemTabs}
+                  className="w-full text-left px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wider text-blue-600 hover:bg-blue-50 transition"
+                >
+                  Restore System Tabs
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 
   const renderUserSelection = () => {
-    const chqUsers = usersList.filter(u => u.role === UserRole.CHQ);
-    const stationUsers = usersList.filter(u => u.role === UserRole.STATION);
+    let chqUsers = usersList.filter(u => u.role === UserRole.CHQ);
+    let stationUsers = usersList.filter(u => u.role === UserRole.STATION);
     const isSuperAdmin = user.role === UserRole.SUPER_ADMIN;
+
+    // Station users can only see their own account in the inspection list.
+    // CHQ and Admin users can see the full set for monitoring.
+    if (user.role === UserRole.STATION) {
+      stationUsers = stationUsers.filter(u => u.id === user.id);
+      chqUsers = [];
+    }
     
     return (
       <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex items-center justify-between">
-          <button onClick={() => setView('overview')} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 transition">
+          <button onClick={() => setView(user.role === UserRole.CHQ ? 'chq-landing' : (user.role === UserRole.STATION ? 'tactical-landing' : 'overview'))} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 transition">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
             Back
           </button>
@@ -467,7 +530,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          {!deletedCategories.includes('CHQ') && (
+          {!deletedCategories.includes('CHQ') && (chqUsers.length > 0) && (
             <div className="space-y-6">
               <div className="flex items-center justify-between border-b pb-2">
                 <h3 className="text-xl font-black">Administrative Units</h3>
@@ -484,7 +547,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                 {chqUsers.map(u => (
                   <div key={u.id} className="relative group">
                     <div 
-                      onClick={() => { setSelectedOverviewUser(u); setDashboardView('chq-operational-dashboard', selectedYear); }} 
+                      onClick={() => { setSelectedOverviewUser(u); setView('unit-landing'); }} 
                       className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-indigo-500 transition-all text-left cursor-pointer shadow-sm group-hover:shadow-md"
                     >
                       <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
@@ -520,7 +583,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
               </div>
             </div>
           )}
-          {!deletedCategories.includes('TACTICAL') && (
+          {!deletedCategories.includes('TACTICAL') && (stationUsers.length > 0) && (
             <div className="space-y-6">
               <div className="flex items-center justify-between border-b pb-2">
                 <h3 className="text-xl font-black">Station Accounts</h3>
@@ -545,7 +608,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                 {stationUsers.map(u => (
                   <div key={u.id} className="relative group">
                     <div 
-                      onClick={() => { setSelectedOverviewUser(u); setDashboardView('tactical-dashboard', selectedYear); }} 
+                      onClick={() => { setSelectedOverviewUser(u); setView('unit-landing'); }} 
                       className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-orange-500 transition-all text-left cursor-pointer shadow-sm group-hover:shadow-md"
                     >
                       <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
@@ -614,9 +677,10 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           {view === 'user-selection' && renderUserSelection()}
           {view === 'chq-landing' && renderChqLanding()}
           {view === 'tactical-landing' && renderTacticalLanding()}
+          {view === 'unit-landing' && renderUnitLanding()}
           {view === 'operational-dashboard' && <OperationalDashboard title={`OPERATIONAL DASHBOARD ${selectedYear}`} onBack={() => setView('overview')} currentUser={user} subjectUser={selectedOverviewUser || user} />}
-          {view === 'chq-operational-dashboard' && <OperationalDashboard title={`CHQ DASHBOARD ${selectedYear}`} onBack={() => setView('chq-landing')} currentUser={user} subjectUser={selectedOverviewUser || user} />}
-          {view === 'tactical-dashboard' && <OperationalDashboard title={`TACTICAL DASHBOARD ${selectedYear}`} onBack={() => setView('tactical-landing')} currentUser={user} subjectUser={selectedOverviewUser || user} />}
+          {view === 'chq-operational-dashboard' && <OperationalDashboard title={`CHQ CONSOLIDATED DASHBOARD ${selectedYear}`} onBack={() => setView('chq-landing')} currentUser={user} subjectUser={selectedOverviewUser || user} />}
+          {view === 'tactical-dashboard' && <OperationalDashboard title={`TACTICAL CONSOLIDATED DASHBOARD ${selectedYear}`} onBack={() => setView('tactical-landing')} currentUser={user} subjectUser={selectedOverviewUser || user} />}
         </div>
         <div className="lg:col-span-1">{renderSidebar()}</div>
       </div>
