@@ -100,7 +100,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
           <div className="relative z-10 space-y-4">
             <div className="flex items-center gap-4 text-sm bg-white/5 border border-white/10 p-4 rounded-xl backdrop-blur-sm">
               <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-              <span>Status: Healthy</span>
+              <span>Status: Active</span>
             </div>
             <div className="text-slate-500 text-xs">
               © 2025 AdminRole System
