@@ -177,15 +177,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             </div>
           </div>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {managedUsers.slice(0, 3).map((statUser, i) => (
-            <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
-              <p className="text-sm font-medium text-slate-500 mb-1">{statUser.name}</p>
-              <h3 className="text-2xl font-bold text-slate-900">88%</h3>
-            </div>
-          ))}
-        </div>
       </div>
     );
   };
