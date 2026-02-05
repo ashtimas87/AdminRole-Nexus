@@ -94,7 +94,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
               </svg>
             </div>
             <h2 className="text-4xl font-bold mb-4 leading-tight">Real-Time Monitoring System</h2>
-            <p className="text-slate-400 text-lg">Managing of Unit Dashboard Accomplishment</p>
+            <p className="text-slate-400 text-lg">Managing Unit Accomplishment</p>
           </div>
 
           <div className="relative z-10 space-y-4">
