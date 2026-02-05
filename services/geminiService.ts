@@ -1,7 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
 import { UserRole } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy-initialize the AI client to handle environments where process.env might be shimmed later
+const getAIClient = () => {
+  const apiKey = (typeof process !== 'undefined' && process.env?.API_KEY) ? process.env.API_KEY : '';
+  return new GoogleGenAI({ apiKey });
+};
 
 // Local fallbacks to maintain the "AI insight" experience when quota is exhausted
 const LOCAL_INSIGHTS: Record<UserRole, string[]> = {
@@ -32,22 +36,17 @@ const getRandomLocalInsight = (role: UserRole) => {
   return insights[Math.floor(Math.random() * insights.length)];
 };
 
-// Simple in-memory cache to prevent redundant hits on the same session
 const insightCache: Record<string, string> = {};
 
-/**
- * Helper to perform API calls with exponential backoff for retryable errors.
- * 429 Quota errors are caught immediately to trigger local fallbacks.
- */
-async function callWithRetry(fn: () => Promise<any>, role: UserRole, maxRetries = 2, baseDelay = 1000) {
+async function callWithRetry(fn: (ai: any) => Promise<any>, role: UserRole, maxRetries = 2, baseDelay = 1000) {
+  const ai = getAIClient();
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      return await fn();
+      return await fn(ai);
     } catch (error: any) {
       const errorMsg = error?.message || "";
       const isQuotaExhausted = errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('RESOURCE_EXHAUSTED');
       
-      // If quota is exhausted, don't keep retrying; return local fallback immediately
       if (isQuotaExhausted) {
         console.warn(`Gemini Quota Exhausted. Using local insight engine for ${role}.`);
         return getRandomLocalInsight(role);
@@ -64,14 +63,13 @@ async function callWithRetry(fn: () => Promise<any>, role: UserRole, maxRetries 
 }
 
 export const getRoleInsight = async (role: UserRole) => {
-  // Check cache first
   if (insightCache[role]) {
     return insightCache[role];
   }
 
   try {
-    const text = await callWithRetry(async () => {
-      const response = await ai.models.generateContent({
+    const text = await callWithRetry(async (aiClient) => {
+      const response = await aiClient.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Provide a professional, concise 2-sentence morning greeting and a strategic tip for a ${role} user in a logistics and operations management platform. Do not use markdown formatting.`,
         config: {
