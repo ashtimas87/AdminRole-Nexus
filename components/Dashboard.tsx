@@ -28,6 +28,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [insight, setInsight] = useState<string>('');
   const [isInsightLoading, setIsInsightLoading] = useState<boolean>(true);
+  const [isOperationalOpen, setIsOperationalOpen] = useState<boolean>(true); // Hide/unhide state
   
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
 
@@ -101,12 +102,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       <h3 className="text-lg font-bold text-slate-800 mb-2">Control Panel</h3>
       <p className="text-xs text-slate-500 mb-6">{selectedOverviewUser ? `Currently viewing: ${selectedOverviewUser.name}` : roleConfig.desc}</p>
       
-      <div className="space-y-3">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Navigation</p>
-        
-        <div className="space-y-2">
-          {user.role === UserRole.SUPER_ADMIN && (
-            <>
+      <div className="space-y-6">
+        {user.role === UserRole.SUPER_ADMIN && (
+          <div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Core Functions</p>
+            <div className="space-y-2">
               <button 
                 onClick={() => { setView('accounts'); setSelectedOverviewUser(null); }}
                 className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'accounts' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
@@ -121,48 +121,61 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 Deployment
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
               </button>
-            </>
-          )}
+            </div>
+          </div>
+        )}
 
-          {user.role !== UserRole.STATION && (
-            <>
-              <button 
-                onClick={() => setDashboardView('operational-dashboard', '2025')}
-                className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'operational-dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}`}
-              >
-                Operational Dashboard
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-              </button>
-              
-              <button 
-                onClick={() => setDashboardView('chq-operational-dashboard', '2025')}
-                className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'chq-operational-dashboard' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
-              >
-                CHQ Dashboard
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m-1 4h1m5-8h1m-1 4h1m-1 4h1" /></svg>
-              </button>
-            </>
-          )}
-
+        <div>
           <button 
-            onClick={() => setDashboardView('tactical-dashboard', '2025')}
-            className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'tactical-dashboard' ? 'bg-slate-700 text-white shadow-lg shadow-slate-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+            onClick={() => setIsOperationalOpen(!isOperationalOpen)}
+            className="w-full flex items-center justify-between group mb-3 focus:outline-none"
           >
-            Tactical Dashboard
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest group-hover:text-slate-600 transition">Operational Dashboards</p>
+            <div className="flex items-center gap-2">
+               <svg className={`w-3 h-3 text-slate-400 transition-transform duration-300 ${isOperationalOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+               </svg>
+            </div>
           </button>
+          
+          <div className={`space-y-3 overflow-hidden transition-all duration-300 ${isOperationalOpen ? 'max-h-[600px] opacity-100 pb-2' : 'max-h-0 opacity-0'}`}>
+            {user.role !== UserRole.STATION && (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  {['2026', '2025', '2024', '2023'].map((year) => (
+                    <button 
+                      key={year}
+                      onClick={() => setDashboardView('operational-dashboard', year)}
+                      className={`relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-300 active:scale-95 ${view === 'operational-dashboard' && selectedYear === year ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/50'}`}
+                    >
+                      <span className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-70">Ops Year</span>
+                      <span className="text-base font-black tracking-tight">{year}</span>
+                    </button>
+                  ))}
+                </div>
+                
+                <button 
+                  onClick={() => setDashboardView('chq-operational-dashboard', '2025')}
+                  className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'chq-operational-dashboard' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                >
+                  CHQ Dashboard
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m-1 4h1m5-8h1m-1 4h1m-1 4h1" /></svg>
+                </button>
+              </>
+            )}
 
-          <button 
-            onClick={() => { setView('overview'); setSelectedOverviewUser(null); }}
-            className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'overview' ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-          >
-            Overview
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-          </button>
+            <button 
+              onClick={() => setDashboardView('tactical-dashboard', '2025')}
+              className={`w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between group ${view === 'tactical-dashboard' ? 'bg-slate-700 text-white shadow-lg shadow-slate-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+            >
+              Tactical Dashboard
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-2 pt-1 border-t border-slate-100">
-          <div className="space-y-1.5 pt-2">
+        <div className="pt-2 border-t border-slate-100">
+          <div className="space-y-1.5">
             {user.role !== UserRole.STATION && (
               <button 
                 onClick={() => { setView('user-selection'); setSelectedYear('2025'); setSelectedOverviewUser(null); }} 
@@ -188,7 +201,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           </div>
         </div>
 
-        {/* AI Strategic Insight Card */}
         <div className="bg-white rounded-2xl border-2 border-indigo-50 shadow-sm p-6 relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
             <svg className="w-16 h-16 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -300,25 +312,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               </div>
             </div>
             <p className="text-slate-600 mb-8 leading-relaxed text-sm max-w-2xl">Your project is production-ready with Netlify. Automatic SSL, custom domain mapping, and lightning-fast edge delivery are available. The included <code>netlify.toml</code> ensures proper SPA routing.</p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
-              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                <span className="text-xs font-bold text-slate-700">SPA Routing Configured</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                <span className="text-xs font-bold text-slate-700">Node.js v20 Runtime</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                <span className="text-xs font-bold text-slate-700">Edge Delivery Optimized</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                <div className="w-2 h-2 rounded-full bg-slate-300"></div>
-                <span className="text-xs font-bold text-slate-400">Custom Domain Mapping</span>
-              </div>
-            </div>
           </div>
 
           <a 
@@ -330,53 +323,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             Go to Netlify Console
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
           </a>
-        </div>
-      </div>
-
-      <div className="bg-slate-900 rounded-3xl shadow-2xl p-10 text-white relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 via-blue-500 to-indigo-500"></div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 relative z-10">
-          <div>
-            <h3 className="text-2xl font-black mb-6 flex items-center gap-3">
-              <svg className="w-8 h-8 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Core Configuration
-            </h3>
-            <p className="text-slate-400 mb-8 leading-relaxed">To activate System Intelligence and secure data processing in production, the following environment variables are mandatory.</p>
-            
-            <div className="space-y-4">
-              <div className="p-5 bg-white/5 border border-white/10 rounded-2xl group hover:border-teal-500/50 transition-colors">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-black text-teal-400 uppercase tracking-[0.2em]">Environment Variable</span>
-                  <span className="px-2 py-0.5 bg-teal-500/20 text-teal-400 rounded-md text-[9px] font-black uppercase tracking-widest">Crucial</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <code className="text-xl font-mono font-bold text-white tracking-tight">API_KEY</code>
-                  <div className="px-2 py-1 bg-emerald-500/10 text-emerald-500 text-[10px] font-bold rounded border border-emerald-500/20">READY</div>
-                </div>
-                <p className="mt-3 text-xs text-slate-500 font-medium">Google Gemini Pro credentials for real-time strategic insights.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white/5 backdrop-blur-md rounded-2xl p-8 border border-white/10">
-            <h4 className="text-sm font-black mb-6 uppercase tracking-widest text-slate-400">Step-by-Step Deployment:</h4>
-            <div className="space-y-6">
-              {[
-                { step: "01", title: "Git Repository", desc: "Push your project to GitHub, GitLab, or Bitbucket." },
-                { step: "02", title: "Site Link", desc: "Select 'Import an existing project' in Netlify and connect your repo." },
-                { step: "03", title: "Variable Sync", desc: "Inject API_KEY into Site Settings > Environment variables." },
-                { step: "04", title: "Build & Deploy", desc: "Publish directory should be '.' - Netlify handles the rest." }
-              ].map((item, idx) => (
-                <div key={idx} className="flex gap-4 items-start">
-                  <span className="text-xs font-black text-teal-500 bg-teal-500/10 w-8 h-8 rounded-lg flex items-center justify-center shrink-0">{item.step}</span>
-                  <div>
-                    <p className="text-sm font-bold text-slate-200">{item.title}</p>
-                    <p className="text-xs text-slate-500 leading-relaxed">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -468,7 +414,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           {view === 'accounts' && renderAccountManagement()}
           {view === 'deployment' && renderDeployment()}
           {view === 'user-selection' && renderUserSelection()}
-          {view === 'operational-dashboard' && <OperationalDashboard title={`OPERATIONAL DASHBOARD`} onBack={() => { setView('overview'); setSelectedOverviewUser(null); }} currentUser={user} subjectUser={selectedOverviewUser || user} />}
+          {view === 'operational-dashboard' && <OperationalDashboard title={`OPERATIONAL DASHBOARD ${selectedYear}`} onBack={() => { setView('overview'); setSelectedOverviewUser(null); }} currentUser={user} subjectUser={selectedOverviewUser || user} />}
           {view === 'chq-operational-dashboard' && <OperationalDashboard title={`CHQ DASHBOARD`} onBack={() => { setView('overview'); setSelectedOverviewUser(null); }} currentUser={user} subjectUser={selectedOverviewUser || user} />}
           {view === 'tactical-dashboard' && <OperationalDashboard title={`TACTICAL DASHBOARD`} onBack={() => { setView('overview'); setSelectedOverviewUser(null); }} currentUser={user} subjectUser={selectedOverviewUser || user} />}
         </div>
