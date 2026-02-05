@@ -44,7 +44,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
   const [insight, setInsight] = useState<string>('');
   const [isInsightLoading, setIsInsightLoading] = useState<boolean>(true);
   
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', role: UserRole.STATION });
 
   const roleConfig = ROLE_LABELS[user.role];
 
@@ -86,11 +86,12 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
       setFormData({ 
         name: userToEdit.name, 
         email: userToEdit.email, 
-        password: userToEdit.password || '' 
+        password: userToEdit.password || '',
+        role: userToEdit.role
       });
     } else {
       setEditingUser(null);
-      setFormData({ name: '', email: '', password: '' });
+      setFormData({ name: '', email: '', password: '', role: UserRole.STATION });
     }
     setIsModalOpen(true);
   };
@@ -105,11 +106,11 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
       }
     } else {
       const newUser: User = {
-        id: `st-${Date.now()}`,
+        id: `${formData.role === UserRole.CHQ ? 'chq' : 'st'}-${Date.now()}`,
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        role: UserRole.STATION,
+        role: formData.role,
         avatar: `https://picsum.photos/seed/${formData.name}/100/100`
       };
       setUsersList(prev => [...prev, newUser]);
@@ -129,6 +130,23 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
         setSelectedOverviewUser(null);
         setView('overview');
       }
+    }
+  };
+
+  const handleResetUnitData = (targetUser: User, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (confirm(`WIPE ALL DATA: Are you sure you want to delete all accomplishment records for ${targetUser.name}? This cannot be undone.`)) {
+      // Iterate through localStorage and remove keys related to this user's accomplishments
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith(`accomplishment_`) || key.startsWith(`files_`)) && key.includes(`_${targetUser.id}_`)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+      alert(`All dashboard data for ${targetUser.name} has been cleared.`);
     }
   };
 
@@ -450,26 +468,33 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                   <div key={u.id} className="relative group">
                     <div 
                       onClick={() => { setSelectedOverviewUser(u); setDashboardView('chq-operational-dashboard', selectedYear); }} 
-                      className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-indigo-500 transition-all text-left cursor-pointer"
+                      className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-indigo-500 transition-all text-left cursor-pointer shadow-sm group-hover:shadow-md"
                     >
                       <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
                       <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-slate-400">CHQ UNIT</p></div>
                     </div>
                     {isSuperAdmin && (
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                        <button 
+                          onClick={(e) => handleResetUnitData(u, e)}
+                          className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition shadow-sm border border-amber-200"
+                          title="Reset All Unit Data"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /><path d="M10 11v6m4-6v6" /></svg>
+                        </button>
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleOpenModal(u); }} 
-                          className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition shadow-sm" 
-                          title="Edit Tab"
+                          className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition shadow-sm border border-blue-200" 
+                          title="Edit Unit/Role"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                         </button>
                         <button 
                           onClick={(e) => handleDeleteUser(u.id, e)} 
-                          className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition shadow-sm" 
-                          title="Delete Tab"
+                          className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition shadow-sm border border-red-200" 
+                          title="Delete Unit Account"
                         >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                       </div>
                     )}
@@ -486,26 +511,33 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                   <div key={u.id} className="relative group">
                     <div 
                       onClick={() => { setSelectedOverviewUser(u); setDashboardView('tactical-dashboard', selectedYear); }} 
-                      className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-orange-500 transition-all text-left cursor-pointer"
+                      className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-orange-500 transition-all text-left cursor-pointer shadow-sm group-hover:shadow-md"
                     >
                       <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
                       <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-slate-400">STATION UNIT</p></div>
                     </div>
                     {isSuperAdmin && (
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                        <button 
+                          onClick={(e) => handleResetUnitData(u, e)}
+                          className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition shadow-sm border border-amber-200"
+                          title="Reset All Unit Data"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /><path d="M10 11v6m4-6v6" /></svg>
+                        </button>
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleOpenModal(u); }} 
-                          className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition shadow-sm" 
-                          title="Edit Tab"
+                          className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition shadow-sm border border-blue-200" 
+                          title="Edit Unit/Role"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                         </button>
                         <button 
                           onClick={(e) => handleDeleteUser(u.id, e)} 
-                          className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition shadow-sm" 
-                          title="Delete Tab"
+                          className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition shadow-sm border border-red-200" 
+                          title="Delete Unit Account"
                         >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                       </div>
                     )}
@@ -551,14 +583,34 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8">
-            <h3 className="text-xl font-bold mb-6">{editingUser ? 'Edit Account' : 'New Account'}</h3>
+            <h3 className="text-xl font-bold mb-6">{editingUser ? 'Edit Unit Account' : 'New Unit Account'}</h3>
             <form onSubmit={handleSaveUser} className="space-y-4">
-              <input type="text" required placeholder="Name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border outline-none focus:ring-2 focus:ring-slate-900" />
-              <input type="email" required placeholder="Email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border outline-none focus:ring-2 focus:ring-slate-900" />
-              <input type="password" required placeholder="Password" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border outline-none focus:ring-2 focus:ring-slate-900" />
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Unit Name</label>
+                <input type="text" required placeholder="Name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Email</label>
+                <input type="email" required placeholder="Email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Password</label>
+                <input type="password" required placeholder="Password" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Account Tabbing (Category)</label>
+                <select 
+                  value={formData.role} 
+                  onChange={e => setFormData({ ...formData, role: e.target.value as UserRole })}
+                  className="w-full px-4 py-2.5 rounded-xl border outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                >
+                  <option value={UserRole.STATION}>Station Account</option>
+                  <option value={UserRole.CHQ}>CHQ (Administrative) Account</option>
+                </select>
+              </div>
               <div className="flex gap-3 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-3 rounded-xl border font-bold">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-slate-900 text-white font-bold">Save</button>
+                <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-slate-900 text-white font-bold">Save Changes</button>
               </div>
             </form>
           </div>
