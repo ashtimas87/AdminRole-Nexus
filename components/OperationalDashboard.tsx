@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { PIData, UserRole, User, MonthFile, MonthData, PIActivity } from '../types';
 import pptxgen from "pptxgenjs";
@@ -425,14 +426,16 @@ const generateStructuredPIs = (
 
   const definitions = getPIDefinitions(year, subjectUser.id, subjectUser.role);
   
+  // Determine if the current view is a CHQ Dashboard
+  const isChqDashboard = subjectUser.role === UserRole.CHQ || dashboardType === 'CHQ';
+
   // Visibility Filtering
   let groupHidden: string[] = [];
   const unitHidden: string[] = JSON.parse(localStorage.getItem(`hidden_pis_${subjectUser.id}`) || '[]');
   
   // Determine isolation group for batch hiding (primarily for Station roles)
-  if (subjectUser.role === UserRole.CHQ || dashboardType === 'CHQ') {
-    groupHidden = JSON.parse(localStorage.getItem('hidden_pis_CHQ') || '[]');
-  } else if (subjectUser.role === UserRole.STATION || dashboardType === 'TACTICAL') {
+  // This logic applies only when NOT a CHQ dashboard AND the subject user is a STATION.
+  if (!isChqDashboard && subjectUser.role === UserRole.STATION) {
     if (subjectUser.name === 'City Mobile Force Company') {
       groupHidden = JSON.parse(localStorage.getItem('hidden_pis_SPECIAL') || '[]');
     } else {
@@ -444,6 +447,11 @@ const generateStructuredPIs = (
     .filter(def => {
       // 1. Explicit override: Always show PI8 for CHQ CCADU (even if they try to hide it locally)
       if (subjectUser.name === 'CHQ CCADU' && def.id === 'PI8') return true;
+
+      // Unhide all activities on CHQ Dashboards (override all other hiding logic)
+      if (isChqDashboard) {
+        return true;
+      }
 
       // 2. Unit-specific hiding: If the subject user has explicitly hidden this PI from *their own* view,
       //    it should be hidden for them, regardless of their role.
@@ -693,7 +701,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
     const storageKey = `hidden_pis_${subjectUser.id}`;
     const groupName = subjectUser.name;
 
-    if (!window.confirm(`Hide tab ${piId} for ${groupName} ONLY? This will NOT hide it for other CHQ or Station users.`)) return;
+    if (!window.confirm(`Hide PI tab ${piId} for ${groupName} ONLY? This will NOT hide it for other CHQ or Station users.`)) return;
     
     const hidden = JSON.parse(localStorage.getItem(storageKey) || '[]');
     if (!hidden.includes(piId)) {
@@ -911,7 +919,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                           </button>
                           <button onClick={(e) => handleDeleteActivity(row.id, e)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition" title="Delete Activity row locally">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1  0 00-1 1v3M4 7h16" /></svg>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                           </button>
                         </div>
                       </td>

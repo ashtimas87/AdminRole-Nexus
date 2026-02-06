@@ -7,7 +7,8 @@ import { UserRole } from "../types";
  * Always use process.env.API_KEY exclusively.
  */
 const getAIClient = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  // Always use process.env.API_KEY directly as per guidelines.
+  return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 // Local fallbacks to maintain the "AI insight" experience when quota is exhausted
