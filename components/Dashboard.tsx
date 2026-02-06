@@ -212,8 +212,8 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
             <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center mb-4 group-hover:bg-slate-900 group-hover:text-white transition">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={cfg.icon} /></svg>
             </div>
-            <h3 className="text-xl font-bold text-slate-900">Operational Dashboard {cfg.year}</h3>
-            <p className="text-slate-500 text-sm mt-1">Review full year data logs</p>
+            <h3 className="text-xl font-bold text-slate-900">Consolidated Accomplishments {cfg.year}</h3>
+            <p className="text-slate-500 text-sm mt-1">Ultimate consolidation of CHQ and Tactical dashboards</p>
           </button>
         ))}
       </div>
@@ -368,7 +368,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           <img src={selectedOverviewUser.avatar} className="w-20 h-20 rounded-2xl border-2 border-slate-100" />
           <div>
             <h2 className="text-4xl font-black text-slate-900">
-              {selectedOverviewUser.name} {isChq ? 'CHQ Dashboard' : 'Tactical Dashboard'}
+              {selectedOverviewUser.name} {isChq ? 'Consolidated CHQ Dashboard' : 'Tactical Dashboard'}
             </h2>
             <p className="text-slate-500 font-medium uppercase tracking-widest text-xs mt-1">Select operational year to review unit performance</p>
           </div>
@@ -385,7 +385,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition group-hover:text-white ${isChq ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600' : 'bg-orange-50 text-orange-600 group-hover:bg-orange-600'}`}>
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={cfg.icon} /></svg>
               </div>
-              <h3 className="text-xl font-bold text-slate-900">{selectedOverviewUser.name} Dashboard {cfg.year}</h3>
+              <h3 className="text-xl font-bold text-slate-900">{isChq ? `${selectedOverviewUser.name} Consolidated Dashboard` : `${selectedOverviewUser.name} Dashboard`} {cfg.year}</h3>
               <p className="text-slate-500 text-sm mt-1">Unit specific data for fiscal year {cfg.year}</p>
             </button>
           ))}
@@ -434,7 +434,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                 onClick={() => { setView('overview'); setSelectedOverviewUser(null); }}
                 className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'overview' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
               >
-                COCPO Operational Dashboards
+                COCPO Consolidated Dashboards
                 <svg className={`w-4 h-4 ${view === 'overview' ? 'text-white' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
               </button>
             </div>
@@ -681,7 +681,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           {view === 'chq-landing' && renderChqLanding()}
           {view === 'tactical-landing' && renderTacticalLanding()}
           {view === 'unit-landing' && renderUnitLanding()}
-          {view === 'operational-dashboard' && <OperationalDashboard title={`OPERATIONAL DASHBOARD ${selectedYear}`} onBack={() => setView('overview')} currentUser={user} subjectUser={selectedOverviewUser || user} />}
+          {view === 'operational-dashboard' && <OperationalDashboard title={`CONSOLIDATED ACCOMPLISHMENTS ${selectedYear}`} onBack={() => setView('overview')} currentUser={user} subjectUser={selectedOverviewUser || user} />}
           {view === 'chq-operational-dashboard' && <OperationalDashboard title={`CHQ CONSOLIDATED DASHBOARD ${selectedYear}`} onBack={() => setView('chq-landing')} currentUser={user} subjectUser={selectedOverviewUser || user} />}
           {view === 'tactical-dashboard' && <OperationalDashboard title={`TACTICAL CONSOLIDATED DASHBOARD ${selectedYear}`} onBack={() => setView('tactical-landing')} currentUser={user} subjectUser={selectedOverviewUser || user} />}
         </div>

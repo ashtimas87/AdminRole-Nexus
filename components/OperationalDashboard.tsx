@@ -353,13 +353,24 @@ const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
       id: "PI28",
       title: "Number of investigative activities funded",
       activities: [
-        { id: "pi28_a1", name: "Monitoring of Investigation of Heinous and Sensational Crimes", indicator: "# monitored", defaults: [4, 0, 6, 4, 0, 4, 1, 2, 0, 1, 0, 6] },
-        { id: "pi28_a2", name: "Filing of Heinous and Sensational Crimes Case Filed", indicator: "# cases filed", defaults: [4, 0, 6, 4, 0, 4, 1, 2, 0, 1, 0, 3] },
-        { id: "pi28_a3", name: "Monitoring and Investigation of Violation of Specials laws monitored", indicator: "# monitored", defaults: [96, 121, 99, 116, 97, 82, 120, 98, 104, 125, 137, 147] },
-        { id: "pi28_a4", name: "Filing of Violation of Specials laws Case Filed", indicator: "# cases filed", defaults: [96, 121, 98, 116, 97, 82, 117, 97, 99, 110, 122, 121] },
-        { id: "pi28_a5", name: "Conduct follow-up investigation of WCPD Cases", indicator: "# conducted", defaults: [1, 1, 0, 1, 1, 2, 1, 2, 2, 4, 0, 2] },
-        { id: "pi28_a6", name: "Filing of cases against identified/neutralized suspects of WCPD", indicator: "# cases filed", defaults: [30, 15, 24, 24, 20, 26, 23, 28, 20, 29, 35, 15] },
-        { id: "pi28_a7", name: "Initiate community advocacy campaign to combat TIP/CICL/CAAC/VAWC", indicator: "Initiated", defaults: [66, 56, 51, 56, 56, 51, 48, 49, 48, 41, 32, 33] }
+        { id: "pi28_a1", name: "monitoring of Investigation of Heinous and Sensational Crimes", indicator: "No. of monitored Investigation of Heinous and Sensational Crimes", defaults: [4, 0, 6, 4, 0, 4, 1, 2, 0, 1, 0, 6] },
+        { id: "pi28_a2", name: "Filing of Heinous and Sensational Crimes", indicator: "No. of Heinous and Sensational Crimes Case Filed", defaults: [4, 0, 6, 4, 0, 4, 1, 2, 0, 1, 0, 3] },
+        { id: "pi28_a3", name: "Monitoring and Investigation of Violation of Specials laws", indicator: "No. of Investigation of Violation of Specials laws monitored", defaults: [96, 121, 99, 116, 97, 82, 120, 98, 104, 125, 137, 147] },
+        { id: "pi28_a4", name: "Filing of Violation of Specials laws", indicator: "No. Case Filed of Violation of Specials laws", defaults: [96, 121, 98, 116, 97, 82, 117, 97, 99, 110, 122, 121] },
+        { id: "pi28_a5", name: "Monitoring and Investigation Referred Cases", indicator: "No. of monitored Investigation Referred Cases", defaults: [40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 159, 226] },
+        { id: "pi28_a6", name: "Conducting cold case review for major cases", indicator: "No. of conducted cold case review for major cases", defaults: [40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 0] },
+        { id: "pi28_a7", name: "Reviewing of dismissed cases on illegal drugs, heinous and sensational cases", indicator: "No. of dismissed cases on illegal drugs, heinous and sensational cases reviewed", defaults: [40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 0] },
+        { id: "pi28_a8", name: "Reviewing of Death Incidents", indicator: "No. of Death Incidents reviewed", defaults: [40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 0] },
+        { id: "pi28_a9", name: "Case Review of WCPD Cases", indicator: "No. of Case Review of WCPD conducted", defaults: [0, 1, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0] },
+        { id: "pi28_a10", name: "Conduct of Rescue Operations & Extend Special Protection to Victims", indicator: "No. of Rescue Operations & Extend Special Protection to Victims conducted", defaults: [2, 1, 3, 2, 3, 3, 2, 2, 0, 7, 0, 2] },
+        { id: "pi28_a11", name: "Administer Mediation & Perform Initial Counseling Between on Domestic Violence Cases (No. of counseling conducted )", indicator: "No of Administer Mediation & Perform Initial Counseling Between on Domestic Violence Cases conducted", defaults: [5, 0, 1, 3, 0, 0, 0, 2, 0, 2, 0, 2] },
+        { id: "pi28_a12", name: "Maintain Closer Partnership and Liaising w/ RIACAT, IACVAWC, IACAP, UN Agencies and other Stakeholders", indicator: "No of liaising /coordination conducted on Maintain Closer Partnership and Liaising w/ RIACAT, IACVAWC, IACAP, UN Agencies and other Stakeholders", defaults: [13, 13, 13, 13, 13, 14, 13, 13, 13, 13, 13, 16] },
+        { id: "pi28_a13", name: "Investigation/case referral/monitoring of WCPD Cases", indicator: "No. of investigation/case referral/monitoring of WCPD Cases conducted", defaults: [27, 14, 24, 21, 20, 26, 24, 24, 25, 25, 35, 13] },
+        { id: "pi28_a14", name: "Investigation/case referral/monitoring of WCPD Cases", indicator: "No. of Investigation/case referral/monitoring of WCPD Cases referred", defaults: [11, 9, 13, 16, 11, 16, 13, 12, 10, 13, 20, 8] },
+        { id: "pi28_a15", name: "Conduct follow-up investigation of WCPD Cases", indicator: "No. of follow-up investigation of WCPD Cases conducted", defaults: [1, 1, 0, 1, 1, 2, 1, 2, 2, 4, 0, 2] },
+        { id: "pi28_a16", name: "Filing of cases against identified and/or neutralized suspects of WCPD cases", indicator: "No. of cases against identified and/or neutralized suspects of WCPD cases filed", defaults: [30, 15, 24, 24, 20, 26, 23, 28, 20, 29, 35, 15] },
+        { id: "pi28_a17", name: "Initiate community advocacy campaign to combat TIP/CICL/CAAC/VAWC", indicator: "No. of community advocacy campaign to combat TIP/CICL/CAAC/VAWC Initiated", defaults: [66, 56, 51, 56, 56, 51, 48, 49, 48, 41, 32, 33] },
+        { id: "pi28_a18", name: "Administer distribution of PNP Manual on Investigation of Trafficking in Person (Nr. Of PNP manuals distributed) (1st Qtr only)", indicator: "No. of distribution of PNP Manual on Investigation of Trafficking in Person Administered (PNP manuals distributed) (1st Qtr only)", defaults: [0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0] }
       ]
     },
     {
@@ -418,7 +429,7 @@ const generateStructuredPIs = (
   let groupHidden: string[] = [];
   const unitHidden: string[] = JSON.parse(localStorage.getItem(`hidden_pis_${subjectUser.id}`) || '[]');
   
-  // Determine isolation group
+  // Determine isolation group for batch hiding (primarily for Station roles)
   if (subjectUser.role === UserRole.CHQ || dashboardType === 'CHQ') {
     groupHidden = JSON.parse(localStorage.getItem('hidden_pis_CHQ') || '[]');
   } else if (subjectUser.role === UserRole.STATION || dashboardType === 'TACTICAL') {
@@ -431,16 +442,23 @@ const generateStructuredPIs = (
 
   return definitions
     .filter(def => {
-      // Logic for isolation:
-      // Unit-specific hiding always takes precedence.
-      if (unitHidden.includes(def.id)) return false;
+      // 1. Explicit override: Always show PI8 for CHQ CCADU (even if they try to hide it locally)
+      if (subjectUser.name === 'CHQ CCADU' && def.id === 'PI8') return true;
+
+      // 2. Unit-specific hiding: If the subject user has explicitly hidden this PI from *their own* view,
+      //    it should be hidden for them, regardless of their role.
+      if (unitHidden.includes(def.id)) {
+        return false;
+      }
       
-      // For CHQ users, we ignore the group-level batch hiding (satisfying the unhide request),
-      // but if the unit specifically had its own tab hidden, that's respected.
-      if (subjectUser.role === UserRole.CHQ) return true;
-      
-      // For others, we check both levels.
-      return !groupHidden.includes(def.id);
+      // 3. Group-level batch hiding: This only applies to Station users (Police Station 1-10 or Special Unit).
+      //    It should NOT apply to Super Admin, Sub Admin, or any CHQ user when they are the subjectUser.
+      if (subjectUser.role === UserRole.STATION && groupHidden.includes(def.id)) {
+          return false;
+      }
+
+      // If none of the above conditions led to hiding, the PI is visible for this subjectUser.
+      return true;
     })
     .map((def) => {
       const isPercentagePI = ["PI4", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(def.id);
@@ -505,7 +523,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
   const [editingLabel, setEditingLabel] = useState<{ rowIdx: number; field: 'activity' | 'indicator' } | null>(null);
   const [textEditValue, setTextEditValue] = useState<string>('');
   
-  const dashboardYear = useMemo(() => title.match(/\d{4}/)?.[0] || '2026', [title]);
+  const dashboardYear = useMemo(() => title.match(/\d{4}/)?.[0] || '2025', [title]); // Changed default year to 2025 as per image
   const dashboardType = useMemo(() => {
     if (title.toUpperCase().includes("CHQ")) return 'CHQ';
     if (title.toUpperCase().includes("TACTICAL")) return 'TACTICAL';
@@ -572,7 +590,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
   }, [currentPI, activeTab]);
 
   const handleCellClick = (rowIdx: number, monthIdx: number, val: number) => {
-    const canEdit = (isSuperAdmin && dataMode !== 'consolidated') || (currentUser.role === UserRole.STATION && currentUser.id === subjectUser.id);
+    const canEdit = (isSuperAdmin && dataMode !== 'consolidated') || ((currentUser.role === UserRole.CHQ || currentUser.role === UserRole.STATION) && currentUser.id === subjectUser.id);
     if (canEdit) {
       setEditingCell({ rowIdx, monthIdx });
       setEditValue(String(val));
@@ -893,7 +911,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                           </button>
                           <button onClick={(e) => handleDeleteActivity(row.id, e)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition" title="Delete Activity row locally">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1  0 00-1 1v3M4 7h16" /></svg>
                           </button>
                         </div>
                       </td>
