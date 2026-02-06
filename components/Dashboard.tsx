@@ -13,7 +13,8 @@ type ViewType =
   | 'status-terminal'
   | 'unit-oversight'
   | 'operational-dashboard'
-  | 'unit-landing';
+  | 'unit-landing'
+  | 'progress';
 
 const YEAR_CONFIG = [
   { year: '2026', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
@@ -43,7 +44,6 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
   const isAdmin = user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN;
   // CHQ and Station users can now see oversight as requested
   const canSeeOversight = isAdmin || user.role === UserRole.CHQ || user.role === UserRole.STATION;
-  const isCompanyUser = user.role === UserRole.STATION && user.name === 'City Mobile Force Company';
 
   useEffect(() => {
     localStorage.setItem('adminrole_users_list', JSON.stringify(usersList));
@@ -156,6 +156,65 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
     </div>
   );
 
+  const renderProgress = () => (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">System Progress</h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Overall Synchronization</h3>
+            <p className="text-4xl font-black text-slate-900">92.4%</p>
+          </div>
+          <div className="mt-6 h-3 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-emerald-500 rounded-full" style={{ width: '92.4%' }}></div>
+          </div>
+        </div>
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+          <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4">Unit Submissions</h3>
+          <div className="space-y-4">
+             <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600">STATION UNITS</span>
+                <span className="text-xs font-black text-slate-900">11/11</span>
+             </div>
+             <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600">CHQ UNITS</span>
+                <span className="text-xs font-black text-slate-900">8/9</span>
+             </div>
+             <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600">SPECIAL UNITS</span>
+                <span className="text-xs font-black text-slate-900">1/1</span>
+             </div>
+          </div>
+        </div>
+      </div>
+      <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl shadow-slate-200/50">
+        <div className="flex items-center gap-4 mb-6">
+           <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center border border-white/20">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+           </div>
+           <div>
+              <h3 className="font-black text-lg">Real-Time Activity</h3>
+              <p className="text-white/40 text-[10px] font-black uppercase tracking-widest">Global Monitoring Engine</p>
+           </div>
+        </div>
+        <div className="space-y-3">
+           <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
+              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+              <span className="text-xs font-bold opacity-80">Police Station 4 uploaded accomplishment reports for Feb 2026</span>
+              <span className="ml-auto text-[10px] opacity-40">2m ago</span>
+           </div>
+           <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
+              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+              <span className="text-xs font-bold opacity-80">CHQ CIDMU modified PI12 Target Baseline</span>
+              <span className="ml-auto text-[10px] opacity-40">15m ago</span>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderStatusTerminal = () => (
     <div className="bg-white p-12 rounded-[2.5rem] border border-slate-200 text-center space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 shadow-xl shadow-slate-200/50">
       <div className="relative w-24 h-24 mx-auto mb-4">
@@ -193,6 +252,24 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
     let specialUsers = usersList.filter(u => u.name === 'City Mobile Force Company');
     let stationUsers = usersList.filter(u => u.role === UserRole.STATION && u.name !== 'City Mobile Force Company');
     
+    // Apply user-specific filtering for STATION users
+    if (user.role === UserRole.STATION) {
+      // Station users only see their own unit
+      specialUsers = specialUsers.filter(u => u.id === user.id);
+      stationUsers = stationUsers.filter(u => u.id === user.id);
+      // Usually Station users shouldn't see CHQ or Sub-Admin oversight either
+      chqUsers = [];
+      subAdminUsers = [];
+    }
+
+    // Apply user-specific filtering for CHQ users
+    if (user.role === UserRole.CHQ) {
+      // Hide Administrative Units (CHQ) except own unit
+      chqUsers = chqUsers.filter(u => u.id === user.id);
+      // Also hide Sub Admin units for CHQ view as requested
+      subAdminUsers = [];
+    }
+
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex items-center justify-between">
@@ -263,8 +340,8 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
         )}
 
         <div className="space-y-8">
-          {/* CHQ Users visible to Admins and CHQ users */}
-          {chqUsers.length > 0 && (isAdmin || user.role === UserRole.CHQ) && (
+          {/* CHQ Units visible to Admins and the specific CHQ user owning the account */}
+          {chqUsers.length > 0 && (
             <div className="space-y-4">
               <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Administrative Units (CHQ)</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -366,8 +443,8 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           </button>
         )}
 
-        {/* Hide personal dashboard for CHQ and Company User as requested */}
-        {user.role !== UserRole.CHQ && !isCompanyUser && (
+        {/* Operational Dashboard link is hidden for CHQ and all STATION users as requested */}
+        {isAdmin && (
           <button 
             onClick={() => { setSelectedOverviewUser(user); setView('operational-dashboard'); }}
             className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'operational-dashboard' && selectedOverviewUser?.id === user.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
@@ -385,6 +462,17 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           >
             Unit Oversight
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+          </button>
+        )}
+
+        {/* Progress Button for Admins requested by user */}
+        {isAdmin && (
+          <button 
+            onClick={() => setView('progress')}
+            className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'progress' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+          >
+            Progress
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
           </button>
         )}
 
@@ -419,6 +507,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
         <div className="lg:col-span-2 space-y-6">
           {view === 'accounts' && renderAccountManagement()}
           {view === 'deployment' && renderDeployment()}
+          {view === 'progress' && isAdmin && renderProgress()}
           {view === 'status-terminal' && renderStatusTerminal()}
           {view === 'unit-oversight' && canSeeOversight && renderUnitOversight()}
           {view === 'unit-landing' && canSeeOversight && renderUnitLanding()}

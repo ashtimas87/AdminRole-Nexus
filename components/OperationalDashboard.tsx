@@ -58,9 +58,7 @@ const createMonthsForActivity = (year: string, userId: string, role: UserRole, p
 const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
   const is2026 = year === '2026';
   const is2025 = year === '2025';
-  const isFullSetYear = ['2026', '2025', '2024', '2023'].includes(year);
-
-  // Define base activities for 2025 based on new format images
+  
   const pi1_25_activities = [
     { id: "pi1_25_1", name: "Formulation of Stratcom Snapshots", indicator: "No. of stratcom snaphot formulated", defaults: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] },
     { id: "pi1_25_2", name: "Social Media Analysis", indicator: "No. of Social Media Analysis conducted", defaults: [13, 13, 13, 12, 9, 13, 13, 13, 13, 13, 13, 13] },
@@ -142,9 +140,9 @@ const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
         { id: "pi3_f_25", name: "National Heroes Day", indicator: "No. of activities conducted", defaults: [5, 4, 4, 4, 7, 4, 4, 4, 5, 4, 4, 4] },
         { id: "pi3_f_26", name: "National Flag Day", indicator: "No. of activities conducted", defaults: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 8, 8] },
         { id: "pi3_f_27", name: "National Crime Prevention Week (NCPW)", indicator: "No of adopted KASIMBAYANAN", defaults: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9] },
-        { id: "pi3_f_28", name: "Celebration of National Women's Month", indicator: "No. of activities conducted", defaults: [5, 4, 4, 4, 7, 4, 4, 4, 4, 5, 4, 4] },
-        { id: "pi3_f_29", name: "18-Day Campaign to End-VAWC", indicator: "No. of activities conducted", defaults: [6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 5] },
-        { id: "pi3_f_30", name: "National Children's Month", indicator: "No. of activities conducted", defaults: [6, 6, 6, 6, 6, 6, 6, 7, 6, 6, 6, 7] }
+        { id: "pi28_f_28", name: "Celebration of National Women's Month", indicator: "No. of activities conducted", defaults: [5, 4, 4, 4, 7, 4, 4, 4, 4, 5, 4, 4] },
+        { id: "pi28_f_29", name: "18-Day Campaign to End-VAWC", indicator: "No. of activities conducted", defaults: [6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 5] },
+        { id: "pi28_f_30", name: "National Children's Month", indicator: "No. of activities conducted", defaults: [6, 6, 6, 6, 6, 6, 6, 7, 6, 6, 6, 7] }
       ]
     },
     {
@@ -335,27 +333,7 @@ const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
     {
       id: "PI17",
       title: "Improvement in response time",
-      activities: isFullSetYear ? [
-        { id: "pi17_f_1", name: "Sports supervision and training component", indicator: "No. of Sports supervision and training component conducted", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_2", name: "Sports competition component", indicator: "No. of Sports competition component conducted", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_3", name: "Crime prevention sports component", indicator: "No. of Crime prevention sports component conducted", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_4", name: "Physical Conditioning and Combat Sport", indicator: "No. of Physical Conditioning and Combat Sport conducted", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_5", name: "Reporting of incidents operational accomplishments of the PNP via Police Operations Management Information System (POMIS) reported", indicator: "No. of incidents operational accomplishments of the PNP via Police Operations Management Information System (POMIS) reported", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_6", name: "Premium gasoline", indicator: "# premium gasoline purchased", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_7", name: "Purchase of Premium diesel", indicator: "# premium diesel purchased", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_8", name: "Repair of patrol vehicles", indicator: "# of patrol vehicles repaired", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_9", name: "Change oil of patrol vehicles", indicator: "# of change oil made", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_10", name: "Repair of motorcycles", indicator: "# of motorcycles repaired", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_11", name: "Change oil of motorcycles", indicator: "# of change oil made", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_12", name: "Purchase of tires for patrol vehicles", indicator: "# of tires for patrol vehicles purchased", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_13", name: "Purchase of tires for MC", indicator: "# of tires for MC purchased", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_14", name: "Purchase of batteries for patrol vehicles", indicator: "# of batteries for patrol vehicles purchased", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_15", name: "Purchase of batteries for MC", indicator: "# of batteries for MC purchased", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_16", name: "Purchase of spare parts for patrol vehicles", indicator: "# of spare parts for patrol vehicles purchased", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_17", name: "Purchase of spare parts for MC", indicator: "# of spare parts for MC purchased", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_18", name: "Payment of cellphone bills", indicator: "# of cellphone bills paid", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        { id: "pi17_f_19", name: "Maintenance of OPCEN", indicator: "# of OPCEN maintained", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }
-      ] : [
+      activities: [
         { id: "pi17_f_1", name: "Sports supervision and training component", indicator: "No. of Sports supervision and training component conducted", defaults: Array(12).fill(0) },
         { id: "pi17_f_2", name: "Sports competition component", indicator: "No. of Sports competition component conducted", defaults: Array(12).fill(0) },
         { id: "pi17_f_3", name: "Crime prevention sports component", indicator: "No. of Crime prevention sports component conducted", defaults: Array(12).fill(0) },
@@ -495,7 +473,21 @@ const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
   const storedCustomPIsStr = localStorage.getItem(`custom_pi_definitions_${year}`);
   const customPIs = storedCustomPIsStr ? JSON.parse(storedCustomPIsStr) : [];
   
-  const allDefinitions = [...baseDefinitions, ...customPIs];
+  let allDefinitions = [...baseDefinitions, ...customPIs];
+
+  // Apply custom order if it exists
+  const storedOrder = localStorage.getItem(`pi_order_${year}`);
+  if (storedOrder) {
+    const orderIds = JSON.parse(storedOrder);
+    allDefinitions = allDefinitions.sort((a, b) => {
+      const aIdx = orderIds.indexOf(a.id);
+      const bIdx = orderIds.indexOf(b.id);
+      if (aIdx === -1 && bIdx === -1) return 0;
+      if (aIdx === -1) return 1;
+      if (bIdx === -1) return -1;
+      return aIdx - bIdx;
+    });
+  }
 
   return allDefinitions.map(pi => {
     const unitSpecificIds = localStorage.getItem(`pi_activity_ids_${year}_${userId}_${pi.id}`);
@@ -535,7 +527,6 @@ const generateStructuredPIs = (
   let groupHidden: string[] = [];
   const unitHidden: string[] = JSON.parse(localStorage.getItem(`hidden_pis_${subjectUser.id}`) || '[]');
   
-  // Decouple removal: Only apply group-level station hiding when NOT in consolidated mode.
   if (mode !== 'consolidated' && subjectUser.role === UserRole.STATION) {
     if (subjectUser.name === 'City Mobile Force Company') {
       groupHidden = JSON.parse(localStorage.getItem('hidden_pis_SPECIAL') || '[]');
@@ -547,11 +538,8 @@ const generateStructuredPIs = (
   return definitions
     .filter(def => {
       if (subjectUser.name === 'CHQ CCADU' && def.id === 'PI8') return true;
-      
-      // Strict isolation: only use user-specific 'unitHidden' list.
       if (unitHidden.includes(def.id)) return false;
       if (mode !== 'consolidated' && subjectUser.role === UserRole.STATION && groupHidden.includes(def.id)) return false;
-      
       return true;
     })
     .map((def) => {
@@ -615,6 +603,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
   const [editingLabel, setEditingLabel] = useState<{ rowIdx: number; field: 'activity' | 'indicator' } | null>(null);
   const [textEditValue, setTextEditValue] = useState<string>('');
   
+  // New state for renaming PI tabs
+  const [editingTabName, setEditingTabName] = useState<string | null>(null);
+  const [tabRenameValue, setTabRenameValue] = useState<string>('');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dashboardYear = useMemo(() => title.match(/\d{4}/)?.[0] || '2026', [title]);
@@ -720,6 +712,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
     const customPIs = storedCustomPIsStr ? JSON.parse(storedCustomPIsStr) : [];
     
     localStorage.setItem(`custom_pi_definitions_${dashboardYear}`, JSON.stringify([...customPIs, newPIDef]));
+    
+    // Update order to include new PI at the end
+    const storedOrder = localStorage.getItem(`pi_order_${dashboardYear}`);
+    let orderIds = storedOrder ? JSON.parse(storedOrder) : piData.map(p => p.id);
+    if (!orderIds.includes(newPIId)) {
+        localStorage.setItem(`pi_order_${dashboardYear}`, JSON.stringify([...orderIds, newPIId]));
+    }
+
     setActiveTab(newPIId);
     refreshData();
   };
@@ -747,7 +747,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
       e.preventDefault();
     }
     
-    if (!isSuperAdmin || !window.confirm(`Are you sure you want to remove this activity row for ${subjectUser.name} ONLY? This won't affect other views.`)) return;
+    if (!isSuperAdmin || !window.confirm(`Are you sure you want to remove this activity row?`)) return;
     
     const unitStorageKey = `pi_activity_ids_${dashboardYear}_${subjectUser.id}_${activeTab}`;
     const globalStorageKey = `pi_activity_ids_${dashboardYear}_${activeTab}`;
@@ -811,6 +811,34 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
     localStorage.setItem(`pi_title_${dashboardYear}_${activeTab}`, textEditValue);
     refreshData();
     setEditingHeader(false);
+  };
+
+  const handleStartRenameTab = (piId: string, currentLabel: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isSuperAdmin) return;
+    setEditingTabName(piId);
+    setTabRenameValue(currentLabel);
+  };
+
+  const handleSaveTabRename = (piId: string) => {
+    if (!editingTabName) return;
+    localStorage.setItem(`pi_tab_label_${dashboardYear}_${piId}`, tabRenameValue);
+    setEditingTabName(null);
+    refreshData();
+  };
+
+  const handleMoveTab = (piId: string, direction: 'left' | 'right', e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isSuperAdmin) return;
+    const ids = piData.map(p => p.id);
+    const idx = ids.indexOf(piId);
+    if (direction === 'left' && idx > 0) {
+      [ids[idx], ids[idx - 1]] = [ids[idx - 1], ids[idx]];
+    } else if (direction === 'right' && idx < ids.length - 1) {
+      [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
+    }
+    localStorage.setItem(`pi_order_${dashboardYear}`, JSON.stringify(ids));
+    refreshData();
   };
 
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -959,25 +987,49 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
 
       <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
         <div className="flex items-center gap-1.5 whitespace-nowrap">
-          {piData.map((pi) => (
-            <div key={pi.id} className="relative group/tab">
-              <button 
-                onClick={() => setActiveTab(pi.id)} 
-                className={`px-4 py-2 rounded-lg text-xs font-black transition-all border flex items-center gap-2 ${activeTab === pi.id ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-              >
-                {pi.id.includes('CUSTOM') ? 'NEW PI' : `PI ${pi.id.replace('PI', '')}`}
-                {isSuperAdmin && (
-                  <span 
-                    onClick={(e) => handleDeletePI(pi.id, e)} 
-                    className="ml-1 opacity-60 hover:opacity-100 hover:text-red-400 transition-all p-0.5 rounded-full hover:bg-white/10"
-                  >
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-                  </span>
+          {piData.map((pi, idx) => {
+            const label = localStorage.getItem(`pi_tab_label_${dashboardYear}_${pi.id}`) || (pi.id.includes('CUSTOM') ? 'NEW PI' : `PI ${pi.id.replace('PI', '')}`);
+            const isEditing = editingTabName === pi.id;
+            
+            return (
+              <div key={pi.id} className="relative group/tab flex items-center gap-0.5">
+                {isSuperAdmin && idx > 0 && (
+                  <button onClick={(e) => handleMoveTab(pi.id, 'left', e)} className="p-1 text-slate-300 hover:text-slate-600 transition bg-slate-50 rounded-l border border-slate-200" title="Move Left">
+                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M15 19l-7-7 7-7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </button>
                 )}
-              </button>
-            </div>
-          ))}
-          {isSuperAdmin && <button onClick={handleAddPI} className="px-4 py-2 rounded-lg text-xs font-black bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition shadow-sm">+ Add PI</button>}
+                
+                <button 
+                  onClick={() => setActiveTab(pi.id)} 
+                  className={`px-4 py-2 rounded-lg text-xs font-black transition-all border flex items-center gap-2 ${activeTab === pi.id ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                >
+                  {isEditing ? (
+                    <input autoFocus className="bg-white text-slate-900 px-1 border border-blue-500 rounded outline-none w-20" value={tabRenameValue} onChange={(e) => setTabRenameValue(e.target.value)} onBlur={() => handleSaveTabRename(pi.id)} onKeyDown={(e) => e.key === 'Enter' && handleSaveTabRename(pi.id)} onClick={(e) => e.stopPropagation()} />
+                  ) : (
+                    <span onDoubleClick={(e) => handleStartRenameTab(pi.id, label, e)}>{label}</span>
+                  )}
+                  
+                  {isSuperAdmin && !isEditing && (
+                    <div className="flex items-center gap-1">
+                      <span onClick={(e) => handleStartRenameTab(pi.id, label, e)} className="opacity-40 hover:opacity-100 transition p-0.5">
+                        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth={3} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                      </span>
+                      <span onClick={(e) => handleDeletePI(pi.id, e)} className="opacity-40 hover:opacity-100 hover:text-red-400 transition p-0.5">
+                        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </span>
+                    </div>
+                  )}
+                </button>
+
+                {isSuperAdmin && idx < piData.length - 1 && (
+                  <button onClick={(e) => handleMoveTab(pi.id, 'right', e)} className="p-1 text-slate-300 hover:text-slate-600 transition bg-slate-50 rounded-r border border-slate-200" title="Move Right">
+                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 5l7 7-7 7" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {isSuperAdmin && <button onClick={handleAddPI} className="px-4 py-2 rounded-lg text-xs font-black bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition shadow-sm ml-2">+ Add PI</button>}
         </div>
       </div>
 
