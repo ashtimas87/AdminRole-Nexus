@@ -40,6 +40,10 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
   const [formData, setFormData] = useState({ name: '', email: '', password: '', role: UserRole.STATION });
 
   const roleConfig = ROLE_LABELS[user.role];
+  const isAdmin = user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN;
+  // CHQ and Station users can now see oversight as requested
+  const canSeeOversight = isAdmin || user.role === UserRole.CHQ || user.role === UserRole.STATION;
+  const isCompanyUser = user.role === UserRole.STATION && user.name === 'City Mobile Force Company';
 
   useEffect(() => {
     localStorage.setItem('adminrole_users_list', JSON.stringify(usersList));
@@ -182,6 +186,8 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
   );
 
   const renderUnitOversight = () => {
+    if (!canSeeOversight) return null;
+
     let subAdminUsers = usersList.filter(u => u.role === UserRole.SUB_ADMIN);
     let chqUsers = usersList.filter(u => u.role === UserRole.CHQ);
     let specialUsers = usersList.filter(u => u.name === 'City Mobile Force Company');
@@ -193,7 +199,6 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">System Units Oversight</h2>
         </div>
 
-        {/* Year Selection Tabs */}
         <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2 overflow-x-auto no-scrollbar">
           {YEAR_CONFIG.map(cfg => (
             <button
@@ -206,31 +211,31 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           ))}
         </div>
 
-        {/* System Summary Quick Access */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-600"></div>
-            System-Wide Consolidation
-          </h3>
-          <div 
-            onClick={() => { setSelectedOverviewUser(user); setView('operational-dashboard'); }} 
-            className="w-full flex items-center gap-5 p-6 bg-slate-900 rounded-3xl border-2 border-slate-800 hover:border-emerald-500 transition-all text-left cursor-pointer shadow-xl group"
-          >
-            <div className="w-14 h-14 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-500 border border-emerald-500/30 group-hover:scale-105 transition-transform">
-               <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-            </div>
-            <div>
-              <p className="text-xl font-black text-white">Full Operational Summary {selectedYear}</p>
-              <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">CONSOLIDATED SYSTEM VIEW</p>
-            </div>
-            <div className="ml-auto p-2 bg-white/5 rounded-xl text-white group-hover:bg-emerald-500 transition-colors">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+        {isAdmin && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-600"></div>
+              System-Wide Consolidation
+            </h3>
+            <div 
+              onClick={() => { setSelectedOverviewUser(user); setView('operational-dashboard'); }} 
+              className="w-full flex items-center gap-5 p-6 bg-slate-900 rounded-3xl border-2 border-slate-800 hover:border-emerald-500 transition-all text-left cursor-pointer shadow-xl group"
+            >
+              <div className="w-14 h-14 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-500 border border-emerald-500/30 group-hover:scale-105 transition-transform">
+                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+              </div>
+              <div>
+                <p className="text-xl font-black text-white">Full Operational Summary {selectedYear}</p>
+                <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">CONSOLIDATED SYSTEM VIEW</p>
+              </div>
+              <div className="ml-auto p-2 bg-white/5 rounded-xl text-white group-hover:bg-emerald-500 transition-colors">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+              </div>
             </div>
           </div>
-        </div>
+        )}
         
-        {/* Sub-Admin Label Section */}
-        {subAdminUsers.length > 0 && (
+        {isAdmin && subAdminUsers.length > 0 && (
           <div className="space-y-4">
             <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-purple-600"></div>
@@ -258,7 +263,8 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
         )}
 
         <div className="space-y-8">
-          {chqUsers.length > 0 && (
+          {/* CHQ Users visible to Admins and CHQ users */}
+          {chqUsers.length > 0 && (isAdmin || user.role === UserRole.CHQ) && (
             <div className="space-y-4">
               <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Administrative Units (CHQ)</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -340,8 +346,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
       </div>
       
       <div className="space-y-4">
-        {/* Account Management remains Admin-only */}
-        {(user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN) && (
+        {isAdmin && (
           <button 
             onClick={() => setView('accounts')}
             className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'accounts' ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
@@ -351,8 +356,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           </button>
         )}
 
-        {/* Status Terminal for Non-Admins */}
-        {user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.SUB_ADMIN && (
+        {!isAdmin && (
           <button 
             onClick={() => setView('status-terminal')}
             className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'status-terminal' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
@@ -362,21 +366,28 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           </button>
         )}
 
-        {/* Oversight and Dashboards visible to all as requested */}
-        <button 
-          onClick={() => { setSelectedOverviewUser(user); setView('operational-dashboard'); }}
-          className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'operational-dashboard' && selectedOverviewUser?.id === user.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
-        >
-          Operational Dashboard
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-        </button>
-        <button 
-          onClick={() => setView('unit-oversight')}
-          className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'unit-oversight' || view === 'unit-landing' || (view === 'operational-dashboard' && selectedOverviewUser && selectedOverviewUser.id !== user.id) ? 'bg-purple-600 text-white shadow-lg shadow-purple-100' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
-        >
-          Unit Oversight
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-        </button>
+        {/* Hide personal dashboard for CHQ and Company User as requested */}
+        {user.role !== UserRole.CHQ && !isCompanyUser && (
+          <button 
+            onClick={() => { setSelectedOverviewUser(user); setView('operational-dashboard'); }}
+            className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'operational-dashboard' && selectedOverviewUser?.id === user.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+          >
+            Operational Dashboard
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+          </button>
+        )}
+
+        {/* Restore/Show Unit Oversight for CHQ and STATION as requested */}
+        {canSeeOversight && (
+          <button 
+            onClick={() => setView('unit-oversight')}
+            className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'unit-oversight' || view === 'unit-landing' || (view === 'operational-dashboard' && selectedOverviewUser && selectedOverviewUser.id !== user.id) ? 'bg-purple-600 text-white shadow-lg shadow-purple-100' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+          >
+            Unit Oversight
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+          </button>
+        )}
+
         <button 
           onClick={() => setView('deployment')}
           className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'deployment' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
@@ -409,12 +420,12 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           {view === 'accounts' && renderAccountManagement()}
           {view === 'deployment' && renderDeployment()}
           {view === 'status-terminal' && renderStatusTerminal()}
-          {view === 'unit-oversight' && renderUnitOversight()}
-          {view === 'unit-landing' && renderUnitLanding()}
+          {view === 'unit-oversight' && canSeeOversight && renderUnitOversight()}
+          {view === 'unit-landing' && canSeeOversight && renderUnitLanding()}
           {view === 'operational-dashboard' && selectedOverviewUser && (
             <OperationalDashboard 
               title={`${selectedOverviewUser.id === user.id || selectedOverviewUser.role === UserRole.SUB_ADMIN ? 'Consolidated Operational' : selectedOverviewUser.name + (selectedOverviewUser.role === UserRole.CHQ ? ' Unit' : ' Tactical')} Dashboard ${selectedYear}`} 
-              onBack={() => setView('unit-oversight')} 
+              onBack={() => setView(canSeeOversight ? 'unit-oversight' : 'status-terminal')} 
               currentUser={user} 
               subjectUser={selectedOverviewUser} 
             />
