@@ -3,6 +3,16 @@ import { User, UserRole } from '../types';
 import { ROLE_LABELS, MOCK_USERS } from '../constants';
 import OperationalDashboard from './OperationalDashboard';
 import { getRoleInsight } from '../services/geminiService';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  Cell
+} from 'recharts';
 
 interface DashboardProps {
   user: User;
@@ -25,10 +35,19 @@ const YEAR_CONFIG = [
   { year: '2023', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' }
 ];
 
+// Mock data for the Main Dashboard chart
+const MOCK_CHART_DATA = [
+  { name: 'Jan', score: 85 },
+  { name: 'Feb', score: 78 },
+  { name: 'Mar', score: 92 },
+  { name: 'Apr', score: 88 },
+  { name: 'May', score: 95 },
+  { name: 'Jun', score: 89 },
+];
+
 const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, onLogout }) => {
-  // Set default view based on role: Admins go to Unit Select, Units go to their Landing
   const [view, setView] = useState<ViewType>(() => {
-    if (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN) return 'user-selection';
+    if (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN) return 'overview';
     return 'unit-landing';
   });
 
@@ -171,33 +190,170 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
 
   const renderOverview = () => (
     <div className="space-y-6">
-      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-slate-900/5 rounded-full blur-3xl"></div>
-        <h2 className="text-4xl font-black text-slate-900 mb-2">Welcome back, {user.name}</h2>
-        <p className="text-slate-500 font-medium">Monitoring Unit Accomplishment & Performance Metrics</p>
+      {/* Main Command Header */}
+      <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-slate-900/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-blue-500/5 rounded-full blur-2xl"></div>
         
-        <div className="mt-8 p-6 bg-slate-900 rounded-2xl text-white shadow-xl shadow-slate-200">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+        <div className="relative z-10">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8">
+            <div className="flex items-center gap-5">
+              <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center text-white text-3xl font-black border-4 border-slate-100 shadow-xl">C</div>
+              <div>
+                <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">Cagayan de Oro City Police Office</h2>
+                <p className="text-slate-500 font-bold uppercase tracking-widest text-[11px] mt-2 opacity-70 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  Strategic Command Hub • Operational Oversight
+                </p>
+              </div>
             </div>
-            <h4 className="font-bold text-sm uppercase tracking-widest text-slate-400">Gemini AI Strategic Insight</h4>
-          </div>
-          {isInsightLoading ? (
             <div className="flex items-center gap-3">
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              <p className="text-slate-400 italic text-sm">Consulting tactical engine...</p>
+               <div className="px-5 py-2.5 bg-slate-900 text-white rounded-2xl text-xs font-black shadow-lg shadow-slate-200 border border-slate-800">
+                  SYSTEM READY
+               </div>
             </div>
-          ) : (
-            <p className="text-lg font-medium leading-relaxed opacity-90">{insight}</p>
-          )}
+          </div>
+          
+          <div className="h-px w-full bg-gradient-to-r from-slate-200 via-slate-100 to-transparent mb-10"></div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex flex-col justify-between group hover:bg-white hover:shadow-lg transition-all cursor-default">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Assets</p>
+              <p className="text-3xl font-black text-slate-900 tracking-tighter">142</p>
+              <p className="text-[9px] font-bold text-emerald-600 uppercase mt-4">Active & Synced</p>
+            </div>
+            <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex flex-col justify-between group hover:bg-white hover:shadow-lg transition-all cursor-default">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Operational Compliance</p>
+              <p className="text-3xl font-black text-slate-900 tracking-tighter">100%</p>
+              <div className="w-full bg-slate-200 h-1 rounded-full mt-4 overflow-hidden">
+                <div className="bg-blue-600 h-full w-full"></div>
+              </div>
+            </div>
+            <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex flex-col justify-between group hover:bg-white hover:shadow-lg transition-all cursor-default">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Units</p>
+              <p className="text-3xl font-black text-slate-900 tracking-tighter">21</p>
+              <p className="text-[9px] font-bold text-slate-500 uppercase mt-4">9 CHQ • 12 Field</p>
+            </div>
+            <div className="p-6 bg-blue-600 rounded-3xl shadow-xl shadow-blue-100 flex flex-col justify-between text-white group hover:scale-[1.02] transition-all cursor-default">
+              <p className="text-[10px] font-black text-blue-100 uppercase tracking-widest mb-1">Security Level</p>
+              <p className="text-3xl font-black tracking-tighter">ELITE</p>
+              <p className="text-[9px] font-bold uppercase mt-4 opacity-70">Encrypted AES-256</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* AI Insights Card */}
+            <div className="p-8 bg-slate-900 rounded-[2rem] text-white shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[280px]">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl"></div>
+              <div>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center border border-blue-400/30">
+                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  </div>
+                  <h4 className="font-black text-xs uppercase tracking-[0.2em] text-blue-400">Gemini Intelligence Hub</h4>
+                </div>
+                {isInsightLoading ? (
+                  <div className="space-y-3">
+                    <div className="h-4 bg-white/5 rounded-lg w-full animate-pulse"></div>
+                    <div className="h-4 bg-white/5 rounded-lg w-5/6 animate-pulse"></div>
+                    <div className="h-4 bg-white/5 rounded-lg w-4/6 animate-pulse"></div>
+                  </div>
+                ) : (
+                  <p className="text-lg font-medium leading-relaxed opacity-90 italic">"{insight}"</p>
+                )}
+              </div>
+              <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
+                 <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Real-time Tactical Engine</span>
+                 <div className="flex gap-1">
+                    <div className="w-1 h-1 rounded-full bg-blue-500"></div>
+                    <div className="w-1 h-1 rounded-full bg-blue-500 opacity-50"></div>
+                    <div className="w-1 h-1 rounded-full bg-blue-500 opacity-20"></div>
+                 </div>
+              </div>
+            </div>
+
+            {/* Performance Chart Card */}
+            <div className="p-8 bg-white rounded-[2rem] border border-slate-200 shadow-sm flex flex-col">
+               <div className="flex items-center justify-between mb-6">
+                  <h4 className="font-black text-xs uppercase tracking-widest text-slate-400">Operational Trend</h4>
+                  <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">+12.5% vs Prev</span>
+               </div>
+               <div className="flex-1 min-h-[180px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={MOCK_CHART_DATA}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="name" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} 
+                        dy={10}
+                      />
+                      <YAxis hide />
+                      <Tooltip 
+                        cursor={{fill: '#f8fafc'}}
+                        contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold'}}
+                      />
+                      <Bar dataKey="score" radius={[6, 6, 6, 6]} barSize={32}>
+                        {MOCK_CHART_DATA.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={index === 4 ? '#2563eb' : '#e2e8f0'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+               </div>
+            </div>
+          </div>
+
+          {/* Quick Command Shortcuts */}
+          <div className="mt-12">
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Command Center Shortcuts</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+               <button 
+                 onClick={() => setView('user-selection')}
+                 className="p-5 bg-white border-2 border-slate-100 rounded-3xl hover:border-slate-900 hover:shadow-xl transition-all group flex flex-col items-center gap-3 text-center"
+               >
+                 <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center group-hover:bg-slate-900 group-hover:text-white transition-colors">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                 </div>
+                 <span className="text-xs font-black text-slate-800 uppercase tracking-tight">Inspect Units</span>
+               </button>
+               <button 
+                 onClick={() => setView('accounts')}
+                 className="p-5 bg-white border-2 border-slate-100 rounded-3xl hover:border-indigo-500 hover:shadow-xl transition-all group flex flex-col items-center gap-3 text-center"
+               >
+                 <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                 </div>
+                 <span className="text-xs font-black text-slate-800 uppercase tracking-tight">Manage Access</span>
+               </button>
+               <button 
+                 onClick={() => setView('deployment')}
+                 className="p-5 bg-white border-2 border-slate-100 rounded-3xl hover:border-blue-500 hover:shadow-xl transition-all group flex flex-col items-center gap-3 text-center"
+               >
+                 <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                 </div>
+                 <span className="text-xs font-black text-slate-800 uppercase tracking-tight">Asset Map</span>
+               </button>
+               <button 
+                 onClick={onLogout}
+                 className="p-5 bg-white border-2 border-slate-100 rounded-3xl hover:border-red-500 hover:shadow-xl transition-all group flex flex-col items-center gap-3 text-center"
+               >
+                 <div className="w-12 h-12 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center group-hover:bg-red-600 group-hover:text-white transition-colors">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                 </div>
+                 <span className="text-xs font-black text-slate-800 uppercase tracking-tight">Lock Console</span>
+               </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 
   const renderAccountManagement = () => (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-slate-900">Account Management</h2>
         <button onClick={() => handleOpenModal()} className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-black shadow-lg">New Unit Account</button>
@@ -222,8 +378,8 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded text-[9px] font-black text-white uppercase ${ROLE_LABELS[u.role].color}`}>
-                    {ROLE_LABELS[u.role].label}
+                  <span className={`px-2 py-1 rounded text-[9px] font-black text-white uppercase ${u.name === 'City Mobile Force Company' ? 'bg-indigo-600' : ROLE_LABELS[u.role].color}`}>
+                    {u.name === 'City Mobile Force Company' ? 'Company User' : ROLE_LABELS[u.role].label}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-slate-500 text-sm">{u.email}</td>
@@ -242,7 +398,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
   );
 
   const renderDeployment = () => (
-    <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-4">
+    <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
       </div>
@@ -264,9 +420,9 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
   const renderUnitLanding = () => {
     if (!selectedOverviewUser) return null;
     const isChq = selectedOverviewUser.role === UserRole.CHQ;
+    const isCompany = selectedOverviewUser.name === 'City Mobile Force Company';
     const dashboardType = isChq ? 'chq-operational-dashboard' : 'tactical-dashboard';
     
-    // Back button behavior for Admins (go back to selection) vs Unit users (cannot go back to list)
     const canGoBack = user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN;
 
     return (
@@ -282,7 +438,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           <img src={selectedOverviewUser.avatar} className="w-20 h-20 rounded-2xl border-2 border-slate-100" />
           <div>
             <h2 className="text-4xl font-black text-slate-900">
-              {selectedOverviewUser.name} {isChq ? 'Consolidated CHQ Dashboard' : 'Tactical Dashboard'}
+              {selectedOverviewUser.name} {isChq ? 'Consolidated CHQ Dashboard' : (isCompany ? 'Company Dashboard' : 'Tactical Dashboard')}
             </h2>
             <p className="text-slate-500 font-medium uppercase tracking-widest text-xs mt-1">Select operational year to review unit performance</p>
           </div>
@@ -293,13 +449,13 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
             <button 
               key={cfg.year}
               onClick={() => { setDashboardView(dashboardType, cfg.year); }}
-              className={`p-6 bg-white border border-slate-200 rounded-2xl hover:shadow-lg transition group text-left relative overflow-hidden ${isChq ? 'hover:border-emerald-500' : 'hover:border-orange-500'}`}
+              className={`p-6 bg-white border border-slate-200 rounded-2xl hover:shadow-lg transition group text-left relative overflow-hidden ${isChq ? 'hover:border-emerald-500' : (isCompany ? 'hover:border-indigo-500' : 'hover:border-orange-500')}`}
             >
-              <div className={`absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 rounded-full blur-3xl opacity-5 group-hover:opacity-10 transition ${isChq ? 'bg-emerald-500' : 'bg-orange-500'}`}></div>
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition group-hover:text-white ${isChq ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600' : 'bg-orange-50 text-orange-600 group-hover:bg-orange-600'}`}>
+              <div className={`absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 rounded-full blur-3xl opacity-5 group-hover:opacity-10 transition ${isChq ? 'bg-emerald-500' : (isCompany ? 'bg-indigo-500' : 'bg-orange-500')}`}></div>
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition group-hover:text-white ${isChq ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600' : (isCompany ? 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600' : 'bg-orange-50 text-orange-600 group-hover:bg-orange-600')}`}>
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={cfg.icon} /></svg>
               </div>
-              <h3 className="text-xl font-bold text-slate-900">{isChq ? `${selectedOverviewUser.name} Consolidated Dashboard` : `${selectedOverviewUser.name} Dashboard`} {cfg.year}</h3>
+              <h3 className="text-xl font-bold text-slate-900">{isChq ? `${selectedOverviewUser.name} Consolidated Dashboard` : `${selectedOverviewUser.name} ${isCompany ? 'Company' : 'Dashboard'}`} {cfg.year}</h3>
               <p className="text-slate-500 text-sm mt-1">Unit specific data for fiscal year {cfg.year}</p>
             </button>
           ))}
@@ -320,12 +476,23 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
       <div className="space-y-8">
         {(user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN) && (
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Management</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Navigation</p>
+            <div className="space-y-1.5">
+              <button 
+                onClick={() => { setView('overview'); setSelectedOverviewUser(null); }}
+                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'overview' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+              >
+                Main Dashboard
+                <svg className={`w-4 h-4 ${view === 'overview' ? 'text-white' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+              </button>
+            </div>
+
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-6 mb-3 px-1">Management</p>
             <div className="space-y-1.5">
               {user.role === UserRole.SUPER_ADMIN && (
                 <button 
                   onClick={() => { setView('accounts'); setSelectedOverviewUser(null); }}
-                  className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'accounts' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                  className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'accounts' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
                 >
                   Accounts
                   <svg className={`w-4 h-4 ${view === 'accounts' ? 'text-white' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
@@ -342,43 +509,23 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           </div>
         )}
 
-        {(user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN || user.role === UserRole.CHQ) && (
-          <div>
-            <div className="space-y-1.5">
-              <button 
-                onClick={() => { 
-                  if (user.role === UserRole.CHQ) {
-                    setSelectedOverviewUser(user);
-                    setView('unit-landing');
-                  } else {
-                    setView('user-selection'); 
-                    setSelectedOverviewUser(null);
-                  }
-                }} 
-                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'user-selection' || (view === 'unit-landing' && user.role === UserRole.CHQ) ? 'bg-slate-700 text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-              >
-                {user.role === UserRole.CHQ ? 'My Dashboard' : 'Unit Select'}
-                <span className="text-[9px] font-black bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded uppercase">Inspect</span>
-              </button>
-              {user.role === UserRole.SUPER_ADMIN && deletedCategories.length > 0 && (
-                <button 
-                  onClick={restoreSystemTabs}
-                  className="w-full text-left px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wider text-blue-600 hover:bg-blue-50 transition"
-                >
-                  Restore System Tabs
-                </button>
-              )}
-            </div>
-          </div>
+        {user.role === UserRole.CHQ && (
+           <button 
+             onClick={() => { setSelectedOverviewUser(user); setView('unit-landing'); }} 
+             className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'unit-landing' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+           >
+             My Dashboard
+             <svg className={`w-4 h-4 ${view === 'unit-landing' ? 'text-white' : 'text-emerald-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+           </button>
         )}
 
         {user.role === UserRole.STATION && (
           <button 
             onClick={() => { setSelectedOverviewUser(user); setView('unit-landing'); }}
-            className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'unit-landing' ? 'bg-orange-600 text-white shadow-lg' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'}`}
+            className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition flex items-center justify-between group ${view === 'unit-landing' ? (user.name === 'City Mobile Force Company' ? 'bg-indigo-600' : 'bg-orange-600') + ' text-white shadow-lg' : (user.name === 'City Mobile Force Company' ? 'bg-indigo-50 text-indigo-700' : 'bg-orange-50 text-orange-700') + ' hover:bg-opacity-80'}`}
           >
-            My Station Dashboard
-            <svg className={`w-4 h-4 ${view === 'unit-landing' ? 'text-white' : 'text-orange-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            {user.name === 'City Mobile Force Company' ? 'My Company Dashboard' : 'My Station Dashboard'}
+            <svg className={`w-4 h-4 ${view === 'unit-landing' ? 'text-white' : (user.name === 'City Mobile Force Company' ? 'text-indigo-400' : 'text-orange-400')}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           </button>
         )}
       </div>
@@ -469,7 +616,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                       onClick={() => { setBatchTarget('SPECIAL'); setIsBatchPIModalOpen(true); }}
                       className="text-[9px] font-black bg-purple-100 text-purple-700 px-2 py-1 rounded hover:bg-purple-200 transition"
                     >
-                      SPECIAL PI MGMT
+                      COMPANY PI MGMT
                     </button>
                   </div>
                 )}
@@ -485,7 +632,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                       <div>
                         <p className="font-black text-slate-800">{u.name}</p>
                         <p className="text-[10px] font-black uppercase text-slate-400">
-                          {u.name === 'City Mobile Force Company' ? 'SPECIAL UNIT' : 'STATION UNIT'}
+                          {u.name === 'City Mobile Force Company' ? 'COMPANY UNIT' : 'STATION UNIT'}
                         </p>
                       </div>
                     </div>
@@ -528,15 +675,15 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <nav className="sticky top-0 z-30 bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white font-black text-xl">A</div>
-          <h1 className="font-bold text-slate-900">AdminRole</h1>
+          <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-slate-200">A</div>
+          <h1 className="font-black text-slate-900 tracking-tighter text-lg">AdminRole Hub</h1>
         </div>
         <div className="flex items-center gap-6">
           <div className="hidden md:block text-right">
             <p className="text-sm font-bold text-slate-900 leading-none">{user.name}</p>
-            <p className="text-xs text-slate-500 mt-1">{roleConfig.label}</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{user.name === 'City Mobile Force Company' ? 'Company User' : roleConfig.label}</p>
           </div>
-          <button onClick={onLogout} className="p-2 text-slate-400 hover:text-red-600 transition font-bold">Sign Out</button>
+          <button onClick={onLogout} className="px-4 py-2 bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl transition-all font-bold text-xs uppercase tracking-widest">Sign Out</button>
         </div>
       </nav>
       <div className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -583,8 +730,8 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                 </select>
               </div>
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-3 rounded-xl border font-bold">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-slate-900 text-white font-bold">Save Changes</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-3 rounded-xl border font-bold hover:bg-slate-50">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition-colors">Save Changes</button>
               </div>
             </form>
           </div>
@@ -594,7 +741,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
       {/* PI Tabbing Management Modal */}
       {isBatchPIModalOpen && batchTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-8 my-8 animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl p-8 my-8 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">PI Tabbing Management</h3>
@@ -602,7 +749,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                   Affecting: <span className="font-bold text-indigo-600">
                     {batchTarget === 'CHQ' ? 'Administrative (CHQ) Units' : 
                      batchTarget === 'STATION_1_10' ? 'Station Units (1-10)' : 
-                     'Special Unit (CMFC)'}
+                     'Company Unit (CMFC)'}
                   </span>
                 </p>
               </div>
@@ -611,13 +758,15 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
               </button>
             </div>
 
-            <div className="bg-indigo-50 p-4 rounded-2xl mb-8 border border-indigo-100 flex gap-3 items-start shadow-inner">
-              <svg className="w-5 h-5 text-indigo-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              <p className="text-xs text-indigo-800 font-bold leading-relaxed">
+            <div className="bg-indigo-50 p-5 rounded-3xl mb-8 border border-indigo-100 flex gap-4 items-start shadow-inner">
+              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-indigo-200">
+                <svg className="w-6 h-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <p className="text-[11px] text-indigo-800 font-bold leading-relaxed">
                 Changes applied here will ONLY affect the selected unit group. 
                 <br/>
-                {batchTarget === 'CHQ' ? 'Stations and Special Unit remain unaffected.' : 
-                 batchTarget === 'STATION_1_10' ? 'CHQ and Special Unit remain unaffected.' : 
+                {batchTarget === 'CHQ' ? 'Stations and Company Unit remain unaffected.' : 
+                 batchTarget === 'STATION_1_10' ? 'CHQ and Company Unit remain unaffected.' : 
                  'CHQ and Stations 1-10 remain unaffected.'}
               </p>
             </div>
@@ -632,7 +781,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                   <button 
                     key={piId}
                     onClick={() => handleToggleBatchPI(piId)}
-                    className={`flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all font-black text-[10px] uppercase tracking-wider ${isHidden ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-white border-indigo-500 text-indigo-600 shadow-sm'}`}
+                    className={`flex items-center justify-between px-4 py-3 rounded-2xl border-2 transition-all font-black text-[10px] uppercase tracking-wider ${isHidden ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-white border-indigo-500 text-indigo-600 shadow-md active:scale-95'}`}
                   >
                     <span>PI {i + 1}</span>
                     <div className={`w-4 h-4 rounded flex items-center justify-center border ${isHidden ? 'border-slate-300' : 'bg-indigo-600 border-indigo-600 text-white'}`}>
@@ -653,11 +802,11 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                 }}
                 className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-2xl text-xs font-black hover:bg-slate-200 transition"
               >
-                RESTORE ALL TABS
+                RESTORE ALL
               </button>
               <button 
                 onClick={() => setIsBatchPIModalOpen(false)} 
-                className="flex-[2] px-4 py-3 bg-slate-900 text-white rounded-2xl text-xs font-black shadow-lg shadow-slate-100 hover:bg-slate-800 transition"
+                className="flex-[2] px-4 py-3 bg-slate-900 text-white rounded-2xl text-xs font-black shadow-xl shadow-slate-200 hover:bg-slate-800 transition"
               >
                 SAVE CONFIGURATION
               </button>
