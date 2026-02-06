@@ -560,8 +560,12 @@ const generateStructuredPIs = (
     }
   }
 
+  // Check for CIU 2025 specific unhide request
+  const isCiu2025 = year === '2025' && subjectUser.name === 'CHQ CIU';
+
   return definitions
     .filter(def => {
+      if (isCiu2025) return true; // Force unhide for CIU 2025 as requested
       if (subjectUser.name === 'CHQ CCADU' && def.id === 'PI8') return true;
       if (unitHidden.includes(def.id)) return false;
       if (mode !== 'consolidated' && subjectUser.role === UserRole.STATION && groupHidden.includes(def.id)) return false;
