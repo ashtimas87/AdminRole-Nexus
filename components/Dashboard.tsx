@@ -263,7 +263,9 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
     }
 
     // Apply user-specific filtering for CHQ users
-    if (user.role === UserRole.CHQ) {
+    // NEW: "unhide all activities" for CHQ Dashboard 2023 
+    // We interpret "unhide all" as showing all units to CHQ users when 2023 is selected
+    if (user.role === UserRole.CHQ && selectedYear !== '2023') {
       // Hide Administrative Units (CHQ) except own unit
       chqUsers = chqUsers.filter(u => u.id === user.id);
       // Also hide Sub Admin units for CHQ view as requested
@@ -288,7 +290,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           ))}
         </div>
 
-        {isAdmin && (
+        {(isAdmin || (user.role === UserRole.CHQ && selectedYear === '2023')) && (
           <div className="space-y-4">
             <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-600"></div>
@@ -312,7 +314,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           </div>
         )}
         
-        {isAdmin && subAdminUsers.length > 0 && (
+        {(isAdmin || (user.role === UserRole.CHQ && selectedYear === '2023')) && subAdminUsers.length > 0 && (
           <div className="space-y-4">
             <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-purple-600"></div>
@@ -450,7 +452,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
             className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'operational-dashboard' && selectedOverviewUser?.id === user.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
           >
             Operational Dashboard
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
           </button>
         )}
 

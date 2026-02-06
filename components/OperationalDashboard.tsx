@@ -5,20 +5,33 @@ import * as XLSX from "xlsx";
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// Helper to get shared definitions with year scoping
-const getSharedActivityName = (year: string, piId: string, activityId: string, defaultName: string): string => {
-  const stored = localStorage.getItem(`pi_activity_name_${year}_${piId}_${activityId}`);
-  return stored || defaultName;
+// Helper to get shared definitions with year and user scoping
+const getSharedActivityName = (year: string, userId: string, piId: string, activityId: string, defaultName: string): string => {
+  const scoped = localStorage.getItem(`pi_activity_name_${year}_${userId}_${piId}_${activityId}`);
+  if (scoped) return scoped;
+  const global = localStorage.getItem(`pi_activity_name_${year}_${piId}_${activityId}`);
+  return global || defaultName;
 };
 
-const getSharedIndicatorName = (year: string, piId: string, activityId: string, defaultIndicator: string): string => {
-  const stored = localStorage.getItem(`pi_indicator_name_${year}_${piId}_${activityId}`);
-  return stored || defaultIndicator;
+const getSharedIndicatorName = (year: string, userId: string, piId: string, activityId: string, defaultIndicator: string): string => {
+  const scoped = localStorage.getItem(`pi_indicator_name_${year}_${userId}_${piId}_${activityId}`);
+  if (scoped) return scoped;
+  const global = localStorage.getItem(`pi_indicator_name_${year}_${piId}_${activityId}`);
+  return global || defaultIndicator;
 };
 
-const getSharedPITitle = (year: string, piId: string, defaultTitle: string): string => {
-  const stored = localStorage.getItem(`pi_title_${year}_${piId}`);
-  return stored || defaultTitle;
+const getSharedPITitle = (year: string, userId: string, piId: string, defaultTitle: string): string => {
+  const scoped = localStorage.getItem(`pi_title_${year}_${userId}_${piId}`);
+  if (scoped) return scoped;
+  const global = localStorage.getItem(`pi_title_${year}_${piId}`);
+  return global || defaultTitle;
+};
+
+const getSharedTabLabel = (year: string, userId: string, piId: string, defaultLabel: string): string => {
+  const scoped = localStorage.getItem(`pi_tab_label_${year}_${userId}_${piId}`);
+  if (scoped) return scoped;
+  const global = localStorage.getItem(`pi_tab_label_${year}_${piId}`);
+  return global || defaultLabel;
 };
 
 // Helper to get individual accomplishment data with year separation
@@ -490,24 +503,33 @@ const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
   }
 
   return allDefinitions.map(pi => {
-    const unitSpecificIds = localStorage.getItem(`pi_activity_ids_${year}_${userId}_${pi.id}`);
-    const globalIds = localStorage.getItem(`pi_activity_ids_${year}_${pi.id}`);
+    const unitSpecificIdsKey = `pi_activity_ids_${year}_${userId}_${pi.id}`;
+    const globalIdsKey = `pi_activity_ids_${year}_${pi.id}`;
     
-    let activityIds = unitSpecificIds ? JSON.parse(unitSpecificIds) : (globalIds ? JSON.parse(globalIds) : pi.activities.map(a => a.id));
+    const unitSpecificIds = localStorage.getItem(unitSpecificIdsKey);
+    const globalIds = localStorage.getItem(globalIdsKey);
+    
+    // Independence logic: If viewing CHQ 2023, 2025, or 2026, we prioritize local unit activities to prevent leaking changes.
+    let activityIds;
+    if ((year === '2023' || year === '2025' || year === '2026') && role === UserRole.CHQ) {
+       activityIds = unitSpecificIds ? JSON.parse(unitSpecificIds) : pi.activities.map(a => a.id);
+    } else {
+       activityIds = unitSpecificIds ? JSON.parse(unitSpecificIds) : (globalIds ? JSON.parse(globalIds) : pi.activities.map(a => a.id));
+    }
 
     const fullActivities = activityIds.map((aid: string) => {
       const baseAct = pi.activities.find(a => a.id === aid);
       return {
         id: aid,
-        activity: getSharedActivityName(year, pi.id, aid, baseAct?.name || "New Activity"),
-        indicator: getSharedIndicatorName(year, pi.id, aid, baseAct?.indicator || "New Indicator"),
+        activity: getSharedActivityName(year, userId, pi.id, aid, baseAct?.name || "New Activity"),
+        indicator: getSharedIndicatorName(year, userId, pi.id, aid, baseAct?.indicator || "New Indicator"),
         months: createMonthsForActivity(year, userId, role, pi.id, aid, baseAct?.defaults || Array(12).fill(0))
       };
     });
 
     return {
       id: pi.id,
-      title: getSharedPITitle(year, pi.id, pi.title),
+      title: getSharedPITitle(year, userId, pi.id, pi.title),
       activities: fullActivities
     };
   });
@@ -525,9 +547,12 @@ const generateStructuredPIs = (
   const definitions = getPIDefinitions(year, subjectUser.id, subjectUser.role);
   
   let groupHidden: string[] = [];
+  
+  // Independence logic: Scoped hidden PIs ensure changes in individual unit dashboards don't leak elsewhere.
   const unitHidden: string[] = JSON.parse(localStorage.getItem(`hidden_pis_${subjectUser.id}`) || '[]');
   
-  if (mode !== 'consolidated' && subjectUser.role === UserRole.STATION) {
+  // Group hiding only for Station users (excluding sandboxed individual views)
+  if (mode !== 'consolidated' && subjectUser.role === UserRole.STATION && year !== '2023' && year !== '2025' && year !== '2026') {
     if (subjectUser.name === 'City Mobile Force Company') {
       groupHidden = JSON.parse(localStorage.getItem('hidden_pis_SPECIAL') || '[]');
     } else {
@@ -603,7 +628,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
   const [editingLabel, setEditingLabel] = useState<{ rowIdx: number; field: 'activity' | 'indicator' } | null>(null);
   const [textEditValue, setTextEditValue] = useState<string>('');
   
-  // New state for renaming PI tabs
   const [editingTabName, setEditingTabName] = useState<string | null>(null);
   const [tabRenameValue, setTabRenameValue] = useState<string>('');
 
@@ -735,8 +759,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
     
     const updatedIds = [...activityIds, newId];
     localStorage.setItem(unitStorageKey, JSON.stringify(updatedIds));
-    localStorage.setItem(`pi_activity_name_${dashboardYear}_${activeTab}_${newId}`, "New Activity");
-    localStorage.setItem(`pi_indicator_name_${dashboardYear}_${activeTab}_${newId}`, "New Indicator");
     
     refreshData();
   };
@@ -795,7 +817,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
   const saveLabel = () => {
     if (!editingLabel || !currentPI) return;
     const activityId = currentPI.activities[editingLabel.rowIdx].id;
-    localStorage.setItem(`pi_${editingLabel.field}_name_${dashboardYear}_${activeTab}_${activityId}`, textEditValue);
+    // Unit-scoped labels ensure Independence
+    localStorage.setItem(`pi_${editingLabel.field}_name_${dashboardYear}_${subjectUser.id}_${activeTab}_${activityId}`, textEditValue);
     refreshData();
     setEditingLabel(null);
   };
@@ -808,7 +831,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
 
   const saveHeader = () => {
     if (!editingHeader) return;
-    localStorage.setItem(`pi_title_${dashboardYear}_${activeTab}`, textEditValue);
+    localStorage.setItem(`pi_title_${dashboardYear}_${subjectUser.id}_${activeTab}`, textEditValue);
     refreshData();
     setEditingHeader(false);
   };
@@ -822,7 +845,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
 
   const handleSaveTabRename = (piId: string) => {
     if (!editingTabName) return;
-    localStorage.setItem(`pi_tab_label_${dashboardYear}_${piId}`, tabRenameValue);
+    localStorage.setItem(`pi_tab_label_${dashboardYear}_${subjectUser.id}_${piId}`, tabRenameValue);
     setEditingTabName(null);
     refreshData();
   };
@@ -861,10 +884,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
             const indicatorName = row[1] ? String(row[1]) : null;
 
             if (activityName) {
-              localStorage.setItem(`pi_activity_name_${dashboardYear}_${activeTab}_${activityId}`, activityName);
+              localStorage.setItem(`pi_activity_name_${dashboardYear}_${subjectUser.id}_${activeTab}_${activityId}`, activityName);
             }
             if (indicatorName) {
-              localStorage.setItem(`pi_indicator_name_${dashboardYear}_${activeTab}_${activityId}`, indicatorName);
+              localStorage.setItem(`pi_indicator_name_${dashboardYear}_${subjectUser.id}_${activeTab}_${activityId}`, indicatorName);
             }
           }
         });
@@ -988,7 +1011,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
       <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
         <div className="flex items-center gap-1.5 whitespace-nowrap">
           {piData.map((pi, idx) => {
-            const label = localStorage.getItem(`pi_tab_label_${dashboardYear}_${pi.id}`) || (pi.id.includes('CUSTOM') ? 'NEW PI' : `PI ${pi.id.replace('PI', '')}`);
+            const label = getSharedTabLabel(dashboardYear, subjectUser.id, pi.id, pi.id.includes('CUSTOM') ? 'NEW PI' : `PI ${pi.id.replace('PI', '')}`);
             const isEditing = editingTabName === pi.id;
             
             return (
