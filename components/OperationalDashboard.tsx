@@ -71,6 +71,7 @@ const createMonthsForActivity = (year: string, userId: string, role: UserRole, p
 const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
   const is2026 = year === '2026';
   const is2025 = year === '2025';
+  const isCiuUser = userId === 'chq-2'; // From constants.ts CHQ CIU is the second name
   
   const pi1_25_activities = [
     { id: "pi1_25_1", name: "Formulation of Stratcom Snapshots", indicator: "No. of stratcom snaphot formulated", defaults: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] },
@@ -161,7 +162,11 @@ const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
     {
       id: "PI4",
       title: "Percentage of accounted loose firearms against the estimated baseline data",
-      activities: [
+      activities: is2026 && isCiuUser ? [
+        { id: "pi4_ciu_1", name: "JAPIC", indicator: "JAPIC conducted", defaults: Array(12).fill(0) },
+        { id: "pi4_ciu_2", name: "Operations on loose firearms", indicator: "Operations on loose firearms conducted", defaults: Array(12).fill(0) },
+        { id: "pi4_ciu_3", name: "Bakal/Sita", indicator: "Bakal/Sita conducted", defaults: Array(12).fill(0) }
+      ] : [
         { id: "pi4_f_1", name: "JAPIC", indicator: "JAPIC conducted", defaults: [0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0] },
         { id: "pi4_f_2", name: "Operations on loose firearms", indicator: "Operations on loose firearms conducted", defaults: [3, 4, 5, 3, 2, 2, 4, 0, 8, 3, 7, 3] },
         { id: "pi4_f_3", name: "Bakal/Sita", indicator: "Bakal/Sita conducted", defaults: [796, 768, 794, 754, 794, 784, 761, 763, 754, 754, 574, 583] }
@@ -208,7 +213,45 @@ const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
     {
       id: "PI8",
       title: "Number of target hardening measures conducted",
-      activities: [
+      activities: is2026 && isCiuUser ? [
+        { id: "pi8_ciu_1", name: "Security Survey/Inspection", indicator: "# of Security Survey/Inspection conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_2", name: "CI check/validation", indicator: "# of CI check/validation conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_3", name: "CI monitoring", indicator: "# CI monitoring conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_4", name: "Clearances issued to civilians", indicator: "# of Clearances issued to civilians", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_5", name: "Clearances issued to PNP/AFP per", indicator: "# of Clearances issued to PNP/AFP per", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_6", name: "Threat assessment", indicator: "# of Threat assessment conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_7", name: "Recruitment/maintenance of FNKN", indicator: "# of Recruitment/maintenance of FNKN", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_8", name: "Communications with FNKN", indicator: "# of Communications with FNKN", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_9", name: "Monitoring of cases/incidents involving foreign nationals", indicator: "# of Monitoring of cases/incidents involving foreign nationals", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_10", name: "SO during national events", indicator: "# of SO during national events conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_11", name: "Security to vital installations", indicator: "# of Security to vital installations conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_12", name: "VIP security protection", indicator: "# of VIP security protection", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_13", name: "collaborative efforts with NGOs, CSOs, GAs and Non-GAs and other stakeholders re Muslim Affairs", indicator: "# of collaborative efforts with NGOs, CSOs, GAs and Non-GAs and other stakeholders re Muslim Affairs conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_14", name: "Medical and Dental outreach and other Similar Activities in Muslim Community", indicator: "# of Medical and Dental outreach and other Similar Activities in Muslim Community conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_15", name: "Awareness activity relative to clan/family feuds settlement and conflict resolution and mediation", indicator: "# of Awareness activity relative to clan/family feuds settlement and conflict resolution and mediation Conduct", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_16", name: "Conduct prayer rallies, peace covenant signing, peace caravan, and other peacebuilding-related activity like sports activity", indicator: "Conduct prayer rallies, peace covenant signing, peace caravan, and other peacebuilding-related activity like sports activity", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_17", name: "Strengthening of Salaam Force Multipliers/Salaam Police Advocacy Groups (SPAG)", indicator: "Strengthening of Salaam Force Multipliers/Salaam Police Advocacy Groups (SPAG)", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_18", name: "Peace and PCVE training for Muslim Scholars", indicator: "Peace and PCVE training for Muslim Scholars", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_19", name: "Understanding PCVE for BJMP Personnel", indicator: "Understanding PCVE for BJMP Personnel", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_20", name: "PNP Custodial Facility Visitation and Counseling of Muslim and Non-Muslim Person's Deprived of Liberty with TRC's", indicator: "PNP Custodial Facility Visitation and Counseling of Muslim and Non-Muslim Person's Deprived of Liberty with TRC's", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_21", name: "Open-house visitation of Masjid and Madrasah", indicator: "Open-house visitation of Masjid and Madrasah", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_22", name: "Masjid and Madrasah Visitation", indicator: "Masjid and Madrasah Visitation", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_23", name: "Masjid and Madrasah Visitation", indicator: "Masjid and Madrasah Visitation", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_24", name: "# of Security opns during rallies/demonstrations conducted", indicator: "# of Security opns during rallies/demonstrations conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_25", name: "# of K9 patrols conducted", indicator: "# of K9 patrols conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_26", name: "# of seaborne patrols conducted", indicator: "# of seaborne patrols conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_27", name: "# of EOD counter measures conducted", indicator: "# of EOD counter measures conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_28", name: "# of BI conducted", indicator: "# of BI conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_29", name: "# of record check conducted", indicator: "# of record check conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_30", name: "# of CI opns conducted", indicator: "# of CI opns conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_31", name: "# of SIMEX conducted", indicator: "# of SIMEX conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_32", name: "# of scty opns during local events conducted", indicator: "# of scty opns during local events conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_33", name: "# of beat/foot patrols conducted", indicator: "# of beat/foot patrols conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_34", name: "# of bike patrols conducted", indicator: "# of bike patrols conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_35", name: "# of horse-riding patrols conducted", indicator: "# of horse-riding patrols conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_36", name: "# of mobile patrols conducted", indicator: "# of mobile patrols conducted", defaults: Array(12).fill(0) },
+        { id: "pi8_ciu_37", name: "# of checkpoints conducted", indicator: "# of checkpoints conducted", defaults: Array(12).fill(0) }
+      ] : [
         { id: "pi8_f_1", name: "Security Survey/Inspection", indicator: "# of Security Survey/Inspection conducted", defaults: [2, 0, 2, 2, 2, 2, 4, 2, 3, 2, 6, 2] },
         { id: "pi8_f_2", name: "CI check/validation", indicator: "# of CI check/validation conducted", defaults: [22, 22, 16, 16, 19, 19, 18, 16, 21, 25, 7, 13] },
         { id: "pi8_f_3", name: "CI monitoring", indicator: "# CI monitoring conducted", defaults: [14, 12, 5, 5, 5, 4, 6, 5, 8, 21, 7, 13] },
@@ -272,7 +315,30 @@ const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
     {
       id: "PI11",
       title: "Number of threat group neutralized",
-      activities: [
+      activities: is2026 && isCiuUser ? [
+        { id: "pi11_ciu_1", name: "COPLANs formulated", indicator: "COPLANs formulated", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_2", name: "COPLANs implemented", indicator: "COPLANs implemented", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_3", name: "HVT reports submitted", indicator: "HVT reports submitted", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_4", name: "information purchased", indicator: "information purchased", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_5", name: "OCG/CG pers neutralized", indicator: "OCG/CG pers neutralized", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_6", name: "HVTs newly identified", indicator: "HVTs newly identified", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_7", name: "HVTs neutralized", indicator: "HVTs neutralized", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_8", name: "PAG personalities neutralized", indicator: "PAG personalities neutralized", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_9", name: "IRs (criminality) for validation referred", indicator: "IRs (criminality) for validation referred", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_10", name: "Oversight Committee Meetings conducted", indicator: "Oversight Committee Meetings conducted", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_11", name: "PICs conducted", indicator: "PICs conducted", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_12", name: "IRs processed", indicator: "IRs processed", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_13", name: "IRs validated", indicator: "IRs validated", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_14", name: "compliances received and filed", indicator: "compliances received and filed", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_15", name: "HVTs arrested/neutralized", indicator: "HVTs arrested/neutralized", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_16", name: "IFCs maintained", indicator: "IFCs maintained", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_17", name: "Periodic Reports on Organized Threat Groups produced", indicator: "Periodic Reports on Organized Threat Groups produced", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_18", name: "assessment reports submitted", indicator: "assessment reports submitted", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_19", name: "intel products disseminated/utilized", indicator: "intel products disseminated/utilized", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_20", name: "debriefings conducted", indicator: "debriefings conducted", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_21", name: "Interviews conducted", indicator: "Interviews conducted", defaults: Array(12).fill(0) },
+        { id: "pi11_ciu_22", name: "elicitations conducted", indicator: "elicitations conducted", defaults: Array(12).fill(0) }
+      ] : [
         { id: "pi11_f_1", name: "COPLANs formulated", indicator: "COPLANs formulated", defaults: [0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0] },
         { id: "pi11_f_2", name: "COPLANs implemented", indicator: "COPLANs implemented", defaults: [1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0] },
         { id: "pi11_f_3", name: "HVT reports submitted", indicator: "HVT reports submitted", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0] },
@@ -300,7 +366,13 @@ const getPIDefinitions = (year: string, userId: string, role: UserRole) => {
     {
       id: "PI12",
       title: "Number of utilized BINs",
-      activities: [
+      activities: is2026 && isCiuUser ? [
+        { id: "pi12_ciu_1", name: "# of inventory made", indicator: "# of inventory made", defaults: Array(12).fill(0) },
+        { id: "pi12_ciu_2", name: "# of assessment/ratings made", indicator: "# of assessment/ratings made", defaults: Array(12).fill(0) },
+        { id: "pi12_ciu_3", name: "# of directives disseminated", indicator: "# of directives disseminated", defaults: Array(12).fill(0) },
+        { id: "pi12_ciu_4", name: "# of BINs documented/registered and maintained", indicator: "# of BINs documented/registered and maintained", defaults: Array(12).fill(0) },
+        { id: "pi12_ciu_5", name: "# of IRs prepared and submitted", indicator: "# of IRs prepared and submitted", defaults: Array(12).fill(0) }
+      ] : [
         { id: "pi12_f_1", name: "# of inventory made", indicator: "# of inventory made", defaults: [20, 20, 20, 20, 20, 31, 38, 43, 58, 59, 57, 51] },
         { id: "pi12_f_2", name: "# of assessment/ratings made", indicator: "# of assessment/ratings made", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
         { id: "pi12_f_3", name: "# of directives disseminated", indicator: "# of directives disseminated", defaults: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
