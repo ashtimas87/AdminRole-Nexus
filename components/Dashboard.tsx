@@ -254,7 +254,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           <div className="space-y-4">
             <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-600"></div>
-              System-Wide Consolidation
+              Consolidation of CHQ & Tactical
             </h3>
             <div 
               onClick={() => { setSelectedOverviewUser(user); setView('operational-dashboard'); }} 
@@ -264,8 +264,8 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
               </div>
               <div>
-                <p className="text-xl font-black text-white">Full Operational Summary {selectedYear}</p>
-                <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">CONSOLIDATED SYSTEM VIEW</p>
+                <p className="text-xl font-black text-white">CHQ & Tactical Consolidated {selectedYear}</p>
+                <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">ACTIVITY DATA ACCOMPLISHMENT</p>
               </div>
             </div>
           </div>
@@ -279,7 +279,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
                 {chqUsers.map(u => (
                   <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('operational-dashboard'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-indigo-500 transition-all text-left cursor-pointer shadow-sm hover:shadow-md">
                     <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
-                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-slate-400">CHQ UNIT</p></div>
+                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-slate-400">CHQ ACCOMPLISHMENT</p></div>
                   </div>
                 ))}
               </div>
@@ -293,7 +293,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
                 {stationUsers.map(u => (
                   <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('operational-dashboard'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-orange-500 transition-all text-left cursor-pointer shadow-sm hover:shadow-md">
                     <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
-                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-slate-400">STATION UNIT</p></div>
+                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-slate-400">TACTICAL ACCOMPLISHMENT</p></div>
                   </div>
                 ))}
               </div>
@@ -333,7 +333,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
 
         {(isAdmin || (user.role === UserRole.CHQ && selectedYear === '2023')) && (
           <div className="space-y-4">
-            <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">System-Wide Consolidation</h3>
+            <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Consolidation of CHQ & Tactical</h3>
             <div 
               onClick={() => { setSelectedOverviewUser(user); setView('target-outlook'); }} 
               className="w-full flex items-center gap-5 p-6 bg-amber-900 rounded-3xl border-2 border-amber-800 hover:border-amber-400 transition-all text-left cursor-pointer shadow-xl group"
@@ -342,7 +342,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
               </div>
               <div>
-                <p className="text-xl font-black text-white">Full Target Outlook Summary {selectedYear}</p>
+                <p className="text-xl font-black text-white">Full Target Outlook Consolidation {selectedYear}</p>
                 <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">OFFICE MASTER PROJECTIONS</p>
               </div>
             </div>
@@ -451,6 +451,19 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
     </div>
   );
 
+  const getDashboardTitle = (targetUser: User, year: string, isOutlook: boolean) => {
+    const isHeadOffice = targetUser.id === user.id || targetUser.role === UserRole.SUB_ADMIN;
+    if (isOutlook) {
+      const type = isHeadOffice ? 'CHQ & Tactical Consolidated' : `${targetUser.name}`;
+      return `${type} ${year} Target Outlook`;
+    } else {
+      const isTactical = targetUser.role === UserRole.STATION;
+      if (isHeadOffice) return `CHQ & Tactical Consolidation ${year} Accomplishment`;
+      const type = isTactical ? 'Tactical Accomplishment' : 'CHQ Accomplishment';
+      return `${targetUser.name} ${year} ${type}`;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <nav className="sticky top-0 z-30 bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm">
@@ -477,7 +490,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           {view === 'target-outlook-landing' && renderTargetOutlookLanding()}
           {view === 'operational-dashboard' && selectedOverviewUser && (
             <OperationalDashboard 
-              title={`${selectedOverviewUser.id === user.id || selectedOverviewUser.role === UserRole.SUB_ADMIN ? 'Consolidated' : selectedOverviewUser.name} ${selectedYear} Accomplishment`} 
+              title={getDashboardTitle(selectedOverviewUser, selectedYear, false)} 
               onBack={() => setView(canSeeOversight ? 'unit-oversight' : 'status-terminal')} 
               currentUser={user} 
               subjectUser={selectedOverviewUser}
@@ -486,7 +499,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           )}
           {view === 'target-outlook' && selectedOverviewUser && (
             <OperationalDashboard 
-              title={`${selectedOverviewUser.id === user.id || selectedOverviewUser.role === UserRole.SUB_ADMIN ? 'System' : selectedOverviewUser.name} ${selectedYear} Target Outlook`} 
+              title={getDashboardTitle(selectedOverviewUser, selectedYear, true)} 
               onBack={() => setView('target-outlook-landing')} 
               currentUser={user} 
               subjectUser={selectedOverviewUser} 

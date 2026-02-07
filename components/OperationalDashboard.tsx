@@ -65,7 +65,7 @@ const createMonthsForActivity = (prefix: string, year: string, userId: string, p
   });
 };
 
-const getPIDefinitions = (prefix: string, year: string, userId: string, role: UserRole, isConsolidated: boolean, units: User[]) => {
+const getPIDefinitions = (prefix: string, year: string, userId: string, role: UserRole, isConsolidated: boolean, units: User[], ignoreHidden = false) => {
   const effectiveId = getEffectiveUserId(userId);
   const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
   const hiddenPIs: string[] = JSON.parse(localStorage.getItem(hiddenPIsKey) || '[]');
@@ -299,7 +299,7 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
   }
 
   return allDefinitions
-    .filter(pi => !hiddenPIs.includes(pi.id))
+    .filter(pi => ignoreHidden ? true : !hiddenPIs.includes(pi.id))
     .map(pi => {
       const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${pi.id}`;
       const storedIds = localStorage.getItem(actIdsKey);
@@ -308,11 +308,21 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
 
       const activities = activityIds.map(aid => {
         const base = pi.activities.find((a: any) => a.id === aid);
+        
+        /**
+         * Requirement: On CHQ, Station, and Company users, 
+         * on Accomplishment views, default data is 0 from JAN to DEC.
+         */
+        let effectiveDefaults = base?.defaults || Array(12).fill(0);
+        if (prefix === 'accomplishment' && (role === UserRole.CHQ || role === UserRole.STATION)) {
+          effectiveDefaults = Array(12).fill(0);
+        }
+
         return {
           id: aid,
           activity: getSharedActivityName(prefix, year, effectiveId, pi.id, aid, base?.name || "New Activity"),
           indicator: getSharedIndicatorName(prefix, year, effectiveId, pi.id, aid, base?.indicator || "New Indicator"),
-          months: createMonthsForActivity(prefix, year, effectiveId, pi.id, aid, base?.defaults || Array(12).fill(0), role, isConsolidated, units)
+          months: createMonthsForActivity(prefix, year, effectiveId, pi.id, aid, effectiveDefaults, role, isConsolidated, units)
         };
       });
 
@@ -565,68 +575,102 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
   /**
    * Generates a comprehensive multi-sheet Excel report for all active Performance Indicators.
-   * As requested: exports all tabbings (PI 1 to PI 29) with their respective monthly data.
+   * As requested: exports ALL tabbings (PI 1 to PI 29) regardless of UI visibility.
    */
   const handleExportExcel = () => {
     const workbook = XLSX.utils.book_new();
+    const unitsToConsolidate = prefix === 'accomplishment' ? allUnits : [];
+    
+    // Fetch FULL data set (ignoreHidden = true)
+    const fullData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate, true);
 
-    piData.forEach(pi => {
+    fullData.forEach(pi => {
+      // Calculate totals for export data
+      const activitiesWithTotals = pi.activities.map(a => ({
+        ...a,
+        total: a.months.reduce((sum, m) => sum + m.value, 0)
+      }));
+
       const tabLabel = getSharedTabLabel(prefix, year, effectiveId, pi.id, `PI ${pi.id.replace('PI','')}`);
       const piIsPercent = ["PI4", "PI9", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(pi.id);
 
-      // Construct a data array for the sheet
-      const sheetData = pi.activities.map(act => {
+      const sheetData = activitiesWithTotals.map(act => {
         const row: Record<string, any> = {
           "Activity": act.activity,
-          "Indicator": act.indicator
+          "Performance Indicator": act.indicator
         };
-        
-        // Add monthly values
         act.months.forEach((m, idx) => {
           row[MONTHS[idx]] = piIsPercent ? `${m.value}%` : m.value;
         });
-        
-        // Add row total
         row["Total"] = piIsPercent ? `${Math.round(act.total / 12)}%` : act.total;
-        
         return row;
       });
 
       const worksheet = XLSX.utils.json_to_sheet(sheetData);
-      
-      // Basic column width hints for better readability
-      worksheet['!cols'] = [
-        { wch: 45 }, // Activity
-        { wch: 45 }, // Indicator
-        ...Array(13).fill({ wch: 8 }) // Jan-Dec + Total
-      ];
-
-      // Excel sheet names are restricted to 31 chars and certain symbols are forbidden
+      worksheet['!cols'] = [{ wch: 45 }, { wch: 45 }, ...Array(13).fill({ wch: 8 })];
       const safeSheetName = tabLabel.substring(0, 31).replace(/[\[\]\*\?\/\\]/g, ' ');
       XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
     });
 
     const reportType = isTargetOutlook ? 'Target_Outlook' : 'Accomplishment_Report';
-    XLSX.writeFile(workbook, `${subjectUser.name}_${reportType}_${year}.xlsx`);
+    XLSX.writeFile(workbook, `${subjectUser.name}_${reportType}_${year}_Full_Report.xlsx`);
   };
 
+  /**
+   * Generates a comprehensive PowerPoint presentation for all active Performance Indicators.
+   * As requested: exports ALL tabbings (PI 1 to PI 29) regardless of UI visibility.
+   */
   const handleExportPPT = async () => {
     const pres = new pptxgen();
     const titleSlide = pres.addSlide();
     titleSlide.background = { fill: "F8FAFC" };
     titleSlide.addText("CPSMU Monitoring Report", { x: 0, y: "40%", w: "100%", align: "center", fontSize: 36, bold: true, color: "0F172A" });
     titleSlide.addText(`${title}\nUnit: ${subjectUser.name}`, { x: 0, y: "55%", w: "100%", align: "center", fontSize: 18, color: "64748B" });
-    piData.forEach(pi => {
+
+    const unitsToConsolidate = prefix === 'accomplishment' ? allUnits : [];
+    
+    // Fetch FULL data set (ignoreHidden = true)
+    const exportData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate, true);
+
+    exportData.forEach(pi => {
+      // Calculate totals for export
+      const activitiesWithTotals = pi.activities.map(a => ({
+        ...a,
+        total: a.months.reduce((sum, m) => sum + m.value, 0)
+      }));
+
       const slide = pres.addSlide();
       slide.addText(pi.title, { x: 0.5, y: 0.3, w: "90%", fontSize: 14, bold: true, color: "0F172A", align: "center" });
+      
       const piIsPercent = ["PI4", "PI9", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(pi.id);
+      
       const tableData = [
-        [{ text: "Activity", options: { fill: "FFFF00", bold: true } }, { text: "Indicator", options: { fill: "FFFF00", bold: true } }, ...MONTHS.map(m => ({ text: m, options: { fill: "00B0F0", bold: true, color: "FFFFFF" } })), { text: "Total", options: { fill: "FFFF00", bold: true } }],
-        ...pi.activities.map(a => [{ text: a.activity }, { text: a.indicator }, ...a.months.map(m => ({ text: piIsPercent ? `${m.value}%` : String(m.value) })), { text: piIsPercent ? `${Math.round(a.total / 12)}%` : String(a.total), options: { bold: true } }])
+        [
+          { text: "Activity", options: { fill: "FFFF00", bold: true, color: "000000" } },
+          { text: "Performance Indicator", options: { fill: "FFFF00", bold: true, color: "000000" } },
+          ...MONTHS.map(m => ({ text: m, options: { fill: "00B0F0", bold: true, color: "FFFFFF" } })),
+          { text: "Total", options: { fill: "FFFF00", bold: true, color: "000000" } }
+        ],
+        ...activitiesWithTotals.map(a => [
+          { text: a.activity },
+          { text: a.indicator },
+          ...a.months.map(m => ({ text: piIsPercent ? `${m.value}%` : String(m.value) })),
+          { text: piIsPercent ? `${Math.round(a.total / 12)}%` : String(a.total), options: { bold: true } }
+        ])
       ];
-      slide.addTable(tableData, { x: 0.2, y: 1.0, w: 9.6, fontSize: 8, border: { type: "solid", color: "CBD5E1", pt: 0.5 }, align: "center", valign: "middle", autoPage: true, colWidths: [1.8, 1.8, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.6] });
+
+      slide.addTable(tableData, {
+        x: 0.2, y: 1.0, w: 9.6,
+        fontSize: 8,
+        border: { type: "solid", color: "CBD5E1", pt: 0.5 },
+        align: "center",
+        valign: "middle",
+        autoPage: true,
+        colWidths: [1.8, 1.8, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.6]
+      });
     });
-    pres.writeFile({ fileName: `${subjectUser.name}_${prefix}_${year}_Dashboard.pptx` });
+
+    pres.writeFile({ fileName: `${subjectUser.name}_${prefix}_${year}_Full_Report.pptx` });
   };
 
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -673,8 +717,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">{title}</h2>
             <span className="px-3 py-1 bg-slate-900 text-white text-[10px] font-black rounded uppercase tracking-widest">UNIT: {subjectUser.name}</span>
             <div className="flex items-center gap-2 ml-2">
-              <button onClick={handleExportPPT} className="p-1 hover:scale-110 transition-transform" title="Export PPT"><DownloadIcon /></button>
-              <button onClick={handleExportExcel} className="p-1 hover:scale-110 transition-transform" title="Export Excel Report (PI 1 to PI 29)"><ExcelExportIcon /></button>
+              <button onClick={handleExportPPT} className="p-1 hover:scale-110 transition-transform" title="Export Full PPT (All Tabs)"><DownloadIcon /></button>
+              <button onClick={handleExportExcel} className="p-1 hover:scale-110 transition-transform" title="Export Full Excel Report (All Tabs)"><ExcelExportIcon /></button>
               {currentUser.role === UserRole.SUPER_ADMIN && (
                 <>
                   <label className="p-1 hover:scale-110 transition-transform cursor-pointer" title="Import Structure Template">
@@ -726,7 +770,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
       <div className="bg-white rounded-2xl border border-slate-300 shadow-xl overflow-hidden">
         <div className="bg-slate-50 py-4 px-6 border-b border-slate-200 text-center font-black uppercase text-slate-800 text-[10px] tracking-widest flex items-center justify-center gap-2">
-          Indicator #{activeTab.replace('PI','')} – {currentPI.title}
+          Performance Indicator #{activeTab.replace('PI','')} – {currentPI.title}
           {isConsolidated && <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded text-[8px] font-black uppercase tracking-tighter">Aggregated View</span>}
         </div>
         <div className="overflow-x-auto">
@@ -734,7 +778,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             <thead>
               <tr className="bg-[#FFFF00] font-black uppercase">
                 <th rowSpan={2} className="border border-slate-300 p-2 w-72">Activity</th>
-                <th rowSpan={2} className="border border-slate-300 p-2 w-72">Indicator</th>
+                <th rowSpan={2} className="border border-slate-300 p-2 w-72">Performance Indicator</th>
                 <th colSpan={12} className="border border-slate-300 bg-[#00B0F0] p-2 text-white">{isTargetOutlook ? `${year} Target Outlook` : `${year} Accomplishments`}</th>
                 <th rowSpan={2} className="border border-slate-300 p-2 w-16">Total</th>
               </tr>
