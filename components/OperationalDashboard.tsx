@@ -394,11 +394,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const isHeadOfficeView = subjectUser.id === currentUser.id || subjectUser.role === UserRole.SUB_ADMIN;
   const isConsolidated = prefix === 'accomplishment' && isHeadOfficeView;
   const isRestrictedSuperAdmin = currentUser.role === UserRole.SUPER_ADMIN && (subjectUser.role === UserRole.CHQ || subjectUser.role === UserRole.STATION);
-  
-  // Data modification (values/files) is restricted for Super Admin on non-owner unit views
   const canModifyData = (isOwner || (currentUser.role === UserRole.SUPER_ADMIN && isHeadOfficeView)) && !isRestrictedSuperAdmin && !isConsolidated;
-  
-  // Structural changes are globally enabled for Super Admin
   const canEditStructure = currentUser.role === UserRole.SUPER_ADMIN;
 
   const refresh = () => {
@@ -432,30 +428,16 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     if (!editingCell || !currentPI) return;
     const val = parseInt(editValue, 10) || 0;
     const aid = currentPI.activities[editingCell.rowIdx].id;
-    
-    // Save to the current unit's specific storage
     const storageKey = `${prefix}_data_${year}_${effectiveId}_${activeTab}_${aid}_${editingCell.monthIdx}`;
     localStorage.setItem(storageKey, String(val));
-
-    /**
-     * Strategic Sync Logic:
-     * If editing Police Station 1's 2026 Target Outlook, automatically broadcast 
-     * this value to all other station users (excluding Company users).
-     */
     if (prefix === 'target' && year === '2026' && subjectUser.name === 'Police Station 1') {
       allUnits.forEach(unit => {
-        // Condition: Role is STATION, name is not Company Force, and it's not the station we just edited
-        if (
-          unit.role === UserRole.STATION && 
-          unit.name !== 'City Mobile Force Company' && 
-          unit.id !== subjectUser.id
-        ) {
+        if (unit.role === UserRole.STATION && unit.name !== 'City Mobile Force Company' && unit.id !== subjectUser.id) {
           const syncKey = `${prefix}_data_${year}_${unit.id}_${activeTab}_${aid}_${editingCell.monthIdx}`;
           localStorage.setItem(syncKey, String(val));
         }
       });
     }
-
     refresh();
     setEditingCell(null);
   };
@@ -510,37 +492,23 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
   const removeActivity = (aid: string) => {
     if (!canEditStructure || !currentPI) return;
-    if (!confirm('Are you sure you want to PERMANENTLY remove this activity and all its data for this specific unit view?')) return;
+    if (!confirm('Are you sure you want to PERMANENTLY remove this activity row for this unit view?')) return;
     const newIds = currentPI.activities.map(a => a.id).filter(id => id !== aid);
     localStorage.setItem(`${prefix}_pi_act_ids_${year}_${effectiveId}_${activeTab}`, JSON.stringify(newIds));
-    localStorage.removeItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${activeTab}_${aid}`);
-    localStorage.removeItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${activeTab}_${aid}`);
-    MONTHS.forEach((_, idx) => {
-      localStorage.removeItem(`${prefix}_data_${year}_${effectiveId}_${activeTab}_${aid}_${idx}`);
-      localStorage.removeItem(`${prefix}_files_${year}_${effectiveId}_${activeTab}_${aid}_${idx}`);
-    });
     refresh();
   };
 
-  const handleMoveActivity = (aid: string, direction: 'up' | 'down') => {
-    if (!canEditStructure || !currentPI) return;
-    const currentIds = currentPI.activities.map(a => a.id);
-    const idx = currentIds.indexOf(aid);
-    if (idx === -1) return;
-    const newIds = [...currentIds];
-    if (direction === 'up' && idx > 0) [newIds[idx], newIds[idx - 1]] = [newIds[idx - 1], newIds[idx]];
-    else if (direction === 'down' && idx < newIds.length - 1) [newIds[idx], newIds[idx + 1]] = [newIds[idx + 1], newIds[idx]];
-    localStorage.setItem(`${prefix}_pi_act_ids_${year}_${effectiveId}_${activeTab}`, JSON.stringify(newIds));
-    refresh();
-  };
-
-  const hideTab = (pid: string, e: React.MouseEvent) => {
+  const handleMoveTab = (e: React.MouseEvent, piId: string, direction: 'left' | 'right') => {
     e.stopPropagation();
     if (!canEditStructure) return;
-    if (!confirm(`Permanently hide Tab ${pid} from the current unit's report profile?`)) return;
-    const key = `${prefix}_hidden_pis_${year}_${effectiveId}`;
-    const hidden: string[] = JSON.parse(localStorage.getItem(key) || '[]');
-    localStorage.setItem(key, JSON.stringify([...hidden, pid]));
+    const orderKey = `${prefix}_pi_order_${year}_${effectiveId}`;
+    const currentOrder = piData.map(p => p.id);
+    const idx = currentOrder.indexOf(piId);
+    if (idx === -1) return;
+    const newOrder = [...currentOrder];
+    if (direction === 'left' && idx > 0) [newOrder[idx], newOrder[idx - 1]] = [newOrder[idx - 1], newOrder[idx]];
+    else if (direction === 'right' && idx < newOrder.length - 1) [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
+    localStorage.setItem(orderKey, JSON.stringify(newOrder));
     refresh();
   };
 
@@ -557,6 +525,16 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       setEditingTabId(null);
       refresh();
     }
+  };
+
+  const hideTab = (pid: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!canEditStructure) return;
+    if (!confirm(`Permanently hide Tab ${pid} from the current unit's report profile?`)) return;
+    const key = `${prefix}_hidden_pis_${year}_${effectiveId}`;
+    const hidden: string[] = JSON.parse(localStorage.getItem(key) || '[]');
+    localStorage.setItem(key, JSON.stringify([...hidden, pid]));
+    refresh();
   };
 
   const handleStartEditField = (aid: string, field: 'activity' | 'indicator', currentVal: string) => {
@@ -576,38 +554,17 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     refresh();
   };
 
-  const handleMoveTab = (e: React.MouseEvent, piId: string, direction: 'left' | 'right') => {
-    e.stopPropagation();
-    if (!canEditStructure) return;
-    const orderKey = `${prefix}_pi_order_${year}_${effectiveId}`;
-    const currentOrder = piData.map(p => p.id);
-    const idx = currentOrder.indexOf(piId);
-    if (idx === -1) return;
-    const newOrder = [...currentOrder];
-    if (direction === 'left' && idx > 0) [newOrder[idx], newOrder[idx - 1]] = [newOrder[idx - 1], newOrder[idx]];
-    else if (direction === 'right' && idx < newOrder.length - 1) [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
-    localStorage.setItem(orderKey, JSON.stringify(newOrder));
-    refresh();
-  };
-
   const unhideAll = () => {
     if (!confirm('Restore all hidden items and reset tab labels/order for this unit/year?')) return;
     localStorage.removeItem(`${prefix}_hidden_pis_${year}_${effectiveId}`);
     localStorage.removeItem(`${prefix}_pi_order_${year}_${effectiveId}`);
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.startsWith(`${prefix}_pi_act_ids_${year}_${effectiveId}_`) || key.startsWith(`${prefix}_pi_tab_${year}_${effectiveId}_`))) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
     refresh();
   };
 
   const handleExportExcel = () => {
+    const currentTabLabel = getSharedTabLabel(prefix, year, effectiveId, currentPI.id, `PI ${currentPI.id.replace('PI','')}`);
     const dataForExport = piData.flatMap(pi => {
-      const tabLabel = getSharedTabLabel(prefix, year, subjectUser.id, pi.id, `PI ${pi.id.replace('PI','')}`);
+      const tabLabel = getSharedTabLabel(prefix, year, effectiveId, pi.id, `PI ${pi.id.replace('PI','')}`);
       return pi.activities.map(act => ({
         PI_ID: pi.id,
         PI_Title: pi.title,
@@ -620,7 +577,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const worksheet = XLSX.utils.json_to_sheet(dataForExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Dashboard Structure");
-    XLSX.writeFile(workbook, `${subjectUser.name}_${prefix}_${year}_Template.xlsx`);
+    // Updated filename as requested: Template_[TabLabel]_[UnitName]
+    XLSX.writeFile(workbook, `Template_${currentTabLabel}_${subjectUser.name}.xlsx`);
   };
 
   const handleExportPPT = async () => {
@@ -629,33 +587,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     titleSlide.background = { fill: "F8FAFC" };
     titleSlide.addText("CPSMU Monitoring Report", { x: 0, y: "40%", w: "100%", align: "center", fontSize: 36, bold: true, color: "0F172A" });
     titleSlide.addText(`${title}\nUnit: ${subjectUser.name}`, { x: 0, y: "55%", w: "100%", align: "center", fontSize: 18, color: "64748B" });
-    
     piData.forEach(pi => {
       const slide = pres.addSlide();
       slide.addText(pi.title, { x: 0.5, y: 0.3, w: "90%", fontSize: 14, bold: true, color: "0F172A", align: "center" });
       const tableData = [
-        [
-          { text: "Activity", options: { fill: "FFFF00", bold: true, color: "000000" } },
-          { text: "Indicator", options: { fill: "FFFF00", bold: true, color: "000000" } },
-          ...MONTHS.map(m => ({ text: m, options: { fill: "00B0F0", bold: true, color: "FFFFFF" } })),
-          { text: "Total", options: { fill: "FFFF00", bold: true, color: "000000" } }
-        ],
-        ...pi.activities.map(a => [
-          { text: a.activity },
-          { text: a.indicator },
-          ...a.months.map(m => ({ text: isPercent ? `${m.value}%` : String(m.value) })),
-          { text: isPercent ? `${Math.round(a.total / 12)}%` : String(a.total), options: { bold: true, fill: "F8FAFC" } }
-        ])
+        [{ text: "Activity", options: { fill: "FFFF00", bold: true } }, { text: "Indicator", options: { fill: "FFFF00", bold: true } }, ...MONTHS.map(m => ({ text: m, options: { fill: "00B0F0", bold: true, color: "FFFFFF" } })), { text: "Total", options: { fill: "FFFF00", bold: true } }],
+        ...pi.activities.map(a => [{ text: a.activity }, { text: a.indicator }, ...a.months.map(m => ({ text: isPercent ? `${m.value}%` : String(m.value) })), { text: isPercent ? `${Math.round(a.total / 12)}%` : String(a.total), options: { bold: true } }])
       ];
-      slide.addTable(tableData, {
-        x: 0.2, y: 1.0, w: 9.6,
-        fontSize: 8,
-        border: { type: "solid", color: "CBD5E1", pt: 0.5 },
-        align: "center",
-        valign: "middle",
-        autoPage: true,
-        colWidths: [1.8, 1.8, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.6]
-      });
+      slide.addTable(tableData, { x: 0.2, y: 1.0, w: 9.6, fontSize: 8, border: { type: "solid", color: "CBD5E1", pt: 0.5 }, align: "center", valign: "middle", autoPage: true, colWidths: [1.8, 1.8, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.6] });
     });
     pres.writeFile({ fileName: `${subjectUser.name}_${prefix}_${year}_Dashboard.pptx` });
   };
@@ -687,12 +626,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     if (!currentPI) return { m: Array(12).fill(0), g: 0 };
     const m = Array(12).fill(0);
     currentPI.activities.forEach(a => a.months.forEach((mo, i) => m[i] += mo.value));
-    const g = isPercent ? (m.reduce((s,v)=>s+v,0)/12) : currentPI.activities.reduce((s, a) => s + a.total, 0);
     const div = currentPI.activities.length || 1;
-    return { 
-      m: isPercent ? m.map(v => Math.round(v / div)) : m, 
-      g: isPercent ? Math.round(g / div) : g 
-    };
+    const mOut = isPercent ? m.map(v => Math.round(v / div)) : m;
+    const g = isPercent ? (mOut.reduce((s,v)=>s+v,0)/12) : currentPI.activities.reduce((s, a) => s + a.total, 0);
+    return { m: mOut, g: isPercent ? Math.round(g) : g };
   }, [currentPI, isPercent]);
 
   if (!currentPI) return null;
@@ -735,26 +672,17 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                     <button onClick={(e) => handleMoveTab(e, pi.id, 'right')} className="p-0.5 bg-slate-100 rounded text-slate-500"><svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg></button>
                   </div>
                 )}
-                <div className="relative group">
-                  <button 
-                    onClick={() => !isEditing && setActiveTab(pi.id)} 
-                    className={`px-4 py-2 rounded-lg text-xs font-black transition-all border flex items-center gap-2 ${activeTab === pi.id ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-                  >
-                    {isEditing ? (
-                      <input autoFocus className="bg-white text-slate-900 px-1 rounded border border-blue-500 font-black outline-none w-24" value={editTabLabel} onChange={e => setEditTabLabel(e.target.value)} onBlur={handleSaveTabLabel} onKeyDown={e => e.key === 'Enter' && handleSaveTabLabel()} />
-                    ) : label}
-                    {canEditStructure && !isEditing && (
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
-                        <button onClick={(e) => handleStartRenameTab(e, pi)} className="text-slate-400 hover:text-blue-400 transition p-0.5" title="Rename Tab">
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        </button>
-                        <button onClick={(e) => hideTab(pi.id, e)} className="text-slate-400 hover:text-red-400 transition p-0.5" title="Hide Tab">
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                      </div>
-                    )}
-                  </button>
-                </div>
+                <button onClick={() => !isEditing && setActiveTab(pi.id)} className={`px-4 py-2 rounded-lg text-xs font-black transition-all border flex items-center gap-2 group ${activeTab === pi.id ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+                  {isEditing ? (
+                    <input autoFocus className="bg-white text-slate-900 px-1 rounded border border-blue-500 font-black outline-none w-24" value={editTabLabel} onChange={e => setEditTabLabel(e.target.value)} onBlur={handleSaveTabLabel} onKeyDown={e => e.key === 'Enter' && handleSaveTabLabel()} />
+                  ) : label}
+                  {canEditStructure && !isEditing && (
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+                      <button onClick={(e) => handleStartRenameTab(e, pi)} className="text-slate-400 hover:text-blue-400 p-0.5"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
+                      <button onClick={(e) => hideTab(pi.id, e)} className="text-slate-400 hover:text-red-400 p-0.5"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                    </div>
+                  )}
+                </button>
               </div>
             );
           })}
@@ -763,8 +691,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
       <div className="bg-white rounded-2xl border border-slate-300 shadow-xl overflow-hidden">
         <div className="bg-slate-50 py-4 px-6 border-b border-slate-200 text-center font-black uppercase text-slate-800 text-[10px] tracking-widest flex items-center justify-center gap-2">
-          Performance Indicator #{activeTab.replace('PI','')} – {currentPI.title}
-          {isConsolidated && <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded text-[8px] font-black border border-emerald-200 uppercase tracking-tighter">Aggregated View</span>}
+          Indicator #{activeTab.replace('PI','')} – {currentPI.title}
+          {isConsolidated && <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded text-[8px] font-black uppercase tracking-tighter">Aggregated View</span>}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[10px]">
@@ -781,31 +709,19 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               {currentPI.activities.map((a, rIdx) => (
                 <tr key={a.id} className="hover:bg-blue-50/30 group">
                   <td className="border border-slate-300 p-2 relative group-hover:pr-10 transition-all">
-                    <div className="flex items-start gap-2">
-                      {editingActivityField?.aid === a.id && editingActivityField?.field === 'activity' ? (
-                        <input autoFocus className="w-full bg-white border border-blue-500 rounded px-1 outline-none font-black" value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={handleSaveField} onKeyDown={e => e.key === 'Enter' && handleSaveField()} />
-                      ) : (
-                        <span className={canEditStructure ? 'cursor-pointer hover:text-blue-600 hover:underline' : ''} onClick={() => handleStartEditField(a.id, 'activity', a.activity)}>{a.activity}</span>
-                      )}
-                    </div>
-                    {canEditStructure && (
-                      <button 
-                        onClick={() => removeActivity(a.id)} 
-                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                        title="Delete Activity Row"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+                    {editingActivityField?.aid === a.id && editingActivityField?.field === 'activity' ? (
+                      <input autoFocus className="w-full bg-white border border-blue-500 rounded px-1 outline-none font-black" value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={handleSaveField} onKeyDown={e => e.key === 'Enter' && handleSaveField()} />
+                    ) : (
+                      <span className={canEditStructure ? 'cursor-pointer hover:underline' : ''} onClick={() => handleStartEditField(a.id, 'activity', a.activity)}>{a.activity}</span>
                     )}
+                    {canEditStructure && <button onClick={() => removeActivity(a.id)} className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 p-1"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}
                   </td>
                   <td className="border border-slate-300 p-2">
                     {editingActivityField?.aid === a.id && editingActivityField?.field === 'indicator' ? (
-                        <input autoFocus className="w-full bg-white border border-blue-500 rounded px-1 outline-none font-black" value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={handleSaveField} onKeyDown={e => e.key === 'Enter' && handleSaveField()} />
-                      ) : (
-                        <span className={canEditStructure ? 'cursor-pointer hover:text-blue-600 hover:underline' : ''} onClick={() => handleStartEditField(a.id, 'indicator', a.indicator)}>{a.indicator}</span>
-                      )}
+                      <input autoFocus className="w-full bg-white border border-blue-500 rounded px-1 outline-none font-black" value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={handleSaveField} onKeyDown={e => e.key === 'Enter' && handleSaveField()} />
+                    ) : (
+                      <span className={canEditStructure ? 'cursor-pointer hover:underline' : ''} onClick={() => handleStartEditField(a.id, 'indicator', a.indicator)}>{a.indicator}</span>
+                    )}
                   </td>
                   {a.months.map((m, mIdx) => (
                     <td key={mIdx} className="border border-slate-300 p-1 text-center">
@@ -831,46 +747,28 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           </table>
         </div>
         {canEditStructure && (
-          <div className="p-4 bg-slate-50/50 border-t border-slate-200 flex justify-center">
-             <button onClick={handleAddActivity} className="flex items-center gap-2 px-6 py-2 bg-white border-2 border-slate-900 text-slate-900 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-sm">Add New Activity Entry</button>
+          <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-center">
+            <button onClick={handleAddActivity} className="px-6 py-2 bg-white border-2 border-slate-900 text-slate-900 rounded-xl font-black text-xs uppercase hover:bg-slate-900 hover:text-white transition-all shadow-sm">Add New Activity Entry</button>
           </div>
         )}
       </div>
 
       {isFilesModalOpen && activeFileCell && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-black text-slate-900 tracking-tight">Evidence Terminal</h3>
-                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-0.5">{MONTHS[activeFileCell.monthIdx]} {year} • {currentPI.activities[activeFileCell.rowIdx].activity}</p>
-              </div>
+              <div><h3 className="text-xl font-black text-slate-900">Evidence Terminal</h3><p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">{MONTHS[activeFileCell.monthIdx]} {year} • {currentPI.activities[activeFileCell.rowIdx].activity}</p></div>
               <button onClick={() => setIsFilesModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition"><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
             </div>
             <div className="p-6 max-h-[50vh] overflow-y-auto space-y-3">
-              {currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.length === 0 ? (
-                <div className="text-center py-8"><p className="text-slate-400 font-bold text-xs">No documents uploaded.</p></div>
-              ) : (
-                currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.map(f => (
-                  <div key={f.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 group">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-black text-slate-800 truncate">{f.name}</p>
-                      <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">{new Date(f.uploadedAt).toLocaleDateString()}</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <a href={f.url} download={f.name} className="p-1.5 text-slate-400 hover:text-blue-600"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg></a>
-                      {canModifyData && <button onClick={() => removeFile(f.id)} className="p-1.5 text-slate-400 hover:text-red-600"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}
-                    </div>
-                  </div>
-                ))
-              )}
+              {currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.length === 0 ? <div className="text-center py-8 text-slate-400 font-bold text-xs">No documents uploaded.</div> : currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.map(f => (
+                <div key={f.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 group">
+                  <div className="flex-1 min-w-0"><p className="text-xs font-black text-slate-800 truncate">{f.name}</p><p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">{new Date(f.uploadedAt).toLocaleDateString()}</p></div>
+                  <div className="flex items-center gap-1"><a href={f.url} download={f.name} className="p-1.5 text-slate-400 hover:text-blue-600"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg></a>{canModifyData && <button onClick={() => removeFile(f.id)} className="p-1.5 text-slate-400 hover:text-red-600"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}</div>
+                </div>
+              ))}
             </div>
-            {canModifyData && (
-              <div className="p-6 bg-slate-50 border-t border-slate-100">
-                <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-                <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow hover:bg-slate-800 transition-all flex items-center justify-center gap-2">Upload Evidence</button>
-              </div>
-            )}
+            {canModifyData && <div className="p-6 bg-slate-50 border-t border-slate-100"><input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" /><button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow hover:bg-slate-800 flex items-center justify-center gap-2 transition-all">Upload Evidence</button></div>}
           </div>
         </div>
       )}
