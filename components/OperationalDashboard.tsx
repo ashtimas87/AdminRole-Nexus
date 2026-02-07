@@ -710,6 +710,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dashboardYear = useMemo(() => title.match(/\d{4}/)?.[0] || '2026', [title]);
+  const isTargetOutlook = useMemo(() => title.toUpperCase().includes("TARGET OUTLOOK"), [title]);
   const dashboardType = useMemo(() => {
     if (title.toUpperCase().includes("CHQ")) return 'CHQ';
     if (title.toUpperCase().includes("TACTICAL")) return 'TACTICAL';
@@ -1148,7 +1149,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title = "OP
               <tr>
                 <th rowSpan={2} className="border border-slate-300 bg-[#FFFF00] p-2 text-center w-72 font-bold uppercase text-slate-900">Activity</th>
                 <th rowSpan={2} className="border border-slate-300 bg-[#FFFF00] p-2 text-center w-72 font-bold uppercase text-slate-900">Performance Indicator</th>
-                <th colSpan={12} className="border border-slate-300 bg-[#00B0F0] p-2 text-center text-white font-extrabold uppercase text-sm">{dashboardYear} Accomplishment</th>
+                <th colSpan={12} className="border border-slate-300 bg-[#00B0F0] p-2 text-center text-white font-extrabold uppercase text-sm">{dashboardYear} {isTargetOutlook ? 'Target Outlook' : 'Accomplishment'}</th>
                 <th rowSpan={2} className="border border-slate-300 bg-[#FFFF00] p-2 text-center w-16 font-bold uppercase text-slate-900">Total</th>
                 {isSuperAdmin && <th rowSpan={2} className="border border-slate-300 bg-slate-900 p-2 text-white w-24 font-bold uppercase text-[9px]">Action</th>}
               </tr>

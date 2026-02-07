@@ -13,6 +13,8 @@ type ViewType =
   | 'status-terminal'
   | 'unit-oversight'
   | 'operational-dashboard'
+  | 'target-outlook'
+  | 'target-outlook-landing'
   | 'unit-landing'
   | 'progress';
 
@@ -417,6 +419,33 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
     );
   };
 
+  const renderTargetOutlookLanding = () => (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-6">
+        <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center border-2 border-amber-200">
+          <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+        </div>
+        <div>
+          <h2 className="text-4xl font-black text-slate-900">Target Outlook System</h2>
+          <p className="text-slate-500 font-medium uppercase tracking-widest text-xs mt-1">Pick a projection cycle for {user.name}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {YEAR_CONFIG.map(cfg => (
+          <button 
+            key={cfg.year} 
+            onClick={() => { setSelectedYear(cfg.year); setSelectedOverviewUser(user); setView('target-outlook'); }} 
+            className="p-6 bg-white border border-slate-200 rounded-2xl hover:shadow-xl transition group text-left relative overflow-hidden border-b-4 border-b-amber-500"
+          >
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white"><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d={cfg.icon} /></svg></div>
+            <h3 className="text-xl font-bold text-slate-900">Target Outlook {cfg.year}</h3>
+            <p className="text-slate-500 text-sm mt-1">Reviewing strategic projections for {cfg.year}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   const renderSidebar = () => (
     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-fit lg:sticky lg:top-24">
       <div className="mb-6 border-b pb-4">
@@ -453,6 +482,17 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           >
             Operational Dashboard
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+          </button>
+        )}
+
+        {/* Target Outlook link for Super Admin, CHQ, and Station users */}
+        {(user.role === UserRole.SUPER_ADMIN || user.role === UserRole.CHQ || user.role === UserRole.STATION) && (
+          <button 
+            onClick={() => { setView('target-outlook-landing'); }}
+            className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'target-outlook' || view === 'target-outlook-landing' ? 'bg-amber-600 text-white shadow-lg shadow-amber-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+          >
+            Target Outlook
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
           </button>
         )}
 
@@ -513,10 +553,19 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           {view === 'status-terminal' && renderStatusTerminal()}
           {view === 'unit-oversight' && canSeeOversight && renderUnitOversight()}
           {view === 'unit-landing' && canSeeOversight && renderUnitLanding()}
+          {view === 'target-outlook-landing' && renderTargetOutlookLanding()}
           {view === 'operational-dashboard' && selectedOverviewUser && (
             <OperationalDashboard 
               title={`${selectedOverviewUser.id === user.id || selectedOverviewUser.role === UserRole.SUB_ADMIN ? 'Consolidated Operational' : selectedOverviewUser.name + (selectedOverviewUser.role === UserRole.CHQ ? ' Unit' : ' Tactical')} Dashboard ${selectedYear}`} 
               onBack={() => setView(canSeeOversight ? 'unit-oversight' : 'status-terminal')} 
+              currentUser={user} 
+              subjectUser={selectedOverviewUser} 
+            />
+          )}
+          {view === 'target-outlook' && selectedOverviewUser && (
+            <OperationalDashboard 
+              title={`Target Outlook ${selectedYear}`} 
+              onBack={() => setView('target-outlook-landing')} 
               currentUser={user} 
               subjectUser={selectedOverviewUser} 
             />
