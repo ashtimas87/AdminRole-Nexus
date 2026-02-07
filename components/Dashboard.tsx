@@ -3,10 +3,6 @@ import { User, UserRole } from '../types';
 import { ROLE_LABELS, MOCK_USERS } from '../constants';
 import OperationalDashboard from './OperationalDashboard';
 
-interface DashboardProps {
-  user: User;
-}
-
 type ViewType = 
   | 'accounts' 
   | 'deployment'
@@ -25,7 +21,7 @@ const YEAR_CONFIG = [
   { year: '2023', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' }
 ];
 
-const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, onLogout }) => {
+const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogout }) => {
   const [view, setView] = useState<ViewType>(() => {
     if (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN) return 'accounts';
     return 'status-terminal';
@@ -44,7 +40,6 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
 
   const roleConfig = ROLE_LABELS[user.role];
   const isAdmin = user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN;
-  // CHQ and Station users can now see oversight as requested
   const canSeeOversight = isAdmin || user.role === UserRole.CHQ || user.role === UserRole.STATION;
 
   useEffect(() => {
@@ -191,29 +186,6 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           </div>
         </div>
       </div>
-      <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl shadow-slate-200/50">
-        <div className="flex items-center gap-4 mb-6">
-           <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center border border-white/20">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-           </div>
-           <div>
-              <h3 className="font-black text-lg">Real-Time Activity</h3>
-              <p className="text-white/40 text-[10px] font-black uppercase tracking-widest">Global Monitoring Engine</p>
-           </div>
-        </div>
-        <div className="space-y-3">
-           <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
-              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-              <span className="text-xs font-bold opacity-80">Police Station 4 uploaded accomplishment reports for Feb 2026</span>
-              <span className="ml-auto text-[10px] opacity-40">2m ago</span>
-           </div>
-           <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
-              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-              <span className="text-xs font-bold opacity-80">CHQ CIDMU modified PI12 Target Baseline</span>
-              <span className="ml-auto text-[10px] opacity-40">15m ago</span>
-           </div>
-        </div>
-      </div>
     </div>
   );
 
@@ -229,50 +201,36 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
         <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Access Active</h2>
         <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-2 opacity-70">Unit: {user.name} • Security Level: High</p>
       </div>
-      <div className="h-px w-24 bg-slate-200 mx-auto"></div>
       <p className="text-slate-600 max-w-sm mx-auto font-medium leading-relaxed">
         Welcome to the Cagayan de Oro City Police Office access terminal. Your account is verified and the system is monitoring activity logs.
       </p>
-      <div className="flex justify-center gap-3 pt-4">
-        <div className="px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-2">
-           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-           <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">Sync Active</span>
-        </div>
-        <div className="px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-2">
-           <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-           <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">AES-256</span>
-        </div>
-      </div>
     </div>
   );
 
-  const renderUnitOversight = () => {
-    if (!canSeeOversight) return null;
-
+  const getFilteredUnits = () => {
     let subAdminUsers = usersList.filter(u => u.role === UserRole.SUB_ADMIN);
     let chqUsers = usersList.filter(u => u.role === UserRole.CHQ);
     let specialUsers = usersList.filter(u => u.name === 'City Mobile Force Company');
     let stationUsers = usersList.filter(u => u.role === UserRole.STATION && u.name !== 'City Mobile Force Company');
     
-    // Apply user-specific filtering for STATION users
     if (user.role === UserRole.STATION) {
-      // Station users only see their own unit
       specialUsers = specialUsers.filter(u => u.id === user.id);
       stationUsers = stationUsers.filter(u => u.id === user.id);
-      // Usually Station users shouldn't see CHQ or Sub-Admin oversight either
       chqUsers = [];
       subAdminUsers = [];
     }
 
-    // Apply user-specific filtering for CHQ users
-    // NEW: "unhide all activities" for CHQ Dashboard 2023 
-    // We interpret "unhide all" as showing all units to CHQ users when 2023 is selected
     if (user.role === UserRole.CHQ && selectedYear !== '2023') {
-      // Hide Administrative Units (CHQ) except own unit
       chqUsers = chqUsers.filter(u => u.id === user.id);
-      // Also hide Sub Admin units for CHQ view as requested
       subAdminUsers = [];
     }
+
+    return { subAdminUsers, chqUsers, specialUsers, stationUsers };
+  };
+
+  const renderUnitOversight = () => {
+    if (!canSeeOversight) return null;
+    const { subAdminUsers, chqUsers, specialUsers, stationUsers } = getFilteredUnits();
 
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -309,42 +267,11 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                 <p className="text-xl font-black text-white">Full Operational Summary {selectedYear}</p>
                 <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">CONSOLIDATED SYSTEM VIEW</p>
               </div>
-              <div className="ml-auto p-2 bg-white/5 rounded-xl text-white group-hover:bg-emerald-500 transition-colors">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-              </div>
             </div>
           </div>
         )}
         
-        {(isAdmin || (user.role === UserRole.CHQ && selectedYear === '2023')) && subAdminUsers.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-purple-600"></div>
-              Administrative Management (COCPO CPSMU)
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {subAdminUsers.map(u => (
-                <div 
-                  key={u.id} 
-                  onClick={() => { setSelectedOverviewUser(u); setView('operational-dashboard'); }} 
-                  className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border-2 border-slate-100 hover:border-purple-500 transition-all text-left cursor-pointer shadow-sm hover:shadow-md group"
-                >
-                  <img src={u.avatar} className="w-12 h-12 rounded-xl border group-hover:scale-105 transition-transform" />
-                  <div>
-                    <p className="font-black text-slate-800">{u.name}</p>
-                    <p className="text-[10px] font-black uppercase text-purple-600 tracking-widest">SUB ADMIN UNIT</p>
-                  </div>
-                  <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                    <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         <div className="space-y-8">
-          {/* CHQ Units visible to Admins and the specific CHQ user owning the account */}
           {chqUsers.length > 0 && (
             <div className="space-y-4">
               <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Administrative Units (CHQ)</h3>
@@ -353,20 +280,6 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
                   <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('operational-dashboard'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-indigo-500 transition-all text-left cursor-pointer shadow-sm hover:shadow-md">
                     <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
                     <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-slate-400">CHQ UNIT</p></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {specialUsers.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Special Units</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {specialUsers.map(u => (
-                  <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('operational-dashboard'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-indigo-600 transition-all text-left cursor-pointer shadow-sm hover:shadow-md">
-                    <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
-                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-slate-400">COMPANY USER</p></div>
                   </div>
                 ))}
               </div>
@@ -391,60 +304,83 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
     );
   };
 
-  const renderUnitLanding = () => {
-    if (!selectedOverviewUser) return null;
-    const dashboardTypeLabel = selectedOverviewUser.role === UserRole.CHQ ? 'Unit Dashboard' : 
-                               selectedOverviewUser.role === UserRole.STATION ? 'Tactical Dashboard' : 
-                               'Operational Dashboard';
+  const renderTargetOutlookLanding = () => {
+    const { subAdminUsers, chqUsers, specialUsers, stationUsers } = getFilteredUnits();
 
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-6">
-          <img src={selectedOverviewUser.avatar} className="w-20 h-20 rounded-2xl border-2 border-slate-100" />
+          <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center border-2 border-amber-200">
+            <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+          </div>
           <div>
-            <h2 className="text-4xl font-black text-slate-900">{selectedOverviewUser.name} {dashboardTypeLabel}</h2>
-            <p className="text-slate-500 font-medium uppercase tracking-widest text-xs mt-1">Select operational year</p>
+            <h2 className="text-4xl font-black text-slate-900 tracking-tight">Target Outlook System</h2>
+            <p className="text-slate-500 font-medium uppercase tracking-widest text-xs mt-1">Strategic projections oversight terminal</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2 overflow-x-auto no-scrollbar">
           {YEAR_CONFIG.map(cfg => (
-            <button key={cfg.year} onClick={() => { setView('operational-dashboard'); setSelectedYear(cfg.year); }} className="p-6 bg-white border border-slate-200 rounded-2xl hover:shadow-lg transition group text-left relative overflow-hidden">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition bg-slate-50 text-slate-600 group-hover:bg-slate-900 group-hover:text-white"><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d={cfg.icon} /></svg></div>
-              <h3 className="text-xl font-bold text-slate-900">{dashboardTypeLabel} {cfg.year}</h3>
-              <p className="text-slate-500 text-sm mt-1">Reviewing fiscal year {cfg.year}</p>
+            <button
+              key={cfg.year}
+              onClick={() => setSelectedYear(cfg.year)}
+              className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${selectedYear === cfg.year ? 'bg-amber-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+            >
+              {cfg.year}
             </button>
           ))}
+        </div>
+
+        {(isAdmin || (user.role === UserRole.CHQ && selectedYear === '2023')) && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">System-Wide Consolidation</h3>
+            <div 
+              onClick={() => { setSelectedOverviewUser(user); setView('target-outlook'); }} 
+              className="w-full flex items-center gap-5 p-6 bg-amber-900 rounded-3xl border-2 border-amber-800 hover:border-amber-400 transition-all text-left cursor-pointer shadow-xl group"
+            >
+              <div className="w-14 h-14 bg-amber-500/20 rounded-2xl flex items-center justify-center text-amber-500 border border-amber-500/30 group-hover:scale-105 transition-transform">
+                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+              </div>
+              <div>
+                <p className="text-xl font-black text-white">Full Target Outlook Summary {selectedYear}</p>
+                <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">OFFICE MASTER PROJECTIONS</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-8">
+          {chqUsers.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Administrative Units (CHQ)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {chqUsers.map(u => (
+                  <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('target-outlook'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-amber-500 transition-all text-left cursor-pointer shadow-sm group">
+                    <img src={u.avatar} className="w-12 h-12 rounded-xl border group-hover:scale-105 transition-transform" />
+                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-amber-600">CHQ TARGET OUTLOOK</p></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {stationUsers.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Station Units</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {stationUsers.map(u => (
+                  <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('target-outlook'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-amber-600 transition-all text-left cursor-pointer shadow-sm group">
+                    <img src={u.avatar} className="w-12 h-12 rounded-xl border group-hover:scale-105 transition-transform" />
+                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-amber-600">STATION TARGET OUTLOOK</p></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
   };
-
-  const renderTargetOutlookLanding = () => (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-6">
-        <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center border-2 border-amber-200">
-          <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-        </div>
-        <div>
-          <h2 className="text-4xl font-black text-slate-900">Target Outlook System</h2>
-          <p className="text-slate-500 font-medium uppercase tracking-widest text-xs mt-1">Pick a projection cycle for {user.name}</p>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {YEAR_CONFIG.map(cfg => (
-          <button 
-            key={cfg.year} 
-            onClick={() => { setSelectedYear(cfg.year); setSelectedOverviewUser(user); setView('target-outlook'); }} 
-            className="p-6 bg-white border border-slate-200 rounded-2xl hover:shadow-xl transition group text-left relative overflow-hidden border-b-4 border-b-amber-500"
-          >
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white"><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d={cfg.icon} /></svg></div>
-            <h3 className="text-xl font-bold text-slate-900">Target Outlook {cfg.year}</h3>
-            <p className="text-slate-500 text-sm mt-1">Reviewing strategic projections for {cfg.year}</p>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 
   const renderSidebar = () => (
     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-fit lg:sticky lg:top-24">
@@ -474,7 +410,6 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           </button>
         )}
 
-        {/* Operational Dashboard link is hidden for CHQ and all STATION users as requested */}
         {isAdmin && (
           <button 
             onClick={() => { setSelectedOverviewUser(user); setView('operational-dashboard'); }}
@@ -485,7 +420,6 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           </button>
         )}
 
-        {/* Target Outlook link for Super Admin, CHQ, and Station users */}
         {(user.role === UserRole.SUPER_ADMIN || user.role === UserRole.CHQ || user.role === UserRole.STATION) && (
           <button 
             onClick={() => { setView('target-outlook-landing'); }}
@@ -496,25 +430,13 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           </button>
         )}
 
-        {/* Restore/Show Unit Oversight for CHQ and STATION as requested */}
         {canSeeOversight && (
           <button 
             onClick={() => setView('unit-oversight')}
-            className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'unit-oversight' || view === 'unit-landing' || (view === 'operational-dashboard' && selectedOverviewUser && selectedOverviewUser.id !== user.id) ? 'bg-purple-600 text-white shadow-lg shadow-purple-100' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+            className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'unit-oversight' || (view === 'operational-dashboard' && selectedOverviewUser && selectedOverviewUser.id !== user.id) ? 'bg-purple-600 text-white shadow-lg shadow-purple-100' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
           >
             Unit Oversight
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-          </button>
-        )}
-
-        {/* Progress Button for Admins requested by user */}
-        {isAdmin && (
-          <button 
-            onClick={() => setView('progress')}
-            className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'progress' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
-          >
-            Progress
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
           </button>
         )}
 
@@ -552,22 +474,23 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
           {view === 'progress' && isAdmin && renderProgress()}
           {view === 'status-terminal' && renderStatusTerminal()}
           {view === 'unit-oversight' && canSeeOversight && renderUnitOversight()}
-          {view === 'unit-landing' && canSeeOversight && renderUnitLanding()}
           {view === 'target-outlook-landing' && renderTargetOutlookLanding()}
           {view === 'operational-dashboard' && selectedOverviewUser && (
             <OperationalDashboard 
-              title={`${selectedOverviewUser.id === user.id || selectedOverviewUser.role === UserRole.SUB_ADMIN ? 'Consolidated Operational' : selectedOverviewUser.name + (selectedOverviewUser.role === UserRole.CHQ ? ' Unit' : ' Tactical')} Dashboard ${selectedYear}`} 
+              title={`${selectedOverviewUser.id === user.id || selectedOverviewUser.role === UserRole.SUB_ADMIN ? 'Consolidated' : selectedOverviewUser.name} ${selectedYear} Accomplishment`} 
               onBack={() => setView(canSeeOversight ? 'unit-oversight' : 'status-terminal')} 
               currentUser={user} 
-              subjectUser={selectedOverviewUser} 
+              subjectUser={selectedOverviewUser}
+              allUnits={usersList.filter(u => u.role === UserRole.STATION || u.role === UserRole.CHQ)} 
             />
           )}
           {view === 'target-outlook' && selectedOverviewUser && (
             <OperationalDashboard 
-              title={`Target Outlook ${selectedYear}`} 
+              title={`${selectedOverviewUser.id === user.id || selectedOverviewUser.role === UserRole.SUB_ADMIN ? 'System' : selectedOverviewUser.name} ${selectedYear} Target Outlook`} 
               onBack={() => setView('target-outlook-landing')} 
               currentUser={user} 
               subjectUser={selectedOverviewUser} 
+              allUnits={usersList.filter(u => u.role === UserRole.STATION || u.role === UserRole.CHQ)} 
             />
           )}
         </div>
@@ -575,7 +498,7 @@ const Dashboard: React.FC<DashboardProps & { onLogout: () => void }> = ({ user, 
       
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-m-md rounded-[2.5rem] shadow-2xl p-8 animate-in zoom-in-95 duration-200">
             <h3 className="text-2xl font-black mb-6 text-slate-900 tracking-tight">{editingUser ? 'Edit Account' : 'New Account'}</h3>
             <form onSubmit={handleSaveUser} className="space-y-4">
               <div>
