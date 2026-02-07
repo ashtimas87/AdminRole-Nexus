@@ -350,9 +350,11 @@ const UploadIcon = () => (
 
 const ExcelExportIcon = () => (
   <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M400 256V412C400 445.137 373.137 472 340 472H100C66.8629 472 40 445.137 40 412V172C40 138.863 66.8629 112 100 112H256" stroke="#64748B" strokeWidth="48" strokeLinecap="round" />
-    <path d="M256 300C256 300 270 150 472 100" stroke="#3B82F6" strokeWidth="48" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M370 40L472 100L370 160" stroke="#3B82F6" strokeWidth="48" strokeLinecap="round" strokeLinejoin="round" />
+    <rect width="512" height="512" rx="120" fill="#10B981" />
+    <path d="M380 160H132V352H380V160Z" stroke="white" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M132 224H380" stroke="white" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M224 160V352" stroke="white" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M170 260L210 310M210 260L170 310" stroke="white" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -561,24 +563,51 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     refresh();
   };
 
+  /**
+   * Generates a comprehensive multi-sheet Excel report for all active Performance Indicators.
+   * As requested: exports all tabbings (PI 1 to PI 29) with their respective monthly data.
+   */
   const handleExportExcel = () => {
-    const currentTabLabel = getSharedTabLabel(prefix, year, effectiveId, currentPI.id, `PI ${currentPI.id.replace('PI','')}`);
-    const dataForExport = piData.flatMap(pi => {
-      const tabLabel = getSharedTabLabel(prefix, year, effectiveId, pi.id, `PI ${pi.id.replace('PI','')}`);
-      return pi.activities.map(act => ({
-        PI_ID: pi.id,
-        PI_Title: pi.title,
-        Tab_Label: tabLabel,
-        Activity_ID: act.id,
-        Activity_Name: act.activity,
-        Indicator_Name: act.indicator
-      }));
-    });
-    const worksheet = XLSX.utils.json_to_sheet(dataForExport);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Dashboard Structure");
-    // Updated filename as requested: Template_[TabLabel]_[UnitName]
-    XLSX.writeFile(workbook, `Template_${currentTabLabel}_${subjectUser.name}.xlsx`);
+
+    piData.forEach(pi => {
+      const tabLabel = getSharedTabLabel(prefix, year, effectiveId, pi.id, `PI ${pi.id.replace('PI','')}`);
+      const piIsPercent = ["PI4", "PI9", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(pi.id);
+
+      // Construct a data array for the sheet
+      const sheetData = pi.activities.map(act => {
+        const row: Record<string, any> = {
+          "Activity": act.activity,
+          "Indicator": act.indicator
+        };
+        
+        // Add monthly values
+        act.months.forEach((m, idx) => {
+          row[MONTHS[idx]] = piIsPercent ? `${m.value}%` : m.value;
+        });
+        
+        // Add row total
+        row["Total"] = piIsPercent ? `${Math.round(act.total / 12)}%` : act.total;
+        
+        return row;
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(sheetData);
+      
+      // Basic column width hints for better readability
+      worksheet['!cols'] = [
+        { wch: 45 }, // Activity
+        { wch: 45 }, // Indicator
+        ...Array(13).fill({ wch: 8 }) // Jan-Dec + Total
+      ];
+
+      // Excel sheet names are restricted to 31 chars and certain symbols are forbidden
+      const safeSheetName = tabLabel.substring(0, 31).replace(/[\[\]\*\?\/\\]/g, ' ');
+      XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
+    });
+
+    const reportType = isTargetOutlook ? 'Target_Outlook' : 'Accomplishment_Report';
+    XLSX.writeFile(workbook, `${subjectUser.name}_${reportType}_${year}.xlsx`);
   };
 
   const handleExportPPT = async () => {
@@ -590,9 +619,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     piData.forEach(pi => {
       const slide = pres.addSlide();
       slide.addText(pi.title, { x: 0.5, y: 0.3, w: "90%", fontSize: 14, bold: true, color: "0F172A", align: "center" });
+      const piIsPercent = ["PI4", "PI9", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(pi.id);
       const tableData = [
         [{ text: "Activity", options: { fill: "FFFF00", bold: true } }, { text: "Indicator", options: { fill: "FFFF00", bold: true } }, ...MONTHS.map(m => ({ text: m, options: { fill: "00B0F0", bold: true, color: "FFFFFF" } })), { text: "Total", options: { fill: "FFFF00", bold: true } }],
-        ...pi.activities.map(a => [{ text: a.activity }, { text: a.indicator }, ...a.months.map(m => ({ text: isPercent ? `${m.value}%` : String(m.value) })), { text: isPercent ? `${Math.round(a.total / 12)}%` : String(a.total), options: { bold: true } }])
+        ...pi.activities.map(a => [{ text: a.activity }, { text: a.indicator }, ...a.months.map(m => ({ text: piIsPercent ? `${m.value}%` : String(m.value) })), { text: piIsPercent ? `${Math.round(a.total / 12)}%` : String(a.total), options: { bold: true } }])
       ];
       slide.addTable(tableData, { x: 0.2, y: 1.0, w: 9.6, fontSize: 8, border: { type: "solid", color: "CBD5E1", pt: 0.5 }, align: "center", valign: "middle", autoPage: true, colWidths: [1.8, 1.8, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.6] });
     });
@@ -644,10 +674,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             <span className="px-3 py-1 bg-slate-900 text-white text-[10px] font-black rounded uppercase tracking-widest">UNIT: {subjectUser.name}</span>
             <div className="flex items-center gap-2 ml-2">
               <button onClick={handleExportPPT} className="p-1 hover:scale-110 transition-transform" title="Export PPT"><DownloadIcon /></button>
+              <button onClick={handleExportExcel} className="p-1 hover:scale-110 transition-transform" title="Export Excel Report (PI 1 to PI 29)"><ExcelExportIcon /></button>
               {currentUser.role === UserRole.SUPER_ADMIN && (
                 <>
-                  <button onClick={handleExportExcel} className="p-1 hover:scale-110 transition-transform" title="Export Excel"><ExcelExportIcon /></button>
-                  <label className="p-1 hover:scale-110 transition-transform cursor-pointer" title="Import Excel">
+                  <label className="p-1 hover:scale-110 transition-transform cursor-pointer" title="Import Structure Template">
                     <UploadIcon />
                     <input type="file" ref={excelImportRef} className="hidden" accept=".xlsx, .xls" onChange={handleImportExcel} />
                   </label>
@@ -672,17 +702,22 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                     <button onClick={(e) => handleMoveTab(e, pi.id, 'right')} className="p-0.5 bg-slate-100 rounded text-slate-500"><svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg></button>
                   </div>
                 )}
-                <button onClick={() => !isEditing && setActiveTab(pi.id)} className={`px-4 py-2 rounded-lg text-xs font-black transition-all border flex items-center gap-2 group ${activeTab === pi.id ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
-                  {isEditing ? (
-                    <input autoFocus className="bg-white text-slate-900 px-1 rounded border border-blue-500 font-black outline-none w-24" value={editTabLabel} onChange={e => setEditTabLabel(e.target.value)} onBlur={handleSaveTabLabel} onKeyDown={e => e.key === 'Enter' && handleSaveTabLabel()} />
-                  ) : label}
-                  {canEditStructure && !isEditing && (
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
-                      <button onClick={(e) => handleStartRenameTab(e, pi)} className="text-slate-400 hover:text-blue-400 p-0.5"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
-                      <button onClick={(e) => hideTab(pi.id, e)} className="text-slate-400 hover:text-red-400 p-0.5"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
-                    </div>
-                  )}
-                </button>
+                <div className="relative group">
+                  <button 
+                    onClick={() => !isEditing && setActiveTab(pi.id)} 
+                    className={`px-4 py-2 rounded-lg text-xs font-black transition-all border flex items-center gap-2 ${activeTab === pi.id ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                  >
+                    {isEditing ? (
+                      <input autoFocus className="bg-white text-slate-900 px-1 rounded border border-blue-500 font-black outline-none w-24" value={editTabLabel} onChange={e => setEditTabLabel(e.target.value)} onBlur={handleSaveTabLabel} onKeyDown={e => e.key === 'Enter' && handleSaveTabLabel()} />
+                    ) : label}
+                    {canEditStructure && !isEditing && (
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+                        <button onClick={(e) => handleStartRenameTab(e, pi)} className="text-slate-400 hover:text-blue-400 p-0.5"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
+                        <button onClick={(e) => hideTab(pi.id, e)} className="text-slate-400 hover:text-red-400 p-0.5"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                      </div>
+                    )}
+                  </button>
+                </div>
               </div>
             );
           })}
