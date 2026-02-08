@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useMemo } from 'react';
 import { User, UserRole } from '../types';
 import { ROLE_LABELS, MOCK_USERS } from '../constants';
 import OperationalDashboard from './OperationalDashboard';
@@ -38,6 +39,9 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({ name: '', email: '', password: '', role: UserRole.STATION });
 
+  // Add state to trigger total updates when data changes
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   const roleConfig = ROLE_LABELS[user.role];
   const isAdmin = user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN;
   const canSeeOversight = isAdmin || user.role === UserRole.CHQ || user.role === UserRole.STATION;
@@ -45,6 +49,24 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
   useEffect(() => {
     localStorage.setItem('adminrole_users_list', JSON.stringify(usersList));
   }, [usersList]);
+
+  // Helper to calculate totals for display
+  const calculateUserTotal = (userId: string, year: string, prefix: 'target' | 'accomplishment') => {
+    let total = 0;
+    const matchPrefix = `${prefix}_data_${year}_${userId}_`;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(matchPrefix)) {
+        const val = parseInt(localStorage.getItem(key) || '0', 10);
+        total += val;
+      }
+    }
+    return total;
+  };
+
+  const calculateConsolidatedTotal = (units: User[], year: string, prefix: 'target' | 'accomplishment') => {
+    return units.reduce((sum, u) => sum + calculateUserTotal(u.id, year, prefix), 0);
+  };
 
   const managedUsers = user.role === UserRole.SUPER_ADMIN 
     ? usersList.filter(u => u.id !== user.id)
@@ -231,6 +253,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
   const renderUnitOversight = () => {
     if (!canSeeOversight) return null;
     const { subAdminUsers, chqUsers, specialUsers, stationUsers } = getFilteredUnits();
+    const allRelevantUnits = [...chqUsers, ...stationUsers, ...specialUsers];
 
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -242,7 +265,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           {YEAR_CONFIG.map(cfg => (
             <button
               key={cfg.year}
-              onClick={() => setSelectedYear(cfg.year)}
+              onClick={() => { setSelectedYear(cfg.year); setRefreshTrigger(t => t + 1); }}
               className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${selectedYear === cfg.year ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
             >
               {cfg.year}
@@ -263,9 +286,15 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
               <div className="w-14 h-14 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-500 border border-emerald-500/30 group-hover:scale-105 transition-transform">
                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-xl font-black text-white">CHQ & Tactical Consolidated {selectedYear}</p>
                 <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">ACTIVITY DATA ACCOMPLISHMENT</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Accomplishment</p>
+                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg font-black text-lg">
+                  {calculateConsolidatedTotal(allRelevantUnits, selectedYear, 'accomplishment').toLocaleString()}
+                </div>
               </div>
             </div>
           </div>
@@ -276,12 +305,22 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
             <div className="space-y-4">
               <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Administrative Units (CHQ)</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {chqUsers.map(u => (
-                  <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('operational-dashboard'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-indigo-500 transition-all text-left cursor-pointer shadow-sm hover:shadow-md">
-                    <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
-                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-slate-400">CHQ ACCOMPLISHMENT</p></div>
-                  </div>
-                ))}
+                {chqUsers.map(u => {
+                  const unitTotal = calculateUserTotal(u.id, selectedYear, 'accomplishment');
+                  return (
+                    <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('operational-dashboard'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-indigo-500 transition-all text-left cursor-pointer shadow-sm hover:shadow-md group">
+                      <img src={u.avatar} className="w-12 h-12 rounded-xl border group-hover:scale-105 transition-transform" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-black text-slate-800 truncate">{u.name}</p>
+                        <p className="text-[10px] font-black uppercase text-slate-400">CHQ ACCOMPLISHMENT</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Total</p>
+                        <p className={`text-sm font-black ${unitTotal > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>{unitTotal.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -290,12 +329,22 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
             <div className="space-y-4">
               <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Station Units</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {stationUsers.map(u => (
-                  <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('operational-dashboard'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-orange-500 transition-all text-left cursor-pointer shadow-sm hover:shadow-md">
-                    <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
-                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-slate-400">TACTICAL ACCOMPLISHMENT</p></div>
-                  </div>
-                ))}
+                {stationUsers.map(u => {
+                  const unitTotal = calculateUserTotal(u.id, selectedYear, 'accomplishment');
+                  return (
+                    <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('operational-dashboard'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-orange-500 transition-all text-left cursor-pointer shadow-sm hover:shadow-md group">
+                      <img src={u.avatar} className="w-12 h-12 rounded-xl border group-hover:scale-105 transition-transform" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-black text-slate-800 truncate">{u.name}</p>
+                        <p className="text-[10px] font-black uppercase text-slate-400">TACTICAL ACCOMPLISHMENT</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Total</p>
+                        <p className={`text-sm font-black ${unitTotal > 0 ? 'text-orange-600' : 'text-slate-300'}`}>{unitTotal.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -304,12 +353,22 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
             <div className="space-y-4">
               <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Force Units (Company)</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {specialUsers.map(u => (
-                  <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('operational-dashboard'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-indigo-500 transition-all text-left cursor-pointer shadow-sm hover:shadow-md">
-                    <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
-                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-slate-400">COMPANY ACCOMPLISHMENT</p></div>
-                  </div>
-                ))}
+                {specialUsers.map(u => {
+                  const unitTotal = calculateUserTotal(u.id, selectedYear, 'accomplishment');
+                  return (
+                    <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('operational-dashboard'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-indigo-500 transition-all text-left cursor-pointer shadow-sm hover:shadow-md group">
+                      <img src={u.avatar} className="w-12 h-12 rounded-xl border group-hover:scale-105 transition-transform" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-black text-slate-800 truncate">{u.name}</p>
+                        <p className="text-[10px] font-black uppercase text-slate-400">COMPANY ACCOMPLISHMENT</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Total</p>
+                        <p className={`text-sm font-black ${unitTotal > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>{unitTotal.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -320,6 +379,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
 
   const renderTargetOutlookLanding = () => {
     const { subAdminUsers, chqUsers, specialUsers, stationUsers } = getFilteredUnits();
+    const allRelevantUnits = [...chqUsers, ...stationUsers, ...specialUsers];
 
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -337,7 +397,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           {YEAR_CONFIG.map(cfg => (
             <button
               key={cfg.year}
-              onClick={() => setSelectedYear(cfg.year)}
+              onClick={() => { setSelectedYear(cfg.year); setRefreshTrigger(t => t + 1); }}
               className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${selectedYear === cfg.year ? 'bg-amber-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
             >
               {cfg.year}
@@ -355,9 +415,15 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
                 <div className="w-14 h-14 bg-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-400 border border-indigo-500/30 group-hover:scale-105 transition-transform">
                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
                 </div>
-                <div>
+                <div className="flex-1">
                   <p className="text-xl font-black text-white">Operational Dashboard Target Outlook</p>
                   <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">MASTER SYSTEM OVERVIEW</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Target</p>
+                  <div className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 px-3 py-1 rounded-lg font-black text-lg">
+                    {calculateConsolidatedTotal(usersList, selectedYear, 'target').toLocaleString()}
+                  </div>
                 </div>
               </div>
             )}
@@ -370,9 +436,15 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
               <div className="w-14 h-14 bg-amber-500/20 rounded-2xl flex items-center justify-center text-amber-500 border border-amber-500/30 group-hover:scale-105 transition-transform">
                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-xl font-black text-white">Operational Target Outlook {selectedYear}</p>
                 <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">OFFICE MASTER PROJECTIONS</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Total Target</p>
+                <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3 py-1 rounded-lg font-black text-lg">
+                  {calculateConsolidatedTotal(allRelevantUnits, selectedYear, 'target').toLocaleString()}
+                </div>
               </div>
             </div>
           </div>
@@ -383,12 +455,22 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
             <div className="space-y-4">
               <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Administrative Units (CHQ)</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {chqUsers.map(u => (
-                  <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('target-outlook'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-amber-500 transition-all text-left cursor-pointer shadow-sm group">
-                    <img src={u.avatar} className="w-12 h-12 rounded-xl border group-hover:scale-105 transition-transform" />
-                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-amber-600">CHQ TARGET OUTLOOK</p></div>
-                  </div>
-                ))}
+                {chqUsers.map(u => {
+                  const unitTotal = calculateUserTotal(u.id, selectedYear, 'target');
+                  return (
+                    <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('target-outlook'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-amber-500 transition-all text-left cursor-pointer shadow-sm group">
+                      <img src={u.avatar} className="w-12 h-12 rounded-xl border group-hover:scale-105 transition-transform" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-black text-slate-800 truncate">{u.name}</p>
+                        <p className="text-[10px] font-black uppercase text-amber-600">CHQ TARGET OUTLOOK</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Total Target</p>
+                        <p className={`text-sm font-black ${unitTotal > 0 ? 'text-amber-600' : 'text-slate-300'}`}>{unitTotal.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -397,12 +479,22 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
             <div className="space-y-4">
               <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Station Units</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {stationUsers.map(u => (
-                  <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('target-outlook'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-amber-600 transition-all text-left cursor-pointer shadow-sm group">
-                    <img src={u.avatar} className="w-12 h-12 rounded-xl border group-hover:scale-105 transition-transform" />
-                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-amber-600">STATION TARGET OUTLOOK</p></div>
-                  </div>
-                ))}
+                {stationUsers.map(u => {
+                  const unitTotal = calculateUserTotal(u.id, selectedYear, 'target');
+                  return (
+                    <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('target-outlook'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-amber-600 transition-all text-left cursor-pointer shadow-sm group">
+                      <img src={u.avatar} className="w-12 h-12 rounded-xl border group-hover:scale-105 transition-transform" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-black text-slate-800 truncate">{u.name}</p>
+                        <p className="text-[10px] font-black uppercase text-amber-600">STATION TARGET OUTLOOK</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Total Target</p>
+                        <p className={`text-sm font-black ${unitTotal > 0 ? 'text-amber-600' : 'text-slate-300'}`}>{unitTotal.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -411,12 +503,22 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
             <div className="space-y-4">
               <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Force Units (Company)</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {specialUsers.map(u => (
-                  <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('target-outlook'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-amber-500 transition-all text-left cursor-pointer shadow-sm group">
-                    <img src={u.avatar} className="w-12 h-12 rounded-xl border group-hover:scale-105 transition-transform" />
-                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-amber-600">COMPANY TARGET OUTLOOK</p></div>
-                  </div>
-                ))}
+                {specialUsers.map(u => {
+                  const unitTotal = calculateUserTotal(u.id, selectedYear, 'target');
+                  return (
+                    <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('target-outlook'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-amber-500 transition-all text-left cursor-pointer shadow-sm group">
+                      <img src={u.avatar} className="w-12 h-12 rounded-xl border group-hover:scale-105 transition-transform" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-black text-slate-800 truncate">{u.name}</p>
+                        <p className="text-[10px] font-black uppercase text-amber-600">COMPANY TARGET OUTLOOK</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Total Target</p>
+                        <p className={`text-sm font-black ${unitTotal > 0 ? 'text-amber-600' : 'text-slate-300'}`}>{unitTotal.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -548,7 +650,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           {view === 'operational-dashboard' && selectedOverviewUser && (
             <OperationalDashboard 
               title={getDashboardTitle(selectedOverviewUser, selectedYear, false)} 
-              onBack={() => setView(canSeeOversight ? 'unit-oversight' : 'status-terminal')} 
+              onBack={() => { setView(canSeeOversight ? 'unit-oversight' : 'status-terminal'); setRefreshTrigger(t => t + 1); }} 
               currentUser={user} 
               subjectUser={selectedOverviewUser}
               allUnits={usersList.filter(u => u.role === UserRole.STATION || u.role === UserRole.CHQ)} 
@@ -557,7 +659,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           {view === 'target-outlook' && selectedOverviewUser && (
             <OperationalDashboard 
               title={getDashboardTitle(selectedOverviewUser, selectedYear, true)} 
-              onBack={() => setView('target-outlook-landing')} 
+              onBack={() => { setView('target-outlook-landing'); setRefreshTrigger(t => t + 1); }} 
               currentUser={user} 
               subjectUser={selectedOverviewUser} 
               allUnits={usersList.filter(u => u.role === UserRole.STATION || u.role === UserRole.CHQ)} 
