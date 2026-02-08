@@ -358,6 +358,16 @@ const UploadIcon = () => (
   </svg>
 );
 
+const TemplateExportIcon = () => (
+  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="512" height="512" rx="120" fill="#6366f1" />
+    <path d="M160 120V392H352V200L272 120H160Z" stroke="white" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M210 240H302" stroke="white" strokeWidth="32" strokeLinecap="round" />
+    <path d="M210 290H302" stroke="white" strokeWidth="32" strokeLinecap="round" />
+    <path d="M210 340H260" stroke="white" strokeWidth="32" strokeLinecap="round" />
+  </svg>
+);
+
 const ExcelExportIcon = () => (
   <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect width="512" height="512" rx="120" fill="#10B981" />
@@ -574,8 +584,35 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   };
 
   /**
+   * Generates a flat Excel file template specifically for updating Activity and Indicator names.
+   * Includes PI_ID, Activity_ID, and current names.
+   */
+  const handleExportStructureTemplate = () => {
+    const unitsToConsolidate = prefix === 'accomplishment' ? allUnits : [];
+    const fullData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate, true);
+    
+    const templateData: any[] = [];
+    fullData.forEach(pi => {
+      pi.activities.forEach(act => {
+        templateData.push({
+          "PI_ID": pi.id,
+          "PI_Title": pi.title,
+          "Activity_ID": act.id,
+          "Activity_Name": act.activity,
+          "Performance_Indicator_Name": act.indicator
+        });
+      });
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    worksheet['!cols'] = [{ wch: 10 }, { wch: 50 }, { wch: 15 }, { wch: 50 }, { wch: 50 }];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Structure_Template");
+    XLSX.writeFile(workbook, `COCPO_Structure_Update_Template_${year}.xlsx`);
+  };
+
+  /**
    * Generates a comprehensive multi-sheet Excel report for all active Performance Indicators.
-   * Now includes the summary TOTAL row at the bottom of each sheet.
    */
   const handleExportExcel = () => {
     const workbook = XLSX.utils.book_new();
@@ -598,7 +635,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         return row;
       });
 
-      // Calculate Summary Total row
       const mTotals = Array(12).fill(0);
       activitiesWithTotals.forEach(a => a.months.forEach((mo, i) => mTotals[i] += mo.value));
       const div = activitiesWithTotals.length || 1;
@@ -640,7 +676,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       slide.addText(pi.title, { x: 0.5, y: 0.3, w: "90%", fontSize: 14, bold: true, color: "0F172A", align: "center" });
       const piIsPercent = ["PI4", "PI9", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(pi.id);
 
-      // Re-calculate totals for the summary row in PPT
       const mTotals = Array(12).fill(0);
       activitiesWithTotals.forEach(a => a.months.forEach((mo, i) => mTotals[i] += mo.value));
       const div = activitiesWithTotals.length || 1;
@@ -669,11 +704,18 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
       jsonData.forEach(row => {
-        const { PI_ID, PI_Title, Tab_Label, Activity_ID, Activity_Name, Indicator_Name } = row;
-        if (PI_ID && PI_Title) localStorage.setItem(`${prefix}_pi_title_${year}_${effectiveId}_${PI_ID}`, PI_Title);
-        if (PI_ID && Tab_Label) localStorage.setItem(`${prefix}_pi_tab_${year}_${effectiveId}_${PI_ID}`, Tab_Label);
-        if (PI_ID && Activity_ID && Activity_Name) localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${PI_ID}_${Activity_ID}`, Activity_Name);
-        if (PI_ID && Activity_ID && Indicator_Name) localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${PI_ID}_${Activity_ID}`, Indicator_Name);
+        // Map common template variations back to standard keys
+        const piId = row.PI_ID;
+        const piTitle = row.PI_Title;
+        const tabLabel = row.Tab_Label;
+        const activityId = row.Activity_ID;
+        const activityName = row.Activity_Name;
+        const indicatorName = row.Performance_Indicator_Name || row.Indicator_Name;
+
+        if (piId && piTitle) localStorage.setItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`, piTitle);
+        if (piId && tabLabel) localStorage.setItem(`${prefix}_pi_tab_${year}_${effectiveId}_${piId}`, tabLabel);
+        if (piId && activityId && activityName) localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${activityId}`, activityName);
+        if (piId && activityId && indicatorName) localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${activityId}`, indicatorName);
       });
       refresh();
       alert('Dashboard structure updated successfully!');
@@ -702,17 +744,20 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">{title}</h2>
             <span className="px-3 py-1 bg-slate-900 text-white text-[10px] font-black rounded uppercase tracking-widest">UNIT: {subjectUser.name}</span>
-            <div className="flex items-center gap-2 ml-2">
-              <button onClick={handleExportPPT} className="p-1 hover:scale-110 transition-transform" title="Export Full PPT"><DownloadIcon /></button>
-              <button onClick={handleExportExcel} className="p-1 hover:scale-110 transition-transform" title="Export Full Excel Report"><ExcelExportIcon /></button>
+            <div className="flex items-center gap-4 ml-2">
+              <div className="flex items-center gap-2">
+                <button onClick={handleExportPPT} className="p-1 hover:scale-110 transition-transform" title="Export Full PPT"><DownloadIcon /></button>
+                <button onClick={handleExportExcel} className="p-1 hover:scale-110 transition-transform" title="Export Full Excel Report"><ExcelExportIcon /></button>
+              </div>
               {currentUser.role === UserRole.SUPER_ADMIN && (
-                <>
-                  <label className="p-1 hover:scale-110 transition-transform cursor-pointer" title="Import Structure Template">
+                <div className="flex items-center gap-2 pl-4 border-l-2 border-slate-200">
+                  <button onClick={handleExportStructureTemplate} className="p-1 hover:scale-110 transition-transform" title="Export Structure Template (Activity/Indicator names)"><TemplateExportIcon /></button>
+                  <label className="p-1 hover:scale-110 transition-transform cursor-pointer" title="Import Structure Template (Activity/Indicator names)">
                     <UploadIcon />
                     <input type="file" ref={excelImportRef} className="hidden" accept=".xlsx, .xls" onChange={handleImportExcel} />
                   </label>
                   <button onClick={unhideAll} className="p-1 hover:scale-110 transition-transform" title="Restore Hidden Items"><RestoreHiddenIcon /></button>
-                </>
+                </div>
               )}
             </div>
           </div>
