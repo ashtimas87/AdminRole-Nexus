@@ -437,6 +437,26 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const currentPI = useMemo(() => piData.find(pi => pi.id === activeTab) || piData[0], [piData, activeTab]);
   const isPercent = useMemo(() => ["PI4", "PI9", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(activeTab), [activeTab]);
 
+  /**
+   * Helper to save value with synchronization logic for Target Outlook.
+   * If saving for Police Station 1 in Target Outlook, sync to all other stations and Force Unit.
+   */
+  const saveDataWithSync = (piId: string, aid: string, monthIdx: number, val: number) => {
+    const storageKey = `${prefix}_data_${year}_${effectiveId}_${piId}_${aid}_${monthIdx}`;
+    localStorage.setItem(storageKey, String(val));
+
+    // Special Sync for Police Station 1 in Target Outlook (2025/2026+)
+    if (prefix === 'target' && subjectUser.name === 'Police Station 1') {
+      allUnits.forEach(unit => {
+        // Target: All Stations AND the City Mobile Force Company (Force Unit)
+        if ((unit.role === UserRole.STATION || unit.name === 'City Mobile Force Company') && unit.id !== subjectUser.id) {
+          const syncKey = `${prefix}_data_${year}_${unit.id}_${piId}_${aid}_${monthIdx}`;
+          localStorage.setItem(syncKey, String(val));
+        }
+      });
+    }
+  };
+
   const handleCellClick = (rowIdx: number, monthIdx: number, val: number) => {
     if (canModifyData) {
       setEditingCell({ rowIdx, monthIdx });
@@ -448,16 +468,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     if (!editingCell || !currentPI) return;
     const val = parseInt(editValue, 10) || 0;
     const aid = currentPI.activities[editingCell.rowIdx].id;
-    const storageKey = `${prefix}_data_${year}_${effectiveId}_${activeTab}_${aid}_${editingCell.monthIdx}`;
-    localStorage.setItem(storageKey, String(val));
-    if (prefix === 'target' && year === '2026' && subjectUser.name === 'Police Station 1') {
-      allUnits.forEach(unit => {
-        if (unit.role === UserRole.STATION && unit.name !== 'City Mobile Force Company' && unit.id !== subjectUser.id) {
-          const syncKey = `${prefix}_data_${year}_${unit.id}_${activeTab}_${aid}_${editingCell.monthIdx}`;
-          localStorage.setItem(syncKey, String(val));
-        }
-      });
-    }
+    saveDataWithSync(activeTab, aid, editingCell.monthIdx, val);
     refresh();
     setEditingCell(null);
   };
@@ -564,7 +575,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           
           MONTHS.forEach((m, i) => {
             if (row[m] !== undefined) {
-              localStorage.setItem(`${prefix}_data_${year}_${effectiveId}_${piId}_${aid}_${i}`, String(row[m]));
+              saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0);
             }
           });
         }
@@ -708,7 +719,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           
           MONTHS.forEach((m, i) => {
             if (row[m] !== undefined) {
-              localStorage.setItem(`${prefix}_data_${year}_${effectiveId}_${piId}_${aid}_${i}`, String(row[m]));
+              saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0);
             }
           });
         }
