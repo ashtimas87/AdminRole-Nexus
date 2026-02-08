@@ -283,7 +283,12 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
     activities: piStructureMap[piId].activities
   }));
 
-  const customKey = `${prefix}_custom_definitions_${year}`;
+  /** 
+   * CRITICAL: Isolation of custom definitions. 
+   * Added effectiveId to the customKey to ensure adding/removing items in one unit view 
+   * does not bleed into the Consolidated (Operational) or Station dashboards.
+   */
+  const customKey = `${prefix}_custom_definitions_${year}_${effectiveId}`;
   const customPIs = JSON.parse(localStorage.getItem(customKey) || '[]');
   let allDefinitions = [...baseDefinitions, ...customPIs];
 
@@ -706,51 +711,82 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
       
-      // Group by PI to update ID lists efficiently
       const piActivityGroups: Record<string, string[]> = {};
+      const customKey = `${prefix}_custom_definitions_${year}_${effectiveId}`;
+      const existingCustomPIs: any[] = JSON.parse(localStorage.getItem(customKey) || '[]');
+      const newCustomPIsMap = new Map<string, any>();
+      existingCustomPIs.forEach(pi => newCustomPIsMap.set(pi.id, pi));
 
       jsonData.forEach(row => {
-        // Map common template variations back to standard keys
-        const piId = row.PI_ID || row["PI ID"];
-        const piTitle = row.PI_Title || row["PI Title"];
-        const tabLabel = row.Tab_Label || row["Tab Label"];
-        const activityId = row.Activity_ID || row["Activity ID"];
-        const activityName = row.Activity_Name || row["Activity Name"];
-        const indicatorName = row.Performance_Indicator_Name || row.Indicator_Name || row["Indicator Name"] || row["Performance Indicator Name"];
+        // Robust Column Mapping
+        const getVal = (keys: string[]) => {
+          for (const key of keys) {
+            if (row[key] !== undefined) return String(row[key]).trim();
+            const normalized = key.toLowerCase().replace(/_/g, ' ');
+            for (const rk of Object.keys(row)) {
+              if (rk.toLowerCase().replace(/_/g, ' ') === normalized) return String(row[rk]).trim();
+            }
+          }
+          return undefined;
+        };
+
+        const piId = getVal(["PI_ID", "PI ID"]);
+        const piTitle = getVal(["PI_Title", "PI Title"]);
+        const tabLabel = getVal(["Tab_Label", "Tab Label"]);
+        let activityId = getVal(["Activity_ID", "Activity ID"]);
+        const activityName = getVal(["Activity_Name", "Activity Name"]);
+        const indicatorName = getVal(["Performance_Indicator_Name", "Indicator_Name", "Indicator Name", "Performance Indicator Name"]);
 
         if (piId) {
+          // If this is a new PI ID not in base 29, we need to ensure it's in custom definitions
+          const basePIIds = ["PI1","PI2","PI3","PI4","PI5","PI6","PI7","PI8","PI9","PI10","PI11","PI12","PI13","PI14","PI15","PI16","PI17","PI18","PI19","PI20","PI21","PI22","PI23","PI24","PI25","PI26","PI27","PI28","PI29"];
+          if (!basePIIds.includes(piId) && !newCustomPIsMap.has(piId)) {
+            newCustomPIsMap.set(piId, {
+              id: piId,
+              title: piTitle || `Performance Indicator ${piId}`,
+              activities: [] // activities will be populated by ID tracking
+            });
+          }
+
           if (piTitle) localStorage.setItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`, piTitle);
           if (tabLabel) localStorage.setItem(`${prefix}_pi_tab_${year}_${effectiveId}_${piId}`, tabLabel);
           
-          if (activityId) {
-            // Track the activity ID for this PI
-            if (!piActivityGroups[piId]) piActivityGroups[piId] = [];
-            piActivityGroups[piId].push(activityId);
+          if (activityName) {
+            // Generate stable unique ID if missing
+            if (!activityId) {
+              const hash = Array.from(activityName).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+              activityId = `imported_act_${piId}_${hash}`;
+            }
 
-            if (activityName) localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${activityId}`, activityName);
-            if (indicatorName) localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${activityId}`, indicatorName);
+            if (!piActivityGroups[piId]) piActivityGroups[piId] = [];
+            if (!piActivityGroups[piId].includes(activityId)) {
+               piActivityGroups[piId].push(activityId);
+            }
+
+            localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${activityId}`, activityName);
+            if (indicatorName) {
+              localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${activityId}`, indicatorName);
+            }
           }
         }
       });
 
-      // Update the active activity ID lists for each PI touched by the import
+      // Update the active activity ID lists for each PI
       Object.entries(piActivityGroups).forEach(([piId, ids]) => {
         const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
         const storedIdsStr = localStorage.getItem(actIdsKey);
         
-        let existingIds: string[] = [];
+        let mergedIds: string[] = [];
         if (storedIdsStr) {
-          existingIds = JSON.parse(storedIdsStr);
+          mergedIds = JSON.parse(storedIdsStr);
         } else {
-          // If no stored IDs, use the base IDs from the current definition
+          // Check base or custom definitions for defaults
           const piDef = piData.find(p => p.id === piId);
           if (piDef) {
-            existingIds = piDef.activities.map(a => a.id);
+            mergedIds = piDef.activities.map(a => a.id);
           }
         }
         
-        // Merge: add any IDs from Excel that aren't already in the list
-        const mergedIds = [...existingIds];
         ids.forEach(id => {
           if (!mergedIds.includes(id)) {
             mergedIds.push(id);
@@ -758,10 +794,28 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         });
         
         localStorage.setItem(actIdsKey, JSON.stringify(mergedIds));
+
+        // If it's a custom PI, we also need to make sure the structure itself contains these activity IDs as stubs
+        if (newCustomPIsMap.has(piId)) {
+          const customDef = newCustomPIsMap.get(piId);
+          ids.forEach(id => {
+            if (!customDef.activities.find((a: any) => a.id === id)) {
+              customDef.activities.push({
+                id: id,
+                name: localStorage.getItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${id}`) || "New Activity",
+                indicator: localStorage.getItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${id}`) || "Indicator",
+                defaults: Array(12).fill(0)
+              });
+            }
+          });
+        }
       });
 
+      // Save custom PI definitions back to localStorage
+      localStorage.setItem(customKey, JSON.stringify(Array.from(newCustomPIsMap.values())));
+
       refresh();
-      alert('Dashboard structure updated successfully!');
+      alert('Dashboard structure updated successfully with new activities!');
       if (excelImportRef.current) excelImportRef.current.value = '';
     };
     reader.readAsArrayBuffer(file);
