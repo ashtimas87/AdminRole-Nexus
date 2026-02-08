@@ -299,6 +299,20 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
               </div>
             </div>
           )}
+
+          {specialUsers.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Force Units (Company)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {specialUsers.map(u => (
+                  <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('operational-dashboard'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-indigo-500 transition-all text-left cursor-pointer shadow-sm hover:shadow-md">
+                    <img src={u.avatar} className="w-12 h-12 rounded-xl border" />
+                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-slate-400">COMPANY ACCOMPLISHMENT</p></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -333,6 +347,21 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
 
         {(isAdmin || (user.role === UserRole.CHQ && selectedYear === '2023')) && (
           <div className="space-y-4">
+            {user.role === UserRole.SUPER_ADMIN && (
+              <div 
+                onClick={() => { setSelectedOverviewUser(user); setView('target-outlook'); }} 
+                className="w-full flex items-center gap-5 p-6 bg-slate-900 rounded-3xl border-2 border-slate-800 hover:border-amber-400 transition-all text-left cursor-pointer shadow-xl group"
+              >
+                <div className="w-14 h-14 bg-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-400 border border-indigo-500/30 group-hover:scale-105 transition-transform">
+                   <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                </div>
+                <div>
+                  <p className="text-xl font-black text-white">Operational Dashboard Target Outlook</p>
+                  <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">MASTER SYSTEM OVERVIEW</p>
+                </div>
+              </div>
+            )}
+
             <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Consolidation of CHQ & Tactical</h3>
             <div 
               onClick={() => { setSelectedOverviewUser(user); setView('target-outlook'); }} 
@@ -342,7 +371,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
               </div>
               <div>
-                <p className="text-xl font-black text-white">Full Target Outlook Consolidation {selectedYear}</p>
+                <p className="text-xl font-black text-white">Operational Target Outlook {selectedYear}</p>
                 <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">OFFICE MASTER PROJECTIONS</p>
               </div>
             </div>
@@ -372,6 +401,20 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
                   <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('target-outlook'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-amber-600 transition-all text-left cursor-pointer shadow-sm group">
                     <img src={u.avatar} className="w-12 h-12 rounded-xl border group-hover:scale-105 transition-transform" />
                     <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-amber-600">STATION TARGET OUTLOOK</p></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {specialUsers.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Force Units (Company)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {specialUsers.map(u => (
+                  <div key={u.id} onClick={() => { setSelectedOverviewUser(u); setView('target-outlook'); }} className="w-full flex items-center gap-5 p-4 bg-white rounded-2xl border hover:border-amber-500 transition-all text-left cursor-pointer shadow-sm group">
+                    <img src={u.avatar} className="w-12 h-12 rounded-xl border group-hover:scale-105 transition-transform" />
+                    <div><p className="font-black text-slate-800">{u.name}</p><p className="text-[10px] font-black uppercase text-amber-600">COMPANY TARGET OUTLOOK</p></div>
                   </div>
                 ))}
               </div>
@@ -461,7 +504,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
         if (user.role === UserRole.CHQ) return `CHQ ${year} Target Outlook`;
       }
       if (isSubAdminUnit || (isSelf && user.role === UserRole.SUPER_ADMIN)) {
-         return `CHQ & Tactical Consolidated ${year} Target Outlook`;
+         return `Operational Target Outlook ${year}`;
       }
       return `${targetUser.name} ${year} Target Outlook`;
     } else {
