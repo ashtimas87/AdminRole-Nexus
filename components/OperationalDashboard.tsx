@@ -575,17 +575,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
   /**
    * Generates a comprehensive multi-sheet Excel report for all active Performance Indicators.
-   * As requested: exports ALL tabbings (PI 1 to PI 29) regardless of UI visibility.
+   * Now includes the summary TOTAL row at the bottom of each sheet.
    */
   const handleExportExcel = () => {
     const workbook = XLSX.utils.book_new();
     const unitsToConsolidate = prefix === 'accomplishment' ? allUnits : [];
-    
-    // Fetch FULL data set (ignoreHidden = true)
     const fullData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate, true);
 
     fullData.forEach(pi => {
-      // Calculate totals for export data
       const activitiesWithTotals = pi.activities.map(a => ({
         ...a,
         total: a.months.reduce((sum, m) => sum + m.value, 0)
@@ -593,32 +590,40 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
       const tabLabel = getSharedTabLabel(prefix, year, effectiveId, pi.id, `PI ${pi.id.replace('PI','')}`);
       const piIsPercent = ["PI4", "PI9", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(pi.id);
-
+      
       const sheetData = activitiesWithTotals.map(act => {
-        const row: Record<string, any> = {
-          "Activity": act.activity,
-          "Performance Indicator": act.indicator
-        };
-        act.months.forEach((m, idx) => {
-          row[MONTHS[idx]] = piIsPercent ? `${m.value}%` : m.value;
-        });
+        const row: Record<string, any> = { "Activity": act.activity, "Performance Indicator": act.indicator };
+        act.months.forEach((m, idx) => { row[MONTHS[idx]] = piIsPercent ? `${m.value}%` : m.value; });
         row["Total"] = piIsPercent ? `${Math.round(act.total / 12)}%` : act.total;
         return row;
       });
+
+      // Calculate Summary Total row
+      const mTotals = Array(12).fill(0);
+      activitiesWithTotals.forEach(a => a.months.forEach((mo, i) => mTotals[i] += mo.value));
+      const div = activitiesWithTotals.length || 1;
+      const mOut = piIsPercent ? mTotals.map(v => Math.round(v / div)) : mTotals;
+      const gTotal = piIsPercent 
+        ? Math.round(mOut.reduce((s,v) => s + v, 0) / 12) 
+        : activitiesWithTotals.reduce((s, a) => s + a.total, 0);
+
+      const totalRow: Record<string, any> = { "Activity": "TOTAL", "Performance Indicator": "" };
+      MONTHS.forEach((m, i) => { totalRow[m] = piIsPercent ? `${mOut[i]}%` : mOut[i]; });
+      totalRow["Total"] = piIsPercent ? `${gTotal}%` : gTotal;
+      sheetData.push(totalRow);
 
       const worksheet = XLSX.utils.json_to_sheet(sheetData);
       worksheet['!cols'] = [{ wch: 45 }, { wch: 45 }, ...Array(13).fill({ wch: 8 })];
       const safeSheetName = tabLabel.substring(0, 31).replace(/[\[\]\*\?\/\\]/g, ' ');
       XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
     });
-
+    
     const reportType = isTargetOutlook ? 'Target_Outlook' : 'Accomplishment_Report';
     XLSX.writeFile(workbook, `${subjectUser.name}_${reportType}_${year}_Full_Report.xlsx`);
   };
 
   /**
    * Generates a comprehensive PowerPoint presentation for all active Performance Indicators.
-   * As requested: exports ALL tabbings (PI 1 to PI 29) regardless of UI visibility.
    */
   const handleExportPPT = async () => {
     const pres = new pptxgen();
@@ -626,50 +631,31 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     titleSlide.background = { fill: "F8FAFC" };
     titleSlide.addText("CPSMU Monitoring Report", { x: 0, y: "40%", w: "100%", align: "center", fontSize: 36, bold: true, color: "0F172A" });
     titleSlide.addText(`${title}\nUnit: ${subjectUser.name}`, { x: 0, y: "55%", w: "100%", align: "center", fontSize: 18, color: "64748B" });
-
     const unitsToConsolidate = prefix === 'accomplishment' ? allUnits : [];
-    
-    // Fetch FULL data set (ignoreHidden = true)
     const exportData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate, true);
 
     exportData.forEach(pi => {
-      // Calculate totals for export
-      const activitiesWithTotals = pi.activities.map(a => ({
-        ...a,
-        total: a.months.reduce((sum, m) => sum + m.value, 0)
-      }));
-
+      const activitiesWithTotals = pi.activities.map(a => ({ ...a, total: a.months.reduce((sum, m) => sum + m.value, 0) }));
       const slide = pres.addSlide();
       slide.addText(pi.title, { x: 0.5, y: 0.3, w: "90%", fontSize: 14, bold: true, color: "0F172A", align: "center" });
-      
       const piIsPercent = ["PI4", "PI9", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(pi.id);
-      
+
+      // Re-calculate totals for the summary row in PPT
+      const mTotals = Array(12).fill(0);
+      activitiesWithTotals.forEach(a => a.months.forEach((mo, i) => mTotals[i] += mo.value));
+      const div = activitiesWithTotals.length || 1;
+      const mOut = piIsPercent ? mTotals.map(v => Math.round(v / div)) : mTotals;
+      const gTotal = piIsPercent 
+        ? Math.round(mOut.reduce((s,v) => s + v, 0) / 12) 
+        : activitiesWithTotals.reduce((s, a) => s + a.total, 0);
+
       const tableData = [
-        [
-          { text: "Activity", options: { fill: "FFFF00", bold: true, color: "000000" } },
-          { text: "Performance Indicator", options: { fill: "FFFF00", bold: true, color: "000000" } },
-          ...MONTHS.map(m => ({ text: m, options: { fill: "00B0F0", bold: true, color: "FFFFFF" } })),
-          { text: "Total", options: { fill: "FFFF00", bold: true, color: "000000" } }
-        ],
-        ...activitiesWithTotals.map(a => [
-          { text: a.activity },
-          { text: a.indicator },
-          ...a.months.map(m => ({ text: piIsPercent ? `${m.value}%` : String(m.value) })),
-          { text: piIsPercent ? `${Math.round(a.total / 12)}%` : String(a.total), options: { bold: true } }
-        ])
+        [{ text: "Activity", options: { fill: "FFFF00", bold: true, color: "000000" } }, { text: "Performance Indicator", options: { fill: "FFFF00", bold: true, color: "000000" } }, ...MONTHS.map(m => ({ text: m, options: { fill: "00B0F0", bold: true, color: "FFFFFF" } })), { text: "Total", options: { fill: "FFFF00", bold: true, color: "000000" } }],
+        ...activitiesWithTotals.map(a => [{ text: a.activity }, { text: a.indicator }, ...a.months.map(m => ({ text: piIsPercent ? `${m.value}%` : String(m.value) })), { text: piIsPercent ? `${Math.round(a.total / 12)}%` : String(a.total), options: { bold: true } }]),
+        [{ text: "TOTAL", options: { bold: true, fill: "F1F5F9" } }, { text: "", options: { fill: "F1F5F9" } }, ...mOut.map(v => ({ text: piIsPercent ? `${v}%` : String(v), options: { bold: true, fill: "F1F5F9" } })), { text: piIsPercent ? `${gTotal}%` : String(gTotal), options: { bold: true, fill: "0F172A", color: "FFFFFF" } }]
       ];
-
-      slide.addTable(tableData, {
-        x: 0.2, y: 1.0, w: 9.6,
-        fontSize: 8,
-        border: { type: "solid", color: "CBD5E1", pt: 0.5 },
-        align: "center",
-        valign: "middle",
-        autoPage: true,
-        colWidths: [1.8, 1.8, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.6]
-      });
+      slide.addTable(tableData, { x: 0.2, y: 1.0, w: 9.6, fontSize: 8, border: { type: "solid", color: "CBD5E1", pt: 0.5 }, align: "center", valign: "middle", autoPage: true, colWidths: [1.8, 1.8, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.6] });
     });
-
     pres.writeFile({ fileName: `${subjectUser.name}_${prefix}_${year}_Full_Report.pptx` });
   };
 
@@ -717,8 +703,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">{title}</h2>
             <span className="px-3 py-1 bg-slate-900 text-white text-[10px] font-black rounded uppercase tracking-widest">UNIT: {subjectUser.name}</span>
             <div className="flex items-center gap-2 ml-2">
-              <button onClick={handleExportPPT} className="p-1 hover:scale-110 transition-transform" title="Export Full PPT (All Tabs)"><DownloadIcon /></button>
-              <button onClick={handleExportExcel} className="p-1 hover:scale-110 transition-transform" title="Export Full Excel Report (All Tabs)"><ExcelExportIcon /></button>
+              <button onClick={handleExportPPT} className="p-1 hover:scale-110 transition-transform" title="Export Full PPT"><DownloadIcon /></button>
+              <button onClick={handleExportExcel} className="p-1 hover:scale-110 transition-transform" title="Export Full Excel Report"><ExcelExportIcon /></button>
               {currentUser.role === UserRole.SUPER_ADMIN && (
                 <>
                   <label className="p-1 hover:scale-110 transition-transform cursor-pointer" title="Import Structure Template">
@@ -747,13 +733,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                   </div>
                 )}
                 <div className="relative group">
-                  <button 
-                    onClick={() => !isEditing && setActiveTab(pi.id)} 
-                    className={`px-4 py-2 rounded-lg text-xs font-black transition-all border flex items-center gap-2 ${activeTab === pi.id ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-                  >
-                    {isEditing ? (
-                      <input autoFocus className="bg-white text-slate-900 px-1 rounded border border-blue-500 font-black outline-none w-24" value={editTabLabel} onChange={e => setEditTabLabel(e.target.value)} onBlur={handleSaveTabLabel} onKeyDown={e => e.key === 'Enter' && handleSaveTabLabel()} />
-                    ) : label}
+                  <button onClick={() => !isEditing && setActiveTab(pi.id)} className={`px-4 py-2 rounded-lg text-xs font-black transition-all border flex items-center gap-2 ${activeTab === pi.id ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+                    {isEditing ? <input autoFocus className="bg-white text-slate-900 px-1 rounded border border-blue-500 font-black outline-none w-24" value={editTabLabel} onChange={e => setEditTabLabel(e.target.value)} onBlur={handleSaveTabLabel} onKeyDown={e => e.key === 'Enter' && handleSaveTabLabel()} /> : label}
                     {canEditStructure && !isEditing && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
                         <button onClick={(e) => handleStartRenameTab(e, pi)} className="text-slate-400 hover:text-blue-400 p-0.5"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
@@ -788,28 +769,20 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               {currentPI.activities.map((a, rIdx) => (
                 <tr key={a.id} className="hover:bg-blue-50/30 group">
                   <td className="border border-slate-300 p-2 relative group-hover:pr-10 transition-all">
-                    {editingActivityField?.aid === a.id && editingActivityField?.field === 'activity' ? (
-                      <input autoFocus className="w-full bg-white border border-blue-500 rounded px-1 outline-none font-black" value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={handleSaveField} onKeyDown={e => e.key === 'Enter' && handleSaveField()} />
-                    ) : (
-                      <span className={canEditStructure ? 'cursor-pointer hover:underline' : ''} onClick={() => handleStartEditField(a.id, 'activity', a.activity)}>{a.activity}</span>
-                    )}
+                    {editingActivityField?.aid === a.id && editingActivityField?.field === 'activity' ? <input autoFocus className="w-full bg-white border border-blue-500 rounded px-1 outline-none font-black" value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={handleSaveField} onKeyDown={e => e.key === 'Enter' && handleSaveField()} /> : <span className={canEditStructure ? 'cursor-pointer hover:underline' : ''} onClick={() => handleStartEditField(a.id, 'activity', a.activity)}>{a.activity}</span>}
                     {canEditStructure && <button onClick={() => removeActivity(a.id)} className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 p-1"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}
                   </td>
                   <td className="border border-slate-300 p-2">
-                    {editingActivityField?.aid === a.id && editingActivityField?.field === 'indicator' ? (
-                      <input autoFocus className="w-full bg-white border border-blue-500 rounded px-1 outline-none font-black" value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={handleSaveField} onKeyDown={e => e.key === 'Enter' && handleSaveField()} />
-                    ) : (
-                      <span className={canEditStructure ? 'cursor-pointer hover:underline' : ''} onClick={() => handleStartEditField(a.id, 'indicator', a.indicator)}>{a.indicator}</span>
-                    )}
+                    {editingActivityField?.aid === a.id && editingActivityField?.field === 'indicator' ? <input autoFocus className="w-full bg-white border border-blue-500 rounded px-1 outline-none font-black" value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={handleSaveField} onKeyDown={e => e.key === 'Enter' && handleSaveField()} /> : <span className={canEditStructure ? 'cursor-pointer hover:underline' : ''} onClick={() => handleStartEditField(a.id, 'indicator', a.indicator)}>{a.indicator}</span>}
                   </td>
                   {a.months.map((m, mIdx) => (
                     <td key={mIdx} className="border border-slate-300 p-1 text-center">
-                      {editingCell?.rowIdx === rIdx && editingCell?.monthIdx === mIdx ? (
-                        <input autoFocus className="w-full bg-white border border-blue-500 rounded text-center outline-none font-black" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e => e.key === 'Enter' && saveEdit()} />
-                      ) : (
+                      {editingCell?.rowIdx === rIdx && editingCell?.monthIdx === mIdx ? <input autoFocus className="w-full bg-white border border-blue-500 rounded text-center outline-none font-black" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e => e.key === 'Enter' && saveEdit()} /> : (
                         <div className="flex flex-col items-center justify-center min-h-[34px]">
                           <span className={`text-blue-700 font-bold ${canModifyData ? 'cursor-pointer hover:underline' : ''}`} onClick={() => handleCellClick(rIdx, mIdx, m.value)}>{m.value}{isPercent ? '%' : ''}</span>
-                          <button onClick={e => handleOpenFiles(e, rIdx, mIdx)} className={`mt-0.5 text-[7px] font-black px-1 rounded border transition-all ${m.files.length > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 opacity-0 group-hover:opacity-100 border-slate-200'}`}>{m.files.length > 0 ? `📎 ${m.files.length}` : '+ FILE'}</button>
+                          {(!isTargetOutlook || m.files.length > 0) && (
+                            <button onClick={e => handleOpenFiles(e, rIdx, mIdx)} className={`mt-0.5 text-[7px] font-black px-1 rounded border transition-all ${m.files.length > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 opacity-0 group-hover:opacity-100 border-slate-200'}`}>{m.files.length > 0 ? `📎 ${m.files.length}` : '+ FILE'}</button>
+                          )}
                         </div>
                       )}
                     </td>
@@ -825,11 +798,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             </tbody>
           </table>
         </div>
-        {canEditStructure && (
-          <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-center">
-            <button onClick={handleAddActivity} className="px-6 py-2 bg-white border-2 border-slate-900 text-slate-900 rounded-xl font-black text-xs uppercase hover:bg-slate-900 hover:text-white transition-all shadow-sm">Add New Activity Entry</button>
-          </div>
-        )}
+        {canEditStructure && <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-center"><button onClick={handleAddActivity} className="px-6 py-2 bg-white border-2 border-slate-900 text-slate-900 rounded-xl font-black text-xs uppercase hover:bg-slate-900 hover:text-white transition-all shadow-sm">Add New Activity Entry</button></div>}
       </div>
 
       {isFilesModalOpen && activeFileCell && (
@@ -843,11 +812,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               {currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.length === 0 ? <div className="text-center py-8 text-slate-400 font-bold text-xs">No documents uploaded.</div> : currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.map(f => (
                 <div key={f.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 group">
                   <div className="flex-1 min-w-0"><p className="text-xs font-black text-slate-800 truncate">{f.name}</p><p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">{new Date(f.uploadedAt).toLocaleDateString()}</p></div>
-                  <div className="flex items-center gap-1"><a href={f.url} download={f.name} className="p-1.5 text-slate-400 hover:text-blue-600"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg></a>{canModifyData && <button onClick={() => removeFile(f.id)} className="p-1.5 text-slate-400 hover:text-red-600"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}</div>
+                  <div className="flex items-center gap-1"><a href={f.url} download={f.name} className="p-1.5 text-slate-400 hover:text-blue-600"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg></a>{canModifyData && !isTargetOutlook && <button onClick={() => removeFile(f.id)} className="p-1.5 text-slate-400 hover:text-red-600"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}</div>
                 </div>
               ))}
             </div>
-            {canModifyData && <div className="p-6 bg-slate-50 border-t border-slate-100"><input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" /><button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow hover:bg-slate-800 flex items-center justify-center gap-2 transition-all">Upload Evidence</button></div>}
+            {canModifyData && !isTargetOutlook && <div className="p-6 bg-slate-50 border-t border-slate-100"><input type="file" style={{ display: 'none' }} ref={fileInputRef} onChange={handleFileUpload} /><button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow hover:bg-slate-800 flex items-center justify-center gap-2 transition-all">Upload Evidence</button></div>}
           </div>
         </div>
       )}

@@ -436,7 +436,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
             className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'unit-oversight' || (view === 'operational-dashboard' && selectedOverviewUser && selectedOverviewUser.id !== user.id) ? 'bg-purple-600 text-white shadow-lg shadow-purple-100' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
           >
             Unit Oversight
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2-2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
           </button>
         )}
 
@@ -452,15 +452,29 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
   );
 
   const getDashboardTitle = (targetUser: User, year: string, isOutlook: boolean) => {
-    const isHeadOffice = targetUser.id === user.id || targetUser.role === UserRole.SUB_ADMIN;
+    const isSelf = targetUser.id === user.id;
+    const isSubAdminUnit = targetUser.role === UserRole.SUB_ADMIN;
+
     if (isOutlook) {
-      const type = isHeadOffice ? 'CHQ & Tactical Consolidated' : `${targetUser.name}`;
-      return `${type} ${year} Target Outlook`;
+      if (isSelf) {
+        if (user.role === UserRole.STATION) return `Tactical ${year} Target Outlook`;
+        if (user.role === UserRole.CHQ) return `CHQ ${year} Target Outlook`;
+      }
+      if (isSubAdminUnit || (isSelf && user.role === UserRole.SUPER_ADMIN)) {
+         return `CHQ & Tactical Consolidated ${year} Target Outlook`;
+      }
+      return `${targetUser.name} ${year} Target Outlook`;
     } else {
-      const isTactical = targetUser.role === UserRole.STATION;
-      if (isHeadOffice) return `CHQ & Tactical Consolidation ${year} Accomplishment`;
-      const type = isTactical ? 'Tactical Accomplishment' : 'CHQ Accomplishment';
-      return `${targetUser.name} ${year} ${type}`;
+      // Accomplishment
+      if (isSelf) {
+        if (user.role === UserRole.STATION) return `Tactical ${year} Accomplishment`;
+        if (user.role === UserRole.CHQ) return `CHQ ${year} Accomplishment`;
+      }
+      if (isSubAdminUnit || (isSelf && user.role === UserRole.SUPER_ADMIN)) {
+        return `CHQ & Tactical Consolidation ${year} Accomplishment`;
+      }
+      const typeLabel = targetUser.role === UserRole.STATION ? 'Tactical Accomplishment' : 'CHQ Accomplishment';
+      return `${targetUser.name} ${year} ${typeLabel}`;
     }
   };
 
@@ -511,7 +525,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
       
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-m-md rounded-[2.5rem] shadow-2xl p-8 animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-md rounded-[2.5rem] shadow-2xl p-8 animate-in zoom-in-95 duration-200">
             <h3 className="text-2xl font-black mb-6 text-slate-900 tracking-tight">{editingUser ? 'Edit Account' : 'New Account'}</h3>
             <form onSubmit={handleSaveUser} className="space-y-4">
               <div>
