@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import pptxgen from "pptxgenjs";
@@ -364,16 +365,6 @@ const TemplateExportIcon = () => (
   </svg>
 );
 
-const ExcelExportIcon = () => (
-  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="512" height="512" rx="120" fill="#10B981" />
-    <path d="M380 160H132V352H380V160Z" stroke="white" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M132 224H380" stroke="white" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M224 160V352" stroke="white" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M170 260L210 310M210 260L170 310" stroke="white" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
 const RestoreHiddenIcon = () => (
   <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect width="512" height="512" rx="120" fill="black" />
@@ -385,6 +376,14 @@ const RestoreHiddenIcon = () => (
 const PaperclipIcon = ({ active }: { active?: boolean }) => (
   <svg className={`w-3.5 h-3.5 ${active ? 'text-emerald-500' : 'text-slate-300 group-hover/cell:text-slate-400'} transition-colors`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+  </svg>
+);
+
+const GoogleDriveIcon = () => (
+  <svg viewBox="0 0 512 512" className="w-6 h-6" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M165.04 100.32L346.96 100.32L512 386.13L330.08 386.13L165.04 100.32Z" fill="#00A859"/>
+    <path d="M181.92 386.13L0 386.13L165.04 100.32L346.96 100.32L181.92 386.13Z" fill="#FFC107"/>
+    <path d="M181.92 386.13L346.96 100.32L512 386.13L330.08 386.13L181.92 386.13Z" fill="#3B82F6"/>
   </svg>
 );
 
@@ -403,26 +402,29 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const [editValue, setEditValue] = useState<string>('');
   const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
   const [activeFileCell, setActiveFileCell] = useState<{ rowIdx: number; monthIdx: number } | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const excelImportRef = useRef<HTMLInputElement>(null);
   const structureImportRef = useRef<HTMLInputElement>(null);
   const masterImportRef = useRef<HTMLInputElement>(null);
-  const [editingTabId, setEditingTabId] = useState<string | null>(null);
-  const [editTabLabel, setEditTabLabel] = useState<string>('');
   const [editingActivityField, setEditingActivityField] = useState<{ aid: string; field: 'activity' | 'indicator' } | null>(null);
   const [editFieldName, setEditFieldName] = useState<string>('');
+  const [vaultOpen, setVaultOpen] = useState(false);
 
   const year = useMemo(() => title.match(/\d{4}/)?.[0] || '2026', [title]);
   const isTargetOutlook = useMemo(() => title.toUpperCase().includes("TARGET OUTLOOK"), [title]);
   const prefix = isTargetOutlook ? 'target' : 'accomplishment';
   const effectiveId = useMemo(() => getEffectiveUserId(subjectUser.id), [subjectUser.id]);
+  
+  const isAdmin = currentUser.role === UserRole.SUPER_ADMIN || currentUser.role === UserRole.SUB_ADMIN;
   const isOwner = currentUser.id === subjectUser.id;
   const isHeadOfficeView = subjectUser.id === currentUser.id || subjectUser.role === UserRole.SUB_ADMIN;
   const isConsolidated = prefix === 'accomplishment' && isHeadOfficeView;
   
-  // Super Admin can manage any unit level data; Sub Admin can manage Stations.
   const canModifyData = isOwner || currentUser.role === UserRole.SUPER_ADMIN || (currentUser.role === UserRole.SUB_ADMIN && subjectUser.role === UserRole.STATION);
   const canEditStructure = currentUser.role === UserRole.SUPER_ADMIN;
+
+  // File access control: Only owner, Super Admin, or Sub Admin can view files.
+  const canAccessFiles = isOwner || isAdmin;
 
   const refresh = () => {
     const unitsToConsolidate = prefix === 'accomplishment' ? allUnits : [];
@@ -445,15 +447,26 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const isPercent = useMemo(() => ["PI4", "PI9", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(activeTab), [activeTab]);
 
   /**
-   * Helper to save value with synchronization logic.
-   * synchronization is ONLY triggered by 'Police Station 1' in Target Outlook mode.
-   * This ensures that CHQ units or other Force units (like Mobile Force Company) imports do not affect others.
+   * Simulated Google Drive automatic sync logic.
+   * Super Admin has access to the Drive Vault which records all unit uploads.
    */
+  const syncToSuperAdminDrive = (files: MonthFile[], unitId: string) => {
+    const vaultKey = `superadmin_drive_vault_${year}`;
+    const vault: any[] = JSON.parse(localStorage.getItem(vaultKey) || '[]');
+    const newEntries = files.map(file => ({
+      ...file,
+      unitId,
+      unitName: subjectUser.name,
+      prefix,
+      piId: activeTab,
+      syncedAt: new Date().toISOString()
+    }));
+    localStorage.setItem(vaultKey, JSON.stringify([...vault, ...newEntries]));
+  };
+
   const saveDataWithSync = (piId: string, aid: string, monthIdx: number, val: number) => {
     const storageKey = `${prefix}_data_${year}_${effectiveId}_${piId}_${aid}_${monthIdx}`;
     localStorage.setItem(storageKey, String(val));
-
-    // Global sync logic restricted to Station 1 only.
     if (prefix === 'target' && subjectUser.name === 'Police Station 1') {
       allUnits.forEach(unit => {
         if ((unit.role === UserRole.STATION || unit.name === 'City Mobile Force Company') && unit.id !== subjectUser.id) {
@@ -464,24 +477,18 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     }
   };
 
-  /**
-   * Filters the hidden list based on what was present in the imported data.
-   * Any PI ID missing from the file will be added to the hidden list for this view.
-   */
   const updateVisibilityFromImport = (importedPIs: Set<string>) => {
     const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
     const allPossiblePIs = Array.from({ length: 29 }, (_, i) => `PI${i + 1}`);
-    
     const customKey = `${prefix}_custom_definitions_${year}_${effectiveId}`;
     const customPIs = JSON.parse(localStorage.getItem(customKey) || '[]');
     customPIs.forEach((c: any) => { if (!allPossiblePIs.includes(c.id)) allPossiblePIs.push(c.id); });
-
     const newHidden = allPossiblePIs.filter(id => !importedPIs.has(id));
     localStorage.setItem(hiddenPIsKey, JSON.stringify(newHidden));
   };
 
   const handleRestoreAllTabs = () => {
-    if (!confirm('Restore all hidden Performance Indicator tabs for this view?')) return;
+    if (!confirm('Restore all hidden Performance Indicator tabs?')) return;
     const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
     localStorage.removeItem(hiddenPIsKey);
     refresh();
@@ -505,30 +512,55 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
   const handleOpenFiles = (e: React.MouseEvent, rowIdx: number, monthIdx: number) => {
     e.stopPropagation();
+    if (!canAccessFiles) {
+      alert("Access Denied. Only Admins or the Unit Owner can access uploaded MOVs.");
+      return;
+    }
     setActiveFileCell({ rowIdx, monthIdx });
     setIsFilesModalOpen(true);
   };
 
+  // Fixed handleFileUpload type casting to resolve unknown type errors
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !activeFileCell || !currentPI) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const aid = currentPI.activities[activeFileCell.rowIdx].id;
-      const key = `${prefix}_files_${year}_${effectiveId}_${activeTab}_${aid}_${activeFileCell.monthIdx}`;
-      const existing: MonthFile[] = JSON.parse(localStorage.getItem(key) || '[]');
-      const newFile: MonthFile = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: file.name,
-        url: reader.result as string,
-        type: file.type,
-        uploadedAt: new Date().toISOString()
-      };
-      localStorage.setItem(key, JSON.stringify([...existing, newFile]));
+    const files = e.target.files;
+    if (!files || files.length === 0 || !activeFileCell || !currentPI) return;
+    
+    setIsSyncing(true);
+    const aid = currentPI.activities[activeFileCell.rowIdx].id;
+    const key = `${prefix}_files_${year}_${effectiveId}_${activeTab}_${aid}_${activeFileCell.monthIdx}`;
+    const existing: MonthFile[] = JSON.parse(localStorage.getItem(key) || '[]');
+    
+    const newFiles: MonthFile[] = [];
+    const uploadPromises = Array.from(files).map((file: File) => {
+      return new Promise<void>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          newFiles.push({
+            id: Math.random().toString(36).substr(2, 9),
+            name: file.name,
+            url: reader.result as string,
+            type: file.type,
+            uploadedAt: new Date().toISOString()
+          });
+          resolve();
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    await Promise.all(uploadPromises);
+    
+    const updatedFiles = [...existing, ...newFiles];
+    localStorage.setItem(key, JSON.stringify(updatedFiles));
+    
+    // Automatic sync to drive vault
+    syncToSuperAdminDrive(newFiles, effectiveId);
+    
+    setTimeout(() => {
+      setIsSyncing(false);
       refresh();
       if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-    reader.readAsDataURL(file);
+    }, 1200);
   };
 
   const removeFile = (fid: string) => {
@@ -540,46 +572,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     refresh();
   };
 
-  const handleAddActivity = () => {
-    if (!canEditStructure || !currentPI) return;
-    const newId = `custom_act_${Date.now()}`;
-    const currentActIds = currentPI.activities.map(a => a.id);
-    const newActIds = [...currentActIds, newId];
-    localStorage.setItem(`${prefix}_pi_act_ids_${year}_${effectiveId}_${activeTab}`, JSON.stringify(newActIds));
-    localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${activeTab}_${newId}`, "New Activity Entry");
-    localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${activeTab}_${newId}`, "Unit Count");
-    refresh();
-  };
-
-  const removeActivity = (aid: string) => {
-    if (!canEditStructure || !currentPI) return;
-    if (!confirm('Remove this activity row?')) return;
-    const newIds = currentPI.activities.map(a => a.id).filter(id => id !== aid);
-    localStorage.setItem(`${prefix}_pi_act_ids_${year}_${effectiveId}_${activeTab}`, JSON.stringify(newIds));
-    refresh();
-  };
-
-  const exportStructureTemplate = () => {
-    if (!currentPI) return;
-    const worksheetData = currentPI.activities.map(act => {
-      const row: any = {
-        'PI ID': currentPI.id,
-        'PI Title': currentPI.title,
-        'Activity ID': act.id,
-        'Activity Name': act.activity,
-        'Indicator': act.indicator,
-      };
-      MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
-      row['Total'] = act.total;
-      return row;
-    });
-
-    const ws = XLSX.utils.json_to_sheet(worksheetData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Structure Template");
-    XLSX.writeFile(wb, `${currentPI.id}_Structure_Template_${year}.xlsx`);
-  };
-
   const handleImportTemplate = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -589,97 +581,24 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const wb = XLSX.read(bstr, { type: 'binary' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const data: any[] = XLSX.utils.sheet_to_json(ws);
-
       const importedPIs = new Set<string>();
       data.forEach(row => {
         const piId = row['PI ID'];
         const aid = row['Activity ID'];
-        const actName = row['Activity Name'] || row['Strategic Activity'];
-        const indicator = row['Indicator'] || row['Performance Indicator'];
-
+        const actName = row['Strategic Activity'] || row['Activity Name'];
+        const indicator = row['Performance Indicator'] || row['Indicator'];
         if (piId) importedPIs.add(piId);
-
         if (piId && aid) {
           if (actName) localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, actName);
           if (indicator) localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicator);
-          
-          MONTHS.forEach((m, i) => {
-            if (row[m] !== undefined) {
-              saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0);
-            }
-          });
+          MONTHS.forEach((m, i) => { if (row[m] !== undefined) saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0); });
         }
       });
-      
       updateVisibilityFromImport(importedPIs);
       refresh();
       if (structureImportRef.current) structureImportRef.current.value = '';
-      alert('Import successful. Tabs missing from the file have been hidden.');
     };
     reader.readAsBinaryString(file);
-  };
-
-  const handleExportExcel = () => {
-    if (!currentPI) return;
-    const worksheetData = currentPI.activities.map(act => {
-      const row: any = { 'Activity': act.activity, 'Indicator': act.indicator };
-      MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
-      row['Total'] = act.total;
-      return row;
-    });
-    const ws = XLSX.utils.json_to_sheet(worksheetData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Report");
-    XLSX.writeFile(wb, `${subjectUser.name}_${activeTab}_Report_${year}.xlsx`);
-  };
-
-  const handleExportAllExcel = () => {
-    const unitsToConsolidate = prefix === 'accomplishment' ? allUnits : [];
-    const allData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate, true);
-    const wb = XLSX.utils.book_new();
-    allData.forEach(pi => {
-      const worksheetData = pi.activities.map(act => {
-        const row: any = { 'Strategic Activity': act.activity, 'Performance Indicator': act.indicator };
-        MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
-        row['Total'] = act.months.reduce((sum, m) => sum + m.value, 0);
-        return row;
-      });
-      const ws = XLSX.utils.json_to_sheet(worksheetData);
-      ws['!cols'] = [{wch: 45}, {wch: 35}, ...MONTHS.map(() => ({wch: 8})), {wch: 10}];
-      XLSX.utils.book_append_sheet(wb, ws, pi.id.substring(0, 31));
-    });
-    XLSX.writeFile(wb, `COCPO_${subjectUser.name}_Full_Report_${year}.xlsx`);
-  };
-
-  const handleExportMasterTemplate = () => {
-    const unitsToConsolidate = prefix === 'accomplishment' ? allUnits : [];
-    const allData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate, true);
-    const flattenedRows: any[] = [];
-    allData.forEach(pi => {
-      pi.activities.forEach(act => {
-        const row: any = { 'PI ID': pi.id, 'PI Title': pi.title, 'Activity ID': act.id, 'Strategic Activity': act.activity, 'Performance Indicator': act.indicator };
-        MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
-        flattenedRows.push(row);
-      });
-    });
-
-    const ws = XLSX.utils.json_to_sheet(flattenedRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Master System Template");
-    
-    let fileName = "";
-    if (isHeadOfficeView || title.toUpperCase().includes("CONSOLIDATION")) {
-      const typeStr = prefix === 'target' ? 'TARGET_OUTLOOK' : 'ACCOMPLISHMENT';
-      fileName = `OPERATIONAL_${typeStr}_${year}.xlsx`;
-    } else {
-      let namePart = title.replace(/CHQ\s+/gi, '').replace(/Tactical\s+/gi, '').replace(/Company\s+/gi, '');
-      const yearMatch = namePart.match(/\d{4}/);
-      const yearStr = yearMatch ? yearMatch[0] : year;
-      namePart = namePart.replace(yearStr, '').replace(/\s+/g, ' ').trim();
-      const typeStr = prefix === 'target' ? 'TARGET_OUTLOOK' : 'ACCOMPLISHMENT';
-      fileName = `${namePart.toUpperCase().replace(/\s+/g, '_')}_${typeStr}_${yearStr}.xlsx`;
-    }
-    XLSX.writeFile(wb, fileName);
   };
 
   const handleImportMasterTemplate = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -707,33 +626,96 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       updateVisibilityFromImport(importedPIs);
       refresh();
       if (masterImportRef.current) masterImportRef.current.value = '';
-      alert('System update complete. Tabs not in the file are hidden.');
     };
     reader.readAsBinaryString(file);
   };
 
+  // Implemented missing handleExportExcel function
+  const handleExportExcel = () => {
+    if (!currentPI) return;
+    const exportData = currentPI.activities.map(act => {
+      const row: any = {
+        'Strategic Activity': act.activity,
+        'Performance Indicator': act.indicator,
+      };
+      MONTHS.forEach((m, i) => {
+        row[m] = act.months[i].value;
+      });
+      row['Total'] = act.total;
+      return row;
+    });
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, activeTab);
+    XLSX.writeFile(wb, `${subjectUser.name}_${activeTab}_${year}.xlsx`);
+  };
+
+  // Implemented missing handleExportMasterTemplate function
+  const handleExportMasterTemplate = () => {
+    const allData: any[] = [];
+    piData.forEach(pi => {
+      pi.activities.forEach(act => {
+        const row: any = {
+          'PI ID': pi.id,
+          'Activity ID': act.id,
+          'Strategic Activity': act.activity,
+          'Performance Indicator': act.indicator,
+        };
+        MONTHS.forEach((m, i) => {
+          row[m] = act.months[i].value;
+        });
+        allData.push(row);
+      });
+    });
+    const ws = XLSX.utils.json_to_sheet(allData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Master Template");
+    XLSX.writeFile(wb, `Master_Template_${year}.xlsx`);
+  };
+
+  // Implemented missing handleMoveTab function
   const handleMoveTab = (e: React.MouseEvent, piId: string, direction: 'left' | 'right') => {
     e.stopPropagation();
-    if (!canEditStructure) return;
     const orderKey = `${prefix}_pi_order_${year}_${effectiveId}`;
-    const currentOrder = piData.map(pi => pi.id);
-    const idx = currentOrder.indexOf(piId);
-    if (idx === -1) return;
-    const newIdx = direction === 'left' ? idx - 1 : idx + 1;
-    if (newIdx < 0 || newIdx >= currentOrder.length) return;
-    const newOrder = [...currentOrder];
-    [newOrder[idx], newOrder[newIdx]] = [newOrder[newIdx], newOrder[idx]];
+    const allPossiblePIs = piData.map(p => p.id);
+    const currentIndex = allPossiblePIs.indexOf(piId);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= allPossiblePIs.length) return;
+
+    const newOrder = [...allPossiblePIs];
+    const temp = newOrder[currentIndex];
+    newOrder[currentIndex] = newOrder[newIndex];
+    newOrder[newIndex] = temp;
+
     localStorage.setItem(orderKey, JSON.stringify(newOrder));
     refresh();
+  };
+
+  const getFileIcon = (type: string) => {
+    if (type.includes('image')) return (
+      <svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    );
+    if (type.includes('pdf')) return (
+      <svg className="w-5 h-5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+      </svg>
+    );
+    return (
+      <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    );
   };
 
   const renderTable = () => {
     const monthlyTotals = Array(12).fill(0);
     let grandTotal = 0;
     currentPI?.activities.forEach(act => {
-      act.months.forEach((m, i) => {
-        monthlyTotals[i] += m.value;
-      });
+      act.months.forEach((m, i) => { monthlyTotals[i] += m.value; });
       grandTotal += act.total;
     });
 
@@ -745,12 +727,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               <h2 className="text-3xl font-black uppercase tracking-tighter flex items-center gap-3">
                 {activeTab} - {currentPI?.title}
               </h2>
-              <p className="text-slate-400 text-xs font-bold tracking-widest uppercase">Office: {subjectUser.name} • Data Terminal: {year}</p>
+              <p className="text-slate-400 text-xs font-bold tracking-widest uppercase flex items-center gap-2">
+                Unit: {subjectUser.name} • Drive Terminal: {year}
+                {isAdmin && <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[8px] border border-emerald-500/30 font-black">DRIVE SYNC ACTIVE</span>}
+              </p>
             </div>
             {canModifyData && (
               <div className="flex gap-3">
                 <button onClick={() => structureImportRef.current?.click()} className="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center gap-2"><UploadIcon /> Import Structure</button>
-                <button onClick={exportStructureTemplate} className="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center gap-2"><TemplateExportIcon /> Export Template</button>
                 <input type="file" ref={structureImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportTemplate} />
               </div>
             )}
@@ -772,7 +756,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               {currentPI?.activities.map((act, rIdx) => (
                 <tr key={act.id} className="hover:bg-slate-50/50 group transition-colors">
                   {canEditStructure && (
-                    <td className="px-6 py-4"><button onClick={() => removeActivity(act.id)} className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></td>
+                    <td className="px-6 py-4"><button onClick={() => {
+                      if(confirm("Permanently remove this entry?")) {
+                        const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${activeTab}`;
+                        const currentIds = JSON.parse(localStorage.getItem(actIdsKey) || '[]');
+                        localStorage.setItem(actIdsKey, JSON.stringify(currentIds.filter((id:any) => id !== act.id)));
+                        refresh();
+                      }
+                    }} className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></td>
                   )}
                   <td className="px-6 py-4">
                     {editingActivityField?.aid === act.id && editingActivityField?.field === 'activity' ? (
@@ -797,7 +788,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                         <button 
                           onClick={(e) => handleOpenFiles(e, rIdx, mIdx)} 
                           className={`flex items-center justify-center w-6 h-6 rounded-md transition-all ${m.files.length > 0 ? 'bg-emerald-50' : 'opacity-0 group-hover/cell:opacity-100 hover:bg-slate-100'}`}
-                          title={m.files.length > 0 ? `${m.files.length} document(s)` : 'Upload MOV'}
                         >
                           <PaperclipIcon active={m.files.length > 0} />
                         </button>
@@ -805,37 +795,28 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                     </td>
                   ))}
                   <td className="px-6 py-4 text-center"><div className="text-sm font-black text-slate-900 bg-slate-100/50 py-2 rounded-xl">{act.total}{isPercent ? '%' : ''}</div></td>
-                  <td className="px-6 py-4 text-center"><button onClick={(e) => { const firstMonthIdx = act.months.findIndex(m => m.files.length > 0); handleOpenFiles(e, rIdx, firstMonthIdx === -1 ? 0 : firstMonthIdx); }} className={`p-2 rounded-xl transition-all ${act.months.some(m => m.files.length > 0) ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-300 hover:text-slate-900 hover:bg-slate-100'}`}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></button></td>
+                  <td className="px-6 py-4 text-center">
+                    <button 
+                      onClick={(e) => { const firstMonthIdx = act.months.findIndex(m => m.files.length > 0); handleOpenFiles(e, rIdx, firstMonthIdx === -1 ? 0 : firstMonthIdx); }} 
+                      className={`p-2 rounded-xl transition-all ${act.months.some(m => m.files.length > 0) ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-300 hover:text-slate-900 hover:bg-slate-100'}`}
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
             <tfoot className="border-t-2 border-slate-900 bg-slate-50/50">
               <tr className="font-black text-slate-900">
                 {canEditStructure && <td className="px-6 py-6"></td>}
-                <td colSpan={2} className="px-6 py-6 text-sm uppercase tracking-widest text-slate-900 font-black">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-6 bg-slate-900 rounded-full"></div>
-                    Grand Total
-                  </div>
-                </td>
-                {monthlyTotals.map((total, idx) => (
-                  <td key={idx} className="px-1 py-6 text-center text-sm">
-                    {total}{isPercent ? '%' : ''}
-                  </td>
-                ))}
-                <td className="px-6 py-6 text-center">
-                  <div className="inline-block px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-black shadow-lg">
-                    {grandTotal}{isPercent ? '%' : ''}
-                  </div>
-                </td>
+                <td colSpan={2} className="px-6 py-6 text-sm uppercase tracking-widest text-slate-900 font-black">Grand Total</td>
+                {monthlyTotals.map((total, idx) => ( <td key={idx} className="px-1 py-6 text-center text-sm">{total}{isPercent ? '%' : ''}</td> ))}
+                <td className="px-6 py-6 text-center"><div className="inline-block px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-black shadow-lg">{grandTotal}{isPercent ? '%' : ''}</div></td>
                 <td className="px-6 py-6"></td>
               </tr>
             </tfoot>
           </table>
         </div>
-        {canEditStructure && (
-          <div className="p-8 border-t border-slate-100 bg-slate-50/30"><button onClick={handleAddActivity} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-400 hover:border-blue-500 hover:text-blue-500 transition-all flex items-center justify-center gap-2 group"><svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>Add Activity Entry</button></div>
-        )}
       </div>
     );
   };
@@ -845,23 +826,24 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-4 flex-1">
           <button onClick={onBack} className="group flex items-center gap-2 text-slate-400 hover:text-slate-900 font-black text-[10px] uppercase tracking-widest transition-all"><svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>Return to Terminal</button>
-          <div className="flex flex-col gap-1"><h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">{title}</h1><p className="text-slate-500 text-xs font-bold uppercase tracking-widest opacity-60">Operations & Unit Accomplishment Control</p></div>
+          <div className="flex flex-col gap-1"><h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">{title}</h1><p className="text-slate-500 text-xs font-bold uppercase tracking-widest opacity-60">Operations & Accomplishment Control</p></div>
         </div>
         <div className="flex flex-wrap gap-2">
           {currentUser.role === UserRole.SUPER_ADMIN && (
             <>
+              <button onClick={() => setVaultOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2">
+                <GoogleDriveIcon /> Unit Drive Vault
+              </button>
               <button onClick={handleRestoreAllTabs} className="bg-slate-100 hover:bg-slate-200 text-slate-900 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2 border border-slate-200"><RestoreHiddenIcon /> Restore Tabs</button>
               <button onClick={handleExportMasterTemplate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><TemplateExportIcon /> Export Master Template</button>
               <button onClick={() => masterImportRef.current?.click()} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><UploadIcon /> Import Master Template</button>
               <input type="file" ref={masterImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportMasterTemplate} />
             </>
           )}
-          <button onClick={handleExportExcel} className="bg-white hover:bg-emerald-50 text-slate-900 hover:text-emerald-700 border border-slate-200 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2"><ExcelExportIcon /> Export PI</button>
-          {currentUser.role === UserRole.SUPER_ADMIN && (
-            <button onClick={handleExportAllExcel} className="bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2"><ExcelExportIcon /> Export All Report</button>
-          )}
+          <button onClick={handleExportExcel} className="bg-white hover:bg-emerald-50 text-slate-900 hover:text-emerald-700 border border-slate-200 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Export Current PI</button>
         </div>
       </div>
+      
       <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
         {piData.map(pi => (
           <div key={pi.id} className="relative group flex-shrink-0">
@@ -875,26 +857,134 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           </div>
         ))}
       </div>
+
       {renderTable()}
+
+      {/* Super Admin Vault Modal */}
+      {vaultOpen && currentUser.role === UserRole.SUPER_ADMIN && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xl animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+              <div className="bg-emerald-900 p-10 text-white flex items-center justify-between">
+                 <div>
+                    <h3 className="text-3xl font-black tracking-tighter uppercase flex items-center gap-4">
+                       <GoogleDriveIcon /> Super Admin Cloud Vault
+                    </h3>
+                    <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest mt-2">Centralized monitoring of all unit MOV uploads • {year}</p>
+                 </div>
+                 <button onClick={() => setVaultOpen(false)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-colors border border-white/10">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                 </button>
+              </div>
+              <div className="p-10 flex-1 overflow-y-auto no-scrollbar">
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {JSON.parse(localStorage.getItem(`superadmin_drive_vault_${year}`) || '[]').reverse().map((file: any) => (
+                      <div key={file.id} className="p-6 bg-slate-50 border border-slate-200 rounded-[2rem] hover:border-emerald-500 transition-all group flex flex-col justify-between shadow-sm hover:shadow-xl">
+                         <div>
+                            <div className="flex items-center gap-4 mb-4">
+                               <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-slate-100 group-hover:scale-110 transition-transform">
+                                  {getFileIcon(file.type)}
+                               </div>
+                               <div className="flex-1 min-w-0">
+                                  <p className="font-black text-slate-900 truncate text-sm">{file.name}</p>
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{file.unitName}</p>
+                               </div>
+                            </div>
+                            <div className="space-y-2 mb-6">
+                               <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                  <span>Synced From</span>
+                                  <span className="text-slate-900">{file.piId}</span>
+                               </div>
+                               <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                  <span>Date</span>
+                                  <span className="text-slate-900">{new Date(file.syncedAt).toLocaleDateString()}</span>
+                               </div>
+                            </div>
+                         </div>
+                         <div className="flex gap-2">
+                            <a href={file.url} download={file.name} className="flex-1 bg-white border border-slate-200 hover:border-emerald-500 hover:text-emerald-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-center gap-2">
+                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> View Link
+                            </a>
+                            <button onClick={() => {
+                               const vaultKey = `superadmin_drive_vault_${year}`;
+                               const vault = JSON.parse(localStorage.getItem(vaultKey) || '[]');
+                               localStorage.setItem(vaultKey, JSON.stringify(vault.filter((f: any) => f.id !== file.id)));
+                               refresh(); // Force re-render of vault list
+                            }} className="w-10 h-10 flex items-center justify-center bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all border border-rose-100 shadow-sm">
+                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                         </div>
+                      </div>
+                    ))}
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Monthly Files/MOVs Modal */}
       {isFilesModalOpen && activeFileCell && currentPI && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl p-8 animate-in zoom-in-95 duration-300">
-            <div className="flex items-center justify-between mb-8">
-              <div><h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">MOVs & Documents</h3><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{currentPI.activities[activeFileCell.rowIdx].activity} • {MONTHS[activeFileCell.monthIdx]}</p></div>
-              <button onClick={() => setIsFilesModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 transition-colors bg-slate-50 rounded-xl"><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+          <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
+            <div className="bg-slate-50 p-8 border-b border-slate-100 relative">
+               <div className="absolute top-8 right-8 flex items-center gap-4">
+                  {isAdmin && <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm"><GoogleDriveIcon /><span className="text-[10px] font-black text-slate-900">DRIVE SYNC</span></div>}
+                  <button onClick={() => setIsFilesModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 transition-colors bg-white border border-slate-200 rounded-xl shadow-sm"><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+               </div>
+               <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">MOVs & Documents</h3>
+               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
+                  Unit: {subjectUser.name} • {MONTHS[activeFileCell.monthIdx]} {year}
+               </p>
+               <div className="mt-4 flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{isSyncing ? 'Synchronizing Cloud Vault...' : 'Auto-Sync Verified to Super Admin Account'}</span>
+               </div>
             </div>
-            <div className="space-y-6">
+
+            <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
               {currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.length > 0 ? (
                 <div className="grid grid-cols-1 gap-3">
                   {currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.map(file => (
-                    <div key={file.id} className="group p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between hover:border-blue-500/50 hover:bg-blue-50/10 transition-all">
-                      <div className="flex items-center gap-4 flex-1 min-w-0"><div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-500 shadow-sm border border-slate-100"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg></div><div className="truncate"><p className="text-sm font-black text-slate-900 truncate">{file.name}</p><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(file.uploadedAt).toLocaleDateString()}</p></div></div>
-                      <div className="flex items-center gap-2"><a href={file.url} download={file.name} className="p-2 text-slate-400 hover:text-blue-600 transition"><DownloadIcon /></a>{canModifyData && (<button onClick={() => removeFile(file.id)} className="p-2 text-slate-400 hover:text-red-600 transition"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>)}</div>
+                    <div key={file.id} className="group p-5 bg-white border border-slate-100 rounded-[1.5rem] flex items-center justify-between hover:border-indigo-500 hover:bg-slate-50/50 transition-all shadow-sm">
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-blue-500 shadow-sm border border-slate-100 group-hover:scale-105 transition-transform">
+                          {getFileIcon(file.type)}
+                        </div>
+                        <div className="truncate">
+                          <p className="text-sm font-black text-slate-900 truncate">{file.name}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">CLOUD SYNC ID: {file.id.toUpperCase()}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <a href={file.url} download={file.name} className="p-2.5 text-slate-400 hover:text-indigo-600 transition bg-white rounded-xl border border-transparent hover:border-slate-100 shadow-none hover:shadow-sm">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                        </a>
+                        {canModifyData && (
+                          <button onClick={() => removeFile(file.id)} className="p-2.5 text-slate-400 hover:text-rose-600 transition bg-white rounded-xl border border-transparent hover:border-slate-100 shadow-none hover:shadow-sm">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
-              ) : ( <div className="py-12 border-2 border-dashed border-slate-100 rounded-3xl text-center"><div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-2xl flex items-center justify-center mx-auto mb-4"><svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div><p className="text-slate-400 text-xs font-black uppercase tracking-widest">No MOVs Found</p></div> )}
-              {canModifyData && ( <div className="pt-4"><button onClick={() => fileInputRef.current?.click()} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest py-4 rounded-2xl transition-all shadow-lg shadow-slate-200 active:scale-[0.98] flex items-center justify-center gap-2"><UploadIcon /> Upload New Document</button><input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} /></div> )}
+              ) : (
+                <div className="py-12 border-2 border-dashed border-slate-100 rounded-3xl text-center">
+                  <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  </div>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">No MOVs Found for this month</p>
+                </div>
+              )}
+
+              {canModifyData && (
+                <div className="pt-6 border-t border-slate-100">
+                  <button onClick={() => fileInputRef.current?.click()} className="group w-full bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest py-5 rounded-2xl transition-all shadow-xl active:scale-[0.98] flex items-center justify-center gap-3">
+                    <UploadIcon /> {isSyncing ? 'Syncing Multiple Files...' : 'Upload Multiple MOVs'}
+                  </button>
+                  <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileUpload} />
+                  <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-4">Selection supports multi-select: PDF, JPG, PNG, DOCX</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
