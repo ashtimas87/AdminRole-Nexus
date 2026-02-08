@@ -440,12 +440,15 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   /**
    * Helper to save value with synchronization logic for Target Outlook.
    * If saving for Police Station 1 in Target Outlook, sync to all other stations and Force Unit.
+   * FOR CHQ UNITS (like CHQ COU), this logic MUST NOT trigger.
    */
   const saveDataWithSync = (piId: string, aid: string, monthIdx: number, val: number) => {
     const storageKey = `${prefix}_data_${year}_${effectiveId}_${piId}_${aid}_${monthIdx}`;
     localStorage.setItem(storageKey, String(val));
 
     // Special Sync for Police Station 1 in Target Outlook (2025/2026+)
+    // Only triggers if the SUBJECT user is exactly Police Station 1.
+    // This ensures that CHQ COU or other units do not change other users' data.
     if (prefix === 'target' && subjectUser.name === 'Police Station 1') {
       allUnits.forEach(unit => {
         // Target: All Stations AND the City Mobile Force Company (Force Unit)
@@ -455,6 +458,25 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         }
       });
     }
+  };
+
+  /**
+   * Filters the hidden list based on what was present in the imported data.
+   * Any PI ID defined in the system but NOT in the imported list will be hidden.
+   */
+  const updateVisibilityFromImport = (importedPIs: Set<string>) => {
+    const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
+    
+    // Get all possible PI IDs from the structure map to identify what needs to be hidden
+    const allPossiblePIs = ["PI1", "PI2", "PI3", "PI4", "PI5", "PI6", "PI7", "PI8", "PI9", "PI10", "PI11", "PI12", "PI13", "PI14", "PI15", "PI16", "PI17", "PI18", "PI19", "PI20", "PI21", "PI22", "PI23", "PI24", "PI25", "PI26", "PI27", "PI28", "PI29"];
+    
+    // Add any custom defined PIs to the check
+    const customKey = `${prefix}_custom_definitions_${year}_${effectiveId}`;
+    const customPIs = JSON.parse(localStorage.getItem(customKey) || '[]');
+    customPIs.forEach((c: any) => allPossiblePIs.push(c.id));
+
+    const newHidden = allPossiblePIs.filter(id => !importedPIs.has(id));
+    localStorage.setItem(hiddenPIsKey, JSON.stringify(newHidden));
   };
 
   const handleCellClick = (rowIdx: number, monthIdx: number, val: number) => {
@@ -563,11 +585,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const ws = wb.Sheets[wsname];
       const data: any[] = XLSX.utils.sheet_to_json(ws);
 
+      const importedPIs = new Set<string>();
       data.forEach(row => {
         const piId = row['PI ID'];
         const aid = row['Activity ID'];
         const actName = row['Activity Name'];
         const indicator = row['Indicator'];
+
+        if (piId) importedPIs.add(piId);
 
         if (piId && aid) {
           if (actName) localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, actName);
@@ -580,9 +605,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           });
         }
       });
+      
+      updateVisibilityFromImport(importedPIs);
       refresh();
       if (structureImportRef.current) structureImportRef.current.value = '';
-      alert('Structure and data imported successfully.');
+      alert('Structure and data imported successfully. PIs not in the file are now hidden.');
     };
     reader.readAsBinaryString(file);
   };
@@ -707,11 +734,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const ws = wb.Sheets[wb.SheetNames[0]];
       const data: any[] = XLSX.utils.sheet_to_json(ws);
 
+      const importedPIs = new Set<string>();
       data.forEach(row => {
         const piId = row['PI ID'];
         const aid = row['Activity ID'];
         const actName = row['Strategic Activity'];
         const indicator = row['Performance Indicator'];
+
+        if (piId) importedPIs.add(piId);
 
         if (piId && aid) {
           if (actName) localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, actName);
@@ -724,9 +754,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           });
         }
       });
+      
+      updateVisibilityFromImport(importedPIs);
       refresh();
       if (masterImportRef.current) masterImportRef.current.value = '';
-      alert('Master system structure and data successfully updated.');
+      alert('Master system structure and data successfully updated. PIs not in the file are now hidden.');
     };
     reader.readAsBinaryString(file);
   };
