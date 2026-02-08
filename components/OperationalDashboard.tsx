@@ -382,6 +382,12 @@ const RestoreHiddenIcon = () => (
   </svg>
 );
 
+const PaperclipIcon = ({ active }: { active?: boolean }) => (
+  <svg className={`w-3.5 h-3.5 ${active ? 'text-emerald-500' : 'text-slate-300 group-hover/cell:text-slate-400'} transition-colors`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+  </svg>
+);
+
 interface OperationalDashboardProps {
   title: string;
   onBack: () => void;
@@ -413,8 +419,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const isOwner = currentUser.id === subjectUser.id;
   const isHeadOfficeView = subjectUser.id === currentUser.id || subjectUser.role === UserRole.SUB_ADMIN;
   const isConsolidated = prefix === 'accomplishment' && isHeadOfficeView;
-  const isRestrictedSuperAdmin = currentUser.role === UserRole.SUPER_ADMIN && (subjectUser.role === UserRole.CHQ || subjectUser.role === UserRole.STATION);
-  const canModifyData = (isOwner || (currentUser.role === UserRole.SUPER_ADMIN && isHeadOfficeView)) && !isRestrictedSuperAdmin && !isConsolidated;
+  
+  // Super Admin can manage any unit level data; Sub Admin can manage Stations.
+  const canModifyData = isOwner || currentUser.role === UserRole.SUPER_ADMIN || (currentUser.role === UserRole.SUB_ADMIN && subjectUser.role === UserRole.STATION);
   const canEditStructure = currentUser.role === UserRole.SUPER_ADMIN;
 
   const refresh = () => {
@@ -438,20 +445,17 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const isPercent = useMemo(() => ["PI4", "PI9", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(activeTab), [activeTab]);
 
   /**
-   * Helper to save value with synchronization logic for Target Outlook.
-   * If saving for Police Station 1 in Target Outlook, sync to all other stations and Force Unit.
-   * FOR CHQ UNITS (like CHQ COU), this logic MUST NOT trigger.
+   * Helper to save value with synchronization logic.
+   * synchronization is ONLY triggered by 'Police Station 1' in Target Outlook mode.
+   * This ensures that CHQ units or other Force units (like Mobile Force Company) imports do not affect others.
    */
   const saveDataWithSync = (piId: string, aid: string, monthIdx: number, val: number) => {
     const storageKey = `${prefix}_data_${year}_${effectiveId}_${piId}_${aid}_${monthIdx}`;
     localStorage.setItem(storageKey, String(val));
 
-    // Special Sync for Police Station 1 in Target Outlook (2025/2026+)
-    // Only triggers if the SUBJECT user is exactly Police Station 1.
-    // This ensures that CHQ COU or other units do not change other users' data.
+    // Global sync logic restricted to Station 1 only.
     if (prefix === 'target' && subjectUser.name === 'Police Station 1') {
       allUnits.forEach(unit => {
-        // Target: All Stations AND the City Mobile Force Company (Force Unit)
         if ((unit.role === UserRole.STATION || unit.name === 'City Mobile Force Company') && unit.id !== subjectUser.id) {
           const syncKey = `${prefix}_data_${year}_${unit.id}_${piId}_${aid}_${monthIdx}`;
           localStorage.setItem(syncKey, String(val));
@@ -462,21 +466,25 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
   /**
    * Filters the hidden list based on what was present in the imported data.
-   * Any PI ID defined in the system but NOT in the imported list will be hidden.
+   * Any PI ID missing from the file will be added to the hidden list for this view.
    */
   const updateVisibilityFromImport = (importedPIs: Set<string>) => {
     const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
+    const allPossiblePIs = Array.from({ length: 29 }, (_, i) => `PI${i + 1}`);
     
-    // Get all possible PI IDs from the structure map to identify what needs to be hidden
-    const allPossiblePIs = ["PI1", "PI2", "PI3", "PI4", "PI5", "PI6", "PI7", "PI8", "PI9", "PI10", "PI11", "PI12", "PI13", "PI14", "PI15", "PI16", "PI17", "PI18", "PI19", "PI20", "PI21", "PI22", "PI23", "PI24", "PI25", "PI26", "PI27", "PI28", "PI29"];
-    
-    // Add any custom defined PIs to the check
     const customKey = `${prefix}_custom_definitions_${year}_${effectiveId}`;
     const customPIs = JSON.parse(localStorage.getItem(customKey) || '[]');
-    customPIs.forEach((c: any) => allPossiblePIs.push(c.id));
+    customPIs.forEach((c: any) => { if (!allPossiblePIs.includes(c.id)) allPossiblePIs.push(c.id); });
 
     const newHidden = allPossiblePIs.filter(id => !importedPIs.has(id));
     localStorage.setItem(hiddenPIsKey, JSON.stringify(newHidden));
+  };
+
+  const handleRestoreAllTabs = () => {
+    if (!confirm('Restore all hidden Performance Indicator tabs for this view?')) return;
+    const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
+    localStorage.removeItem(hiddenPIsKey);
+    refresh();
   };
 
   const handleCellClick = (rowIdx: number, monthIdx: number, val: number) => {
@@ -545,7 +553,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
   const removeActivity = (aid: string) => {
     if (!canEditStructure || !currentPI) return;
-    if (!confirm('Are you sure you want to PERMANENTLY remove this activity row for this unit view?')) return;
+    if (!confirm('Remove this activity row?')) return;
     const newIds = currentPI.activities.map(a => a.id).filter(id => id !== aid);
     localStorage.setItem(`${prefix}_pi_act_ids_${year}_${effectiveId}_${activeTab}`, JSON.stringify(newIds));
     refresh();
@@ -561,9 +569,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         'Activity Name': act.activity,
         'Indicator': act.indicator,
       };
-      MONTHS.forEach((m, i) => {
-        row[m] = act.months[i].value;
-      });
+      MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
       row['Total'] = act.total;
       return row;
     });
@@ -581,16 +587,15 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     reader.onload = (evt) => {
       const bstr = evt.target?.result;
       const wb = XLSX.read(bstr, { type: 'binary' });
-      const wsname = wb.SheetNames[0];
-      const ws = wb.Sheets[wsname];
+      const ws = wb.Sheets[wb.SheetNames[0]];
       const data: any[] = XLSX.utils.sheet_to_json(ws);
 
       const importedPIs = new Set<string>();
       data.forEach(row => {
         const piId = row['PI ID'];
         const aid = row['Activity ID'];
-        const actName = row['Activity Name'];
-        const indicator = row['Indicator'];
+        const actName = row['Activity Name'] || row['Strategic Activity'];
+        const indicator = row['Indicator'] || row['Performance Indicator'];
 
         if (piId) importedPIs.add(piId);
 
@@ -609,7 +614,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       updateVisibilityFromImport(importedPIs);
       refresh();
       if (structureImportRef.current) structureImportRef.current.value = '';
-      alert('Structure and data imported successfully. PIs not in the file are now hidden.');
+      alert('Import successful. Tabs missing from the file have been hidden.');
     };
     reader.readAsBinaryString(file);
   };
@@ -617,17 +622,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const handleExportExcel = () => {
     if (!currentPI) return;
     const worksheetData = currentPI.activities.map(act => {
-      const row: any = {
-        'Activity': act.activity,
-        'Indicator': act.indicator,
-      };
-      MONTHS.forEach((m, i) => {
-        row[m] = act.months[i].value;
-      });
+      const row: any = { 'Activity': act.activity, 'Indicator': act.indicator };
+      MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
       row['Total'] = act.total;
       return row;
     });
-
     const ws = XLSX.utils.json_to_sheet(worksheetData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Report");
@@ -636,63 +635,30 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
   const handleExportAllExcel = () => {
     const unitsToConsolidate = prefix === 'accomplishment' ? allUnits : [];
-    // Get all definitions, ignoring hidden state for a full system export
     const allData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate, true);
-    
     const wb = XLSX.utils.book_new();
-    
     allData.forEach(pi => {
       const worksheetData = pi.activities.map(act => {
-        const row: any = {
-          'Strategic Activity': act.activity,
-          'Performance Indicator': act.indicator,
-        };
-        MONTHS.forEach((m, i) => {
-          row[m] = act.months[i].value;
-        });
-        const total = act.months.reduce((sum, m) => sum + m.value, 0);
-        row['Total'] = total;
+        const row: any = { 'Strategic Activity': act.activity, 'Performance Indicator': act.indicator };
+        MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
+        row['Total'] = act.months.reduce((sum, m) => sum + m.value, 0);
         return row;
       });
-      
       const ws = XLSX.utils.json_to_sheet(worksheetData);
-      
-      // Auto-size columns roughly for better UX
-      const wscols = [
-        {wch: 45}, // Strategic Activity
-        {wch: 35}, // Performance Indicator
-        ...MONTHS.map(() => ({wch: 8})),
-        {wch: 10}  // Total
-      ];
-      ws['!cols'] = wscols;
-
-      // Excel sheet names have a limit of 31 characters
+      ws['!cols'] = [{wch: 45}, {wch: 35}, ...MONTHS.map(() => ({wch: 8})), {wch: 10}];
       XLSX.utils.book_append_sheet(wb, ws, pi.id.substring(0, 31));
     });
-    
     XLSX.writeFile(wb, `COCPO_${subjectUser.name}_Full_Report_${year}.xlsx`);
   };
 
-  /**
-   * Bulk Export Master Template (All 29 PIs) in a single flat sheet for easy system editing.
-   */
   const handleExportMasterTemplate = () => {
     const unitsToConsolidate = prefix === 'accomplishment' ? allUnits : [];
     const allData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate, true);
-    
     const flattenedRows: any[] = [];
     allData.forEach(pi => {
       pi.activities.forEach(act => {
-        const row: any = {
-          'PI ID': pi.id,
-          'PI Title': pi.title,
-          'Activity ID': act.id,
-          'Strategic Activity': act.activity,
-          'Performance Indicator': act.indicator,
-        };
-        MONTHS.forEach((m, i) => {
-          row[m] = act.months[i].value;
-        });
+        const row: any = { 'PI ID': pi.id, 'PI Title': pi.title, 'Activity ID': act.id, 'Strategic Activity': act.activity, 'Performance Indicator': act.indicator };
+        MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
         flattenedRows.push(row);
       });
     });
@@ -701,29 +667,21 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Master System Template");
     
-    // Rename filename based on requested patterns for Consolidated/Master views.
     let fileName = "";
     if (isHeadOfficeView || title.toUpperCase().includes("CONSOLIDATION")) {
       const typeStr = prefix === 'target' ? 'TARGET_OUTLOOK' : 'ACCOMPLISHMENT';
       fileName = `OPERATIONAL_${typeStr}_${year}.xlsx`;
     } else {
-      // For specific units, clean up the title for the filename.
-      let namePart = title.replace(/CHQ\s+/gi, '');
+      let namePart = title.replace(/CHQ\s+/gi, '').replace(/Tactical\s+/gi, '').replace(/Company\s+/gi, '');
       const yearMatch = namePart.match(/\d{4}/);
-      const yearStr = yearMatch ? yearMatch[0] : '';
-      if (yearStr) {
-        namePart = namePart.replace(yearStr, '').replace(/\s+/g, ' ').trim();
-        namePart = `${namePart} ${yearStr}`;
-      }
-      fileName = namePart.toUpperCase().replace(/\s+/g, '_') + '.xlsx';
+      const yearStr = yearMatch ? yearMatch[0] : year;
+      namePart = namePart.replace(yearStr, '').replace(/\s+/g, ' ').trim();
+      const typeStr = prefix === 'target' ? 'TARGET_OUTLOOK' : 'ACCOMPLISHMENT';
+      fileName = `${namePart.toUpperCase().replace(/\s+/g, '_')}_${typeStr}_${yearStr}.xlsx`;
     }
-    
     XLSX.writeFile(wb, fileName);
   };
 
-  /**
-   * Bulk Import Master Template (All 29 PIs) from a single Excel file.
-   */
   const handleImportMasterTemplate = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -733,32 +691,23 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const wb = XLSX.read(bstr, { type: 'binary' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const data: any[] = XLSX.utils.sheet_to_json(ws);
-
       const importedPIs = new Set<string>();
       data.forEach(row => {
         const piId = row['PI ID'];
         const aid = row['Activity ID'];
-        const actName = row['Strategic Activity'];
-        const indicator = row['Performance Indicator'];
-
+        const actName = row['Strategic Activity'] || row['Activity Name'];
+        const indicator = row['Performance Indicator'] || row['Indicator'];
         if (piId) importedPIs.add(piId);
-
         if (piId && aid) {
           if (actName) localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, actName);
           if (indicator) localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicator);
-          
-          MONTHS.forEach((m, i) => {
-            if (row[m] !== undefined) {
-              saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0);
-            }
-          });
+          MONTHS.forEach((m, i) => { if (row[m] !== undefined) saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0); });
         }
       });
-      
       updateVisibilityFromImport(importedPIs);
       refresh();
       if (masterImportRef.current) masterImportRef.current.value = '';
-      alert('Master system structure and data successfully updated. PIs not in the file are now hidden.');
+      alert('System update complete. Tabs not in the file are hidden.');
     };
     reader.readAsBinaryString(file);
   };
@@ -790,18 +739,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           </div>
           {canModifyData && (
             <div className="flex gap-3">
-              <button 
-                onClick={() => structureImportRef.current?.click()}
-                className="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center gap-2"
-              >
-                <UploadIcon /> Import Structure
-              </button>
-              <button 
-                onClick={exportStructureTemplate}
-                className="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center gap-2"
-              >
-                <TemplateExportIcon /> Export Template
-              </button>
+              <button onClick={() => structureImportRef.current?.click()} className="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center gap-2"><UploadIcon /> Import Structure</button>
+              <button onClick={exportStructureTemplate} className="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center gap-2"><TemplateExportIcon /> Export Template</button>
               <input type="file" ref={structureImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportTemplate} />
             </div>
           )}
@@ -814,9 +753,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               {canEditStructure && <th className="px-6 py-4 w-12"></th>}
               <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[200px]">Strategic Activity</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[150px]">Performance Indicator</th>
-              {MONTHS.map(m => (
-                <th key={m} className="px-3 py-4 text-center text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[60px]">{m}</th>
-              ))}
+              {MONTHS.map(m => ( <th key={m} className="px-3 py-4 text-center text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[70px]">{m}</th> ))}
               <th className="px-6 py-4 text-center text-[10px] font-black uppercase text-slate-900 tracking-widest min-w-[80px]">Total</th>
               <th className="px-6 py-4 text-center text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[80px]">Docs</th>
             </tr>
@@ -825,79 +762,47 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             {currentPI?.activities.map((act, rIdx) => (
               <tr key={act.id} className="hover:bg-slate-50/50 group transition-colors">
                 {canEditStructure && (
-                  <td className="px-6 py-4">
-                    <button onClick={() => removeActivity(act.id)} className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
-                  </td>
+                  <td className="px-6 py-4"><button onClick={() => removeActivity(act.id)} className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></td>
                 )}
                 <td className="px-6 py-4">
                   {editingActivityField?.aid === act.id && editingActivityField?.field === 'activity' ? (
-                    <input autoFocus value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={() => {
-                      localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${activeTab}_${act.id}`, editFieldName);
-                      setEditingActivityField(null);
-                      refresh();
-                    }} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-900 outline-none" />
-                  ) : (
-                    <div onClick={() => canEditStructure && (setEditingActivityField({ aid: act.id, field: 'activity' }), setEditFieldName(act.activity))} className={`text-sm font-bold text-slate-900 leading-snug ${canEditStructure ? 'cursor-pointer hover:text-blue-600' : ''}`}>
-                      {act.activity}
-                    </div>
-                  )}
+                    <input autoFocus value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={() => { localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${activeTab}_${act.id}`, editFieldName); setEditingActivityField(null); refresh(); }} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-900 outline-none" />
+                  ) : ( <div onClick={() => canEditStructure && (setEditingActivityField({ aid: act.id, field: 'activity' }), setEditFieldName(act.activity))} className={`text-sm font-bold text-slate-900 leading-snug ${canEditStructure ? 'cursor-pointer hover:text-blue-600' : ''}`}>{act.activity}</div> )}
                 </td>
                 <td className="px-6 py-4">
                   {editingActivityField?.aid === act.id && editingActivityField?.field === 'indicator' ? (
-                    <input autoFocus value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={() => {
-                      localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${activeTab}_${act.id}`, editFieldName);
-                      setEditingActivityField(null);
-                      refresh();
-                    }} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-medium text-slate-500 outline-none" />
-                  ) : (
-                    <div onClick={() => canEditStructure && (setEditingActivityField({ aid: act.id, field: 'indicator' }), setEditFieldName(act.indicator))} className={`text-xs font-medium text-slate-500 leading-relaxed ${canEditStructure ? 'cursor-pointer hover:text-blue-600' : ''}`}>
-                      {act.indicator}
-                    </div>
-                  )}
+                    <input autoFocus value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={() => { localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${activeTab}_${act.id}`, editFieldName); setEditingActivityField(null); refresh(); }} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-medium text-slate-500 outline-none" />
+                  ) : ( <div onClick={() => canEditStructure && (setEditingActivityField({ aid: act.id, field: 'indicator' }), setEditFieldName(act.indicator))} className={`text-xs font-medium text-slate-500 leading-relaxed ${canEditStructure ? 'cursor-pointer hover:text-blue-600' : ''}`}>{act.indicator}</div> )}
                 </td>
                 {act.months.map((m, mIdx) => (
-                  <td key={mIdx} className="px-2 py-4">
-                    {editingCell?.rowIdx === rIdx && editingCell?.monthIdx === mIdx ? (
-                      <input autoFocus type="number" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e => e.key === 'Enter' && saveEdit()} className="w-16 mx-auto px-2 py-1 bg-white border-2 border-slate-900 rounded text-center text-sm font-black outline-none shadow-lg z-20" />
-                    ) : (
-                      <div onClick={() => handleCellClick(rIdx, mIdx, m.value)} className={`w-12 h-10 mx-auto flex items-center justify-center rounded-xl text-sm font-black transition-all ${canModifyData ? 'cursor-pointer hover:bg-slate-100 hover:scale-105 active:scale-95' : ''} ${m.value > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
-                        {m.value}{isPercent ? '%' : ''}
-                      </div>
-                    )}
+                  <td key={mIdx} className="px-1 py-4 group/cell">
+                    <div className="flex items-center justify-center gap-0.5">
+                      {editingCell?.rowIdx === rIdx && editingCell?.monthIdx === mIdx ? (
+                        <input autoFocus type="number" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e => e.key === 'Enter' && saveEdit()} className="w-12 mx-auto px-1 py-1 bg-white border-2 border-slate-900 rounded text-center text-xs font-black outline-none shadow-lg z-20" />
+                      ) : ( 
+                        <div onClick={() => handleCellClick(rIdx, mIdx, m.value)} className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-black transition-all ${canModifyData ? 'cursor-pointer hover:bg-slate-100' : ''} ${m.value > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
+                          {m.value}{isPercent ? '%' : ''}
+                        </div> 
+                      )}
+                      <button 
+                        onClick={(e) => handleOpenFiles(e, rIdx, mIdx)} 
+                        className={`flex items-center justify-center w-6 h-6 rounded-md transition-all ${m.files.length > 0 ? 'bg-emerald-50' : 'opacity-0 group-hover/cell:opacity-100 hover:bg-slate-100'}`}
+                        title={m.files.length > 0 ? `${m.files.length} document(s)` : 'Upload MOV'}
+                      >
+                        <PaperclipIcon active={m.files.length > 0} />
+                      </button>
+                    </div>
                   </td>
                 ))}
-                <td className="px-6 py-4 text-center">
-                  <div className="text-sm font-black text-slate-900 bg-slate-100/50 py-2 rounded-xl">
-                    {act.total}{isPercent ? '%' : ''}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <button 
-                    onClick={(e) => {
-                      const firstMonthIdx = act.months.findIndex(m => m.files.length > 0);
-                      handleOpenFiles(e, rIdx, firstMonthIdx === -1 ? 0 : firstMonthIdx);
-                    }} 
-                    className={`p-2 rounded-xl transition-all ${act.months.some(m => m.files.length > 0) ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-300 hover:text-slate-900 hover:bg-slate-100'}`}
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </button>
-                </td>
+                <td className="px-6 py-4 text-center"><div className="text-sm font-black text-slate-900 bg-slate-100/50 py-2 rounded-xl">{act.total}{isPercent ? '%' : ''}</div></td>
+                <td className="px-6 py-4 text-center"><button onClick={(e) => { const firstMonthIdx = act.months.findIndex(m => m.files.length > 0); handleOpenFiles(e, rIdx, firstMonthIdx === -1 ? 0 : firstMonthIdx); }} className={`p-2 rounded-xl transition-all ${act.months.some(m => m.files.length > 0) ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-300 hover:text-slate-900 hover:bg-slate-100'}`}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></button></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       {canEditStructure && (
-        <div className="p-8 border-t border-slate-100 bg-slate-50/30">
-          <button onClick={handleAddActivity} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-400 hover:border-blue-500 hover:text-blue-500 transition-all flex items-center justify-center gap-2 group">
-            <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            Add Activity Entry
-          </button>
-        </div>
+        <div className="p-8 border-t border-slate-100 bg-slate-50/30"><button onClick={handleAddActivity} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-400 hover:border-blue-500 hover:text-blue-500 transition-all flex items-center justify-center gap-2 group"><svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>Add Activity Entry</button></div>
       )}
     </div>
   );
@@ -906,117 +811,57 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-4 flex-1">
-          <button onClick={onBack} className="group flex items-center gap-2 text-slate-400 hover:text-slate-900 font-black text-[10px] uppercase tracking-widest transition-all">
-            <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
-            Return to Terminal
-          </button>
-          <div className="flex flex-col gap-1">
-            <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">{title}</h1>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest opacity-60">Operations & Unit Accomplishment Control</p>
-          </div>
+          <button onClick={onBack} className="group flex items-center gap-2 text-slate-400 hover:text-slate-900 font-black text-[10px] uppercase tracking-widest transition-all"><svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>Return to Terminal</button>
+          <div className="flex flex-col gap-1"><h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">{title}</h1><p className="text-slate-500 text-xs font-bold uppercase tracking-widest opacity-60">Operations & Unit Accomplishment Control</p></div>
         </div>
         <div className="flex flex-wrap gap-2">
           {currentUser.role === UserRole.SUPER_ADMIN && (
             <>
-              <button onClick={handleExportMasterTemplate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2">
-                <TemplateExportIcon /> Export Master Template
-              </button>
-              <button onClick={() => masterImportRef.current?.click()} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2">
-                <UploadIcon /> Import Master Template
-              </button>
+              <button onClick={handleRestoreAllTabs} className="bg-slate-100 hover:bg-slate-200 text-slate-900 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2 border border-slate-200"><RestoreHiddenIcon /> Restore Tabs</button>
+              <button onClick={handleExportMasterTemplate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><TemplateExportIcon /> Export Master Template</button>
+              <button onClick={() => masterImportRef.current?.click()} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><UploadIcon /> Import Master Template</button>
               <input type="file" ref={masterImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportMasterTemplate} />
             </>
           )}
-          <button onClick={handleExportExcel} className="bg-white hover:bg-emerald-50 text-slate-900 hover:text-emerald-700 border border-slate-200 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2">
-            <ExcelExportIcon /> Export Current PI
-          </button>
+          <button onClick={handleExportExcel} className="bg-white hover:bg-emerald-50 text-slate-900 hover:text-emerald-700 border border-slate-200 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2"><ExcelExportIcon /> Export PI</button>
           {currentUser.role === UserRole.SUPER_ADMIN && (
-            <button onClick={handleExportAllExcel} className="bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2">
-              <ExcelExportIcon /> Export All PIs Report
-            </button>
+            <button onClick={handleExportAllExcel} className="bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2"><ExcelExportIcon /> Export All Report</button>
           )}
         </div>
       </div>
-
       <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
         {piData.map(pi => (
           <div key={pi.id} className="relative group flex-shrink-0">
-            <button onClick={() => setActiveTab(pi.id)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === pi.id ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}>
-              {getSharedTabLabel(prefix, year, effectiveId, pi.id, pi.id)}
-            </button>
+            <button onClick={() => setActiveTab(pi.id)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === pi.id ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}>{getSharedTabLabel(prefix, year, effectiveId, pi.id, pi.id)}</button>
             {canEditStructure && (
               <div className="absolute -top-1 -right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-all scale-75">
-                <button onClick={(e) => handleMoveTab(e, pi.id, 'left')} className="p-1.5 bg-white shadow-lg rounded-full text-slate-900 hover:bg-slate-900 hover:text-white border border-slate-100">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
-                </button>
-                <button onClick={(e) => handleMoveTab(e, pi.id, 'right')} className="p-1.5 bg-white shadow-lg rounded-full text-slate-900 hover:bg-slate-900 hover:text-white border border-slate-100">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
-                </button>
+                <button onClick={(e) => handleMoveTab(e, pi.id, 'left')} className="p-1.5 bg-white shadow-lg rounded-full text-slate-900 hover:bg-slate-900 hover:text-white border border-slate-100"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg></button>
+                <button onClick={(e) => handleMoveTab(e, pi.id, 'right')} className="p-1.5 bg-white shadow-lg rounded-full text-slate-900 hover:bg-slate-900 hover:text-white border border-slate-100"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg></button>
               </div>
             )}
           </div>
         ))}
       </div>
-
       {renderTable()}
-
       {isFilesModalOpen && activeFileCell && currentPI && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl p-8 animate-in zoom-in-95 duration-300">
             <div className="flex items-center justify-between mb-8">
-              <div>
-                <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">MOVs & Documents</h3>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
-                  {currentPI.activities[activeFileCell.rowIdx].activity} • {MONTHS[activeFileCell.monthIdx]}
-                </p>
-              </div>
-              <button onClick={() => setIsFilesModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 transition-colors bg-slate-50 rounded-xl">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
+              <div><h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">MOVs & Documents</h3><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{currentPI.activities[activeFileCell.rowIdx].activity} • {MONTHS[activeFileCell.monthIdx]}</p></div>
+              <button onClick={() => setIsFilesModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 transition-colors bg-slate-50 rounded-xl"><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
             </div>
-
             <div className="space-y-6">
               {currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.length > 0 ? (
                 <div className="grid grid-cols-1 gap-3">
                   {currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.map(file => (
                     <div key={file.id} className="group p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between hover:border-blue-500/50 hover:bg-blue-50/10 transition-all">
-                      <div className="flex items-center gap-4 flex-1 min-w-0">
-                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-500 shadow-sm border border-slate-100">
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                        </div>
-                        <div className="truncate">
-                          <p className="text-sm font-black text-slate-900 truncate">{file.name}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(file.uploadedAt).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <a href={file.url} download={file.name} className="p-2 text-slate-400 hover:text-blue-600 transition"><DownloadIcon /></a>
-                        {canModifyData && (
-                          <button onClick={() => removeFile(file.id)} className="p-2 text-slate-400 hover:text-red-600 transition">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
-                        )}
-                      </div>
+                      <div className="flex items-center gap-4 flex-1 min-w-0"><div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-500 shadow-sm border border-slate-100"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg></div><div className="truncate"><p className="text-sm font-black text-slate-900 truncate">{file.name}</p><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(file.uploadedAt).toLocaleDateString()}</p></div></div>
+                      <div className="flex items-center gap-2"><a href={file.url} download={file.name} className="p-2 text-slate-400 hover:text-blue-600 transition"><DownloadIcon /></a>{canModifyData && (<button onClick={() => removeFile(file.id)} className="p-2 text-slate-400 hover:text-red-600 transition"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>)}</div>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="py-12 border-2 border-dashed border-slate-100 rounded-3xl text-center">
-                  <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                  </div>
-                  <p className="text-slate-400 text-xs font-black uppercase tracking-widest">No MOVs Found</p>
-                </div>
-              )}
-
-              {canModifyData && (
-                <div className="pt-4">
-                  <button onClick={() => fileInputRef.current?.click()} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest py-4 rounded-2xl transition-all shadow-lg shadow-slate-200 active:scale-[0.98] flex items-center justify-center gap-2">
-                    <UploadIcon /> Upload New Document
-                  </button>
-                  <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-                </div>
-              )}
+              ) : ( <div className="py-12 border-2 border-dashed border-slate-100 rounded-3xl text-center"><div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-2xl flex items-center justify-center mx-auto mb-4"><svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div><p className="text-slate-400 text-xs font-black uppercase tracking-widest">No MOVs Found</p></div> )}
+              {canModifyData && ( <div className="pt-4"><button onClick={() => fileInputRef.current?.click()} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest py-4 rounded-2xl transition-all shadow-lg shadow-slate-200 active:scale-[0.98] flex items-center justify-center gap-2"><UploadIcon /> Upload New Document</button><input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} /></div> )}
             </div>
           </div>
         </div>
