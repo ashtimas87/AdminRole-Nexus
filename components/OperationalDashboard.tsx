@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import pptxgen from "pptxgenjs";
@@ -103,7 +102,7 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
     PI3: {
       title: "Number of participating respondents",
       activities: [
-        { id: "pi3_a1", name: "Secretariat Meetings", indicator: "No. Secretariat Meetings conducted", defaults: Array(12).fill(5) },
+        { id: "pi3_a1", name: "Secretariat Meetings", indicator: "No Secretariat Meetings conducted", defaults: Array(12).fill(5) },
         { id: "pi3_a2", name: "Convening of IO Working Group", indicator: "No. of activities conducted", defaults: Array(12).fill(6) },
         { id: "pi3_a3", name: "Activation of SyncCom during major events", indicator: "No. of activities conducted", defaults: Array(12).fill(8) },
         { id: "pi3_a4", name: "Summing-up on Revitalized-Pulis Sa Barangay (R-PSB)", indicator: "No. of summing-up conducted", defaults: Array(12).fill(10) },
@@ -401,6 +400,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const fileInputRef = useRef<HTMLInputElement>(null);
   const excelImportRef = useRef<HTMLInputElement>(null);
   const structureImportRef = useRef<HTMLInputElement>(null);
+  const masterImportRef = useRef<HTMLInputElement>(null);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editTabLabel, setEditTabLabel] = useState<string>('');
   const [editingActivityField, setEditingActivityField] = useState<{ aid: string; field: 'activity' | 'indicator' } | null>(null);
@@ -596,6 +596,112 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     XLSX.writeFile(wb, `${subjectUser.name}_${activeTab}_Report_${year}.xlsx`);
   };
 
+  const handleExportAllExcel = () => {
+    const unitsToConsolidate = prefix === 'accomplishment' ? allUnits : [];
+    // Get all definitions, ignoring hidden state for a full system export
+    const allData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate, true);
+    
+    const wb = XLSX.utils.book_new();
+    
+    allData.forEach(pi => {
+      const worksheetData = pi.activities.map(act => {
+        const row: any = {
+          'Strategic Activity': act.activity,
+          'Performance Indicator': act.indicator,
+        };
+        MONTHS.forEach((m, i) => {
+          row[m] = act.months[i].value;
+        });
+        const total = act.months.reduce((sum, m) => sum + m.value, 0);
+        row['Total'] = total;
+        return row;
+      });
+      
+      const ws = XLSX.utils.json_to_sheet(worksheetData);
+      
+      // Auto-size columns roughly for better UX
+      const wscols = [
+        {wch: 45}, // Strategic Activity
+        {wch: 35}, // Performance Indicator
+        ...MONTHS.map(() => ({wch: 8})),
+        {wch: 10}  // Total
+      ];
+      ws['!cols'] = wscols;
+
+      // Excel sheet names have a limit of 31 characters
+      XLSX.utils.book_append_sheet(wb, ws, pi.id.substring(0, 31));
+    });
+    
+    XLSX.writeFile(wb, `COCPO_${subjectUser.name}_Full_Report_${year}.xlsx`);
+  };
+
+  /**
+   * Bulk Export Master Template (All 29 PIs) in a single flat sheet for easy system editing.
+   */
+  const handleExportMasterTemplate = () => {
+    const unitsToConsolidate = prefix === 'accomplishment' ? allUnits : [];
+    const allData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate, true);
+    
+    const flattenedRows: any[] = [];
+    allData.forEach(pi => {
+      pi.activities.forEach(act => {
+        const row: any = {
+          'PI ID': pi.id,
+          'PI Title': pi.title,
+          'Activity ID': act.id,
+          'Strategic Activity': act.activity,
+          'Performance Indicator': act.indicator,
+        };
+        MONTHS.forEach((m, i) => {
+          row[m] = act.months[i].value;
+        });
+        flattenedRows.push(row);
+      });
+    });
+
+    const ws = XLSX.utils.json_to_sheet(flattenedRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Master System Template");
+    XLSX.writeFile(wb, `COCPO_MASTER_TEMPLATE_${prefix.toUpperCase()}_${year}.xlsx`);
+  };
+
+  /**
+   * Bulk Import Master Template (All 29 PIs) from a single Excel file.
+   */
+  const handleImportMasterTemplate = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const data: any[] = XLSX.utils.sheet_to_json(ws);
+
+      data.forEach(row => {
+        const piId = row['PI ID'];
+        const aid = row['Activity ID'];
+        const actName = row['Strategic Activity'];
+        const indicator = row['Performance Indicator'];
+
+        if (piId && aid) {
+          if (actName) localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, actName);
+          if (indicator) localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicator);
+          
+          MONTHS.forEach((m, i) => {
+            if (row[m] !== undefined) {
+              localStorage.setItem(`${prefix}_data_${year}_${effectiveId}_${piId}_${aid}_${i}`, String(row[m]));
+            }
+          });
+        }
+      });
+      refresh();
+      if (masterImportRef.current) masterImportRef.current.value = '';
+      alert('Master system structure and data successfully updated.');
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const handleMoveTab = (e: React.MouseEvent, piId: string, direction: 'left' | 'right') => {
     e.stopPropagation();
     if (!canEditStructure) return;
@@ -707,7 +813,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                   </div>
                 </td>
                 <td className="px-6 py-4 text-center">
-                  {/* Fixed: Undefined 'mIdx' was used here. Now finding the first month with files or defaulting to 0. */}
                   <button 
                     onClick={(e) => {
                       const firstMonthIdx = act.months.findIndex(m => m.files.length > 0);
@@ -750,9 +855,25 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {currentUser.role === UserRole.SUPER_ADMIN && (
+            <>
+              <button onClick={handleExportMasterTemplate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2">
+                <TemplateExportIcon /> Export Master Template
+              </button>
+              <button onClick={() => masterImportRef.current?.click()} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2">
+                <UploadIcon /> Import Master Template
+              </button>
+              <input type="file" ref={masterImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportMasterTemplate} />
+            </>
+          )}
           <button onClick={handleExportExcel} className="bg-white hover:bg-emerald-50 text-slate-900 hover:text-emerald-700 border border-slate-200 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2">
-            <ExcelExportIcon /> Export Excel
+            <ExcelExportIcon /> Export Current PI
           </button>
+          {currentUser.role === UserRole.SUPER_ADMIN && (
+            <button onClick={handleExportAllExcel} className="bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2">
+              <ExcelExportIcon /> Export All PIs Report
+            </button>
+          )}
         </div>
       </div>
 
