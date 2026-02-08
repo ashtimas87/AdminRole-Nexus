@@ -635,6 +635,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         return row;
       });
 
+      // Calculate Summary Total row
       const mTotals = Array(12).fill(0);
       activitiesWithTotals.forEach(a => a.months.forEach((mo, i) => mTotals[i] += mo.value));
       const div = activitiesWithTotals.length || 1;
@@ -676,6 +677,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       slide.addText(pi.title, { x: 0.5, y: 0.3, w: "90%", fontSize: 14, bold: true, color: "0F172A", align: "center" });
       const piIsPercent = ["PI4", "PI9", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(pi.id);
 
+      // Re-calculate totals for the summary row in PPT
       const mTotals = Array(12).fill(0);
       activitiesWithTotals.forEach(a => a.months.forEach((mo, i) => mTotals[i] += mo.value));
       const div = activitiesWithTotals.length || 1;
@@ -703,20 +705,61 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const workbook = XLSX.read(data, { type: 'array' });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+      
+      // Group by PI to update ID lists efficiently
+      const piActivityGroups: Record<string, string[]> = {};
+
       jsonData.forEach(row => {
         // Map common template variations back to standard keys
-        const piId = row.PI_ID;
-        const piTitle = row.PI_Title;
-        const tabLabel = row.Tab_Label;
-        const activityId = row.Activity_ID;
-        const activityName = row.Activity_Name;
-        const indicatorName = row.Performance_Indicator_Name || row.Indicator_Name;
+        const piId = row.PI_ID || row["PI ID"];
+        const piTitle = row.PI_Title || row["PI Title"];
+        const tabLabel = row.Tab_Label || row["Tab Label"];
+        const activityId = row.Activity_ID || row["Activity ID"];
+        const activityName = row.Activity_Name || row["Activity Name"];
+        const indicatorName = row.Performance_Indicator_Name || row.Indicator_Name || row["Indicator Name"] || row["Performance Indicator Name"];
 
-        if (piId && piTitle) localStorage.setItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`, piTitle);
-        if (piId && tabLabel) localStorage.setItem(`${prefix}_pi_tab_${year}_${effectiveId}_${piId}`, tabLabel);
-        if (piId && activityId && activityName) localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${activityId}`, activityName);
-        if (piId && activityId && indicatorName) localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${activityId}`, indicatorName);
+        if (piId) {
+          if (piTitle) localStorage.setItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`, piTitle);
+          if (tabLabel) localStorage.setItem(`${prefix}_pi_tab_${year}_${effectiveId}_${piId}`, tabLabel);
+          
+          if (activityId) {
+            // Track the activity ID for this PI
+            if (!piActivityGroups[piId]) piActivityGroups[piId] = [];
+            piActivityGroups[piId].push(activityId);
+
+            if (activityName) localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${activityId}`, activityName);
+            if (indicatorName) localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${activityId}`, indicatorName);
+          }
+        }
       });
+
+      // Update the active activity ID lists for each PI touched by the import
+      Object.entries(piActivityGroups).forEach(([piId, ids]) => {
+        const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
+        const storedIdsStr = localStorage.getItem(actIdsKey);
+        
+        let existingIds: string[] = [];
+        if (storedIdsStr) {
+          existingIds = JSON.parse(storedIdsStr);
+        } else {
+          // If no stored IDs, use the base IDs from the current definition
+          const piDef = piData.find(p => p.id === piId);
+          if (piDef) {
+            existingIds = piDef.activities.map(a => a.id);
+          }
+        }
+        
+        // Merge: add any IDs from Excel that aren't already in the list
+        const mergedIds = [...existingIds];
+        ids.forEach(id => {
+          if (!mergedIds.includes(id)) {
+            mergedIds.push(id);
+          }
+        });
+        
+        localStorage.setItem(actIdsKey, JSON.stringify(mergedIds));
+      });
+
       refresh();
       alert('Dashboard structure updated successfully!');
       if (excelImportRef.current) excelImportRef.current.value = '';
