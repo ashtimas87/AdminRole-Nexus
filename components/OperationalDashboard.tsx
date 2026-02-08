@@ -662,7 +662,25 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const ws = XLSX.utils.json_to_sheet(flattenedRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Master System Template");
-    XLSX.writeFile(wb, `COCPO_MASTER_TEMPLATE_${prefix.toUpperCase()}_${year}.xlsx`);
+    
+    // Rename filename based on requested patterns for Consolidated/Master views.
+    let fileName = "";
+    if (isHeadOfficeView || title.toUpperCase().includes("CONSOLIDATION")) {
+      const typeStr = prefix === 'target' ? 'TARGET_OUTLOOK' : 'ACCOMPLISHMENT';
+      fileName = `OPERATIONAL_${typeStr}_${year}.xlsx`;
+    } else {
+      // For specific units, clean up the title for the filename.
+      let namePart = title.replace(/CHQ\s+/gi, '');
+      const yearMatch = namePart.match(/\d{4}/);
+      const yearStr = yearMatch ? yearMatch[0] : '';
+      if (yearStr) {
+        namePart = namePart.replace(yearStr, '').replace(/\s+/g, ' ').trim();
+        namePart = `${namePart} ${yearStr}`;
+      }
+      fileName = namePart.toUpperCase().replace(/\s+/g, '_') + '.xlsx';
+    }
+    
+    XLSX.writeFile(wb, fileName);
   };
 
   /**
