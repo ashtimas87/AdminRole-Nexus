@@ -604,11 +604,12 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
           const isAggregationDashboard = subjectUser.role === UserRole.SUPER_ADMIN || subjectUser.role === UserRole.SUB_ADMIN;
 
-          if (!isAggregationDashboard) {
+          // Allow importing data if it's not an aggregation dashboard (standard unit behavior)
+          // OR if it is a 'target' dashboard (allowing Admins to upload Master Targets including values)
+          if (!isAggregationDashboard || prefix === 'target') {
             MONTHS.forEach((m, i) => { 
               // Force save for every month. If undefined in excel, save as 0.
-              // This ensures the dashboard displays exactly what was uploaded,
-              // overriding any underlying consolidation logic.
+              // This ensures the dashboard displays exactly what was uploaded.
               const rawVal = row[m];
               const val = (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') 
                 ? (parseInt(rawVal, 10) || 0) 
