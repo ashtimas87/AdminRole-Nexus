@@ -57,8 +57,8 @@ const createMonthsForActivity = (prefix: string, year: string, userId: string, p
 
     if (stored !== null) {
       value = parseInt(stored, 10);
-    } else if (prefix === 'accomplishment' && isConsolidated && units.length > 0) {
-      // Fallback to consolidation if no explicit value
+    } else if ((prefix === 'accomplishment' || prefix === 'target') && isConsolidated && units.length > 0) {
+      // Fallback to consolidation if no explicit value. Now supports both Accomplishment and Target.
       value = units.reduce((sum, unit) => {
         const unitKey = `${prefix}_data_${year}_${unit.id}_${piId}_${activityId}_${mIdx}`;
         const val = localStorage.getItem(unitKey);
@@ -320,8 +320,10 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
       const activities = activityIds.map(aid => {
         const base = pi.activities.find((a: any) => a.id === aid);
         
+        // Zero out defaults for Accomplishment and Target dashboards when using specific roles,
+        // to prevent hardcoded defaults from appearing as valid data.
         let effectiveDefaults = base?.defaults || Array(12).fill(0);
-        if (prefix === 'accomplishment' && (role === UserRole.CHQ || role === UserRole.STATION)) {
+        if ((prefix === 'accomplishment' || prefix === 'target') && (role === UserRole.CHQ || role === UserRole.STATION)) {
           effectiveDefaults = Array(12).fill(0);
         }
 
@@ -428,7 +430,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const isAdmin = currentUser.role === UserRole.SUPER_ADMIN || currentUser.role === UserRole.SUB_ADMIN;
   const isOwner = currentUser.id === subjectUser.id;
   const isHeadOfficeView = subjectUser.id === currentUser.id || subjectUser.role === UserRole.SUB_ADMIN;
-  const isConsolidated = prefix === 'accomplishment' && isHeadOfficeView;
+  // Enable consolidation for both Accomplishment and Target Outlook when in a head office/aggregated view
+  const isConsolidated = (prefix === 'accomplishment' || prefix === 'target') && isHeadOfficeView;
   
   const canModifyData = isOwner || currentUser.role === UserRole.SUPER_ADMIN || (currentUser.role === UserRole.SUB_ADMIN && subjectUser.role === UserRole.STATION);
   const canEditStructure = currentUser.role === UserRole.SUPER_ADMIN;
@@ -436,7 +439,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const canAccessFiles = isOwner || isAdmin;
 
   const refresh = () => {
-    const unitsToConsolidate = prefix === 'accomplishment' ? allUnits : [];
+    // Pass units to consolidate for both Accomplishment and Target Outlook
+    const unitsToConsolidate = (prefix === 'accomplishment' || prefix === 'target') ? allUnits : [];
     const data = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate);
     setPiData(data.map(d => ({
       ...d,
