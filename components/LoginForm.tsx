@@ -8,7 +8,7 @@ interface LoginFormProps {
 
 const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState(''); // Default empty for security testing
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -17,95 +17,84 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     setError('');
     setLoading(true);
 
+    // Simulated verification delay
     setTimeout(() => {
       const foundUser = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
       
-      // Perform validation check
       if (foundUser && foundUser.password === password) {
         onLogin(foundUser);
       } else {
-        setError('Invalid email or password. Please try again.');
+        setError('Verification Failed. Invalid Access Credentials.');
         setLoading(false);
       }
-    }, 800);
+    }, 600);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <div className="max-w-4xl w-full flex flex-col md:flex-row bg-white rounded-2xl shadow-xl overflow-hidden">
-        {/* Left Side: Form */}
-        <div className="w-full md:w-1/2 p-8 lg:p-12">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-slate-900">Login</h1>
-            <p className="text-slate-500 mt-2">Sign in to access your dashboard.</p>
+    <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] p-6 font-sans">
+      <div className="w-full max-w-[400px] bg-white p-10 rounded-[2.5rem] shadow-2xl shadow-slate-200/60 animate-in fade-in zoom-in-95 duration-500 border border-slate-100">
+        <div className="text-center mb-10">
+          <div className="w-20 h-20 bg-slate-900 rounded-[2.2rem] flex items-center justify-center text-white text-3xl font-black mx-auto mb-6 shadow-2xl shadow-slate-900/20 active:scale-95 transition-transform cursor-pointer">
+            C
           </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                placeholder="Email Address"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-
-            {error && (
-              <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : 'Sign In'}
-            </button>
-          </form>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">HUB Login</h1>
+          <p className="text-slate-400 text-[9px] font-bold uppercase tracking-[0.25em] mt-3 opacity-60">Cagayan de Oro Monitoring Storage</p>
         </div>
 
-        {/* Right Side: Visual/Context */}
-        <div className="hidden md:flex w-1/2 bg-slate-900 p-12 text-white flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl"></div>
-          
-          <div className="relative z-10">
-            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center mb-8 border border-white/20">
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-            </div>
-            <h2 className="text-4xl font-bold mb-4 leading-tight">Real-Time Monitoring System</h2>
-            <p className="text-slate-400 text-lg">Managing Unit Accomplishment</p>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Terminal Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-900 focus:bg-white outline-none transition-all font-bold text-sm text-slate-900 placeholder:text-slate-300"
+              placeholder="name@example.com"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Access Key</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-900 focus:bg-white outline-none transition-all font-bold text-sm text-slate-900 placeholder:text-slate-300"
+              placeholder="••••••••"
+              required
+            />
           </div>
 
-          <div className="relative z-10 space-y-4">
-            <div className="flex items-center gap-4 text-sm bg-white/5 border border-white/10 p-4 rounded-xl backdrop-blur-sm">
-              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-              <span>Status: Active</span>
+          {error && (
+            <div className="p-4 bg-rose-50 text-rose-500 text-[10px] font-black uppercase tracking-widest rounded-2xl border border-rose-100 text-center animate-in slide-in-from-top-2">
+              {error}
             </div>
-            <div className="text-slate-500 text-xs">
-              © 2025 AdminRole System
-            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-[0.2em] py-5 rounded-2xl transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98] flex items-center justify-center gap-3"
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+            ) : (
+              <>
+                Initialize Terminal
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </>
+            )}
+          </button>
+        </form>
+
+        <div className="mt-12 pt-8 border-t border-slate-50 flex flex-col items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Secure Cloud Gateway Active</span>
           </div>
+          <p className="text-[9px] font-bold text-slate-300 uppercase tracking-[0.1em]">Terminal v2.5.0-R2026</p>
         </div>
       </div>
     </div>

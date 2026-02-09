@@ -354,16 +354,6 @@ const UploadIcon = () => (
   </svg>
 );
 
-const TemplateExportIcon = () => (
-  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="512" height="512" rx="120" fill="#6366f1" />
-    <path d="M160 120V392H352V200L272 120H160Z" stroke="white" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M210 240H302" stroke="white" strokeWidth="32" strokeLinecap="round" />
-    <path d="M210 290H302" stroke="white" strokeWidth="32" strokeLinecap="round" />
-    <path d="M210 340H260" stroke="white" strokeWidth="32" strokeLinecap="round" />
-  </svg>
-);
-
 const RestoreHiddenIcon = () => (
   <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect width="512" height="512" rx="120" fill="black" />
@@ -603,15 +593,30 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     XLSX.utils.book_append_sheet(wb, ws, "Master Template");
     
     let filename = `Master_Template_${year}.xlsx`;
-    // Specific rename requirements
-    if (year === '2026' && prefix === 'accomplishment') {
-      if (subjectUser.name === 'CHQ CARMU') {
-        filename = `CARMU_ACCOMPLISHMENT_2026.xlsx`;
-      } else if (subjectUser.name === 'Police Station 1') {
-        filename = `POLICE_STATION1_ACCOMPLISHMENT_2026.xlsx`;
-      } else if (subjectUser.name === 'City Mobile Force Company') {
-        filename = `FORCE_COMPANY_ACCOMPLISHMENT_2026.xlsx`;
+    // Consistent and dynamic renaming logic for professional 2026 exports
+    if (year === '2026') {
+      const isAccom = prefix === 'accomplishment';
+      const suffix = isAccom ? 'ACCOMPLISHMENT_2026' : 'TARGET_OUTLOOK_2026';
+      
+      let cleanName = subjectUser.name.toUpperCase();
+      
+      // Formatting based on terminal navigation context
+      if (cleanName.startsWith('CHQ ')) {
+        // "CHQ CARMU" -> "CARMU"
+        cleanName = cleanName.substring(4);
       }
+      
+      if (cleanName.startsWith('POLICE STATION')) {
+        // "POLICE STATION 1" -> "POLICE_STATION1"
+        cleanName = cleanName.replace('POLICE STATION ', 'POLICE_STATION');
+      } else if (cleanName === 'CITY MOBILE FORCE COMPANY') {
+        cleanName = 'FORCE_COMPANY';
+      } else {
+        // "SUPER_ADMIN", "LOGISTICS", etc.
+        cleanName = cleanName.replace(/\s+/g, '_');
+      }
+      
+      filename = `${cleanName}_${suffix}.xlsx`;
     }
     
     XLSX.writeFile(wb, filename);
@@ -763,7 +768,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                 </a>
               </div>
               <button onClick={handleRestoreAllTabs} className="bg-slate-100 hover:bg-slate-200 text-slate-900 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2 border border-slate-200"><RestoreHiddenIcon /> Restore Tabs</button>
-              <button onClick={handleExportMasterTemplate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Master Template</button>
+              <button onClick={handleExportMasterTemplate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Export Master</button>
               <button onClick={() => masterImportRef.current?.click()} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><UploadIcon /> Import Master</button>
               <input type="file" ref={masterImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportMasterTemplate} />
             </>
