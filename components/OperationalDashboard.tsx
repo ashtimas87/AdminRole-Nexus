@@ -603,9 +603,15 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     XLSX.utils.book_append_sheet(wb, ws, "Master Template");
     
     let filename = `Master_Template_${year}.xlsx`;
-    // Specific rename requirement for CHQ CARMU 2026 Accomplishment
-    if (subjectUser.name === 'CHQ CARMU' && year === '2026' && prefix === 'accomplishment') {
-      filename = `CARMU_ACCOMPLISHMENT_2026.xlsx`;
+    // Specific rename requirements
+    if (year === '2026' && prefix === 'accomplishment') {
+      if (subjectUser.name === 'CHQ CARMU') {
+        filename = `CARMU_ACCOMPLISHMENT_2026.xlsx`;
+      } else if (subjectUser.name === 'Police Station 1') {
+        filename = `POLICE_STATION1_ACCOMPLISHMENT_2026.xlsx`;
+      } else if (subjectUser.name === 'City Mobile Force Company') {
+        filename = `FORCE_COMPANY_ACCOMPLISHMENT_2026.xlsx`;
+      }
     }
     
     XLSX.writeFile(wb, filename);
