@@ -403,6 +403,12 @@ const GoogleDriveIcon = () => (
   </svg>
 );
 
+const FolderIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-full h-full text-blue-400" fill="currentColor">
+    <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/>
+  </svg>
+);
+
 interface OperationalDashboardProps {
   title: string;
   onBack: () => void;
@@ -420,6 +426,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const [activeFileCell, setActiveFileCell] = useState<{ rowIdx: number; monthIdx: number } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [vaultData, setVaultData] = useState<any[]>([]); // Reactive vault data
+  const [vaultFolder, setVaultFolder] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const masterImportRef = useRef<HTMLInputElement>(null);
   const [editingActivityField, setEditingActivityField] = useState<{ aid: string; field: 'activity' | 'indicator' } | null>(null);
@@ -571,6 +578,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const key = `${prefix}_files_${year}_${effectiveId}_${activeTab}_${aid}_${activeFileCell.monthIdx}`;
     const existing: MonthFile[] = JSON.parse(localStorage.getItem(key) || '[]');
     localStorage.setItem(key, JSON.stringify(existing.filter(f => f.id !== fid)));
+
+    // Sync deletion to Super Admin Drive Vault
+    const vaultKey = `superadmin_drive_vault_${year}`;
+    const vault: any[] = JSON.parse(localStorage.getItem(vaultKey) || '[]');
+    const updatedVault = vault.filter((f: any) => f.id !== fid);
+    localStorage.setItem(vaultKey, JSON.stringify(updatedVault));
+    setVaultData(updatedVault);
+
     refresh();
   };
 
@@ -720,6 +735,16 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     if (type.includes('pdf')) return <svg className="w-5 h-5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>;
     return <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
   };
+
+  const vaultFolders = useMemo(() => {
+    const units = new Set(vaultData.map((f: any) => f.unitName));
+    return Array.from(units).sort();
+  }, [vaultData]);
+
+  const filteredVaultFiles = useMemo(() => {
+    if (!vaultFolder) return [];
+    return vaultData.filter((f: any) => f.unitName === vaultFolder).reverse();
+  }, [vaultData, vaultFolder]);
 
   const renderTable = () => {
     const monthlyTotals = Array(12).fill(0);
@@ -887,12 +912,27 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                         <a href="https://drive.google.com" target="_blank" rel="noopener noreferrer" className="text-white text-xs font-black uppercase tracking-widest hover:text-emerald-300 transition underline underline-offset-4 decoration-emerald-500/50">barvickrunch@gmail.com</a>
                       </div>
                       <div className="flex items-center gap-2">
-                        <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest">MASTER FOLDER: </p>
-                        <span className="text-white text-xs font-black uppercase tracking-widest">CPSMU MONITORING STORAGE</span>
+                        {vaultFolder ? (
+                           <div className="flex items-center gap-2">
+                             <span onClick={() => setVaultFolder(null)} className="text-white/60 hover:text-white cursor-pointer text-xs font-black uppercase tracking-widest transition">ROOT</span>
+                             <span className="text-white/40">/</span>
+                             <span className="text-white text-xs font-black uppercase tracking-widest">{vaultFolder}</span>
+                           </div>
+                        ) : (
+                          <>
+                            <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest">MASTER FOLDER: </p>
+                            <span className="text-white text-xs font-black uppercase tracking-widest">CPSMU MONITORING STORAGE</span>
+                          </>
+                        )}
                       </div>
                     </div>
                  </div>
                  <div className="flex items-center gap-3">
+                   {vaultFolder && (
+                     <button onClick={() => setVaultFolder(null)} className="bg-white/10 hover:bg-white/20 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition flex items-center gap-2 border border-white/10">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg> BACK
+                     </button>
+                   )}
                    <a href="https://drive.google.com" target="_blank" rel="noopener noreferrer" className="bg-emerald-500 hover:bg-emerald-400 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition flex items-center gap-2 shadow-lg active:scale-95">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg> Launch Storage Root
                    </a>
@@ -902,50 +942,70 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                  </div>
               </div>
               <div className="p-10 flex-1 overflow-y-auto no-scrollbar">
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {vaultData.length > 0 ? vaultData.slice().reverse().map((file: any) => (
-                      <div key={file.id} className="p-6 bg-slate-50 border border-slate-200 rounded-[2rem] hover:border-emerald-500 transition-all group flex flex-col justify-between shadow-sm hover:shadow-xl">
-                         <div>
-                            <div className="flex items-center gap-4 mb-4">
-                               <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-slate-100 group-hover:scale-110 transition-transform">
-                                  {getFileIcon(file.type)}
-                               </div>
-                               <div className="flex-1 min-w-0">
-                                  <p className="font-black text-slate-900 truncate text-sm">{file.name}</p>
-                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{file.unitName}</p>
-                                </div>
+                 {!vaultFolder ? (
+                   <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                      {vaultFolders.length > 0 ? vaultFolders.map(folder => (
+                         <div key={folder} onClick={() => setVaultFolder(folder)} className="group cursor-pointer p-6 bg-slate-50 border border-slate-200 rounded-[2rem] hover:bg-white hover:border-blue-500 hover:shadow-xl transition-all flex flex-col items-center justify-center gap-4">
+                            <div className="w-20 h-20 text-blue-300 group-hover:text-blue-500 transition-colors">
+                               <FolderIcon />
                             </div>
-                            <div className="space-y-2 mb-6">
-                               <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                  <span>Synced From</span>
-                                  <span className="text-slate-900">{file.piId}</span>
-                               </div>
-                               <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                  <span>Date</span>
-                                  <span className="text-slate-900">{new Date(file.syncedAt).toLocaleDateString()}</span>
-                               </div>
+                            <div className="text-center">
+                               <p className="font-black text-slate-900 text-sm truncate max-w-[150px]">{folder}</p>
+                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Unit Folder</p>
                             </div>
                          </div>
-                         <div className="flex gap-2">
-                            <a href={file.url} download={file.name} className="flex-1 bg-white border border-slate-200 hover:border-emerald-500 hover:text-emerald-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-center gap-2">
-                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> View Link
-                            </a>
-                            <button onClick={() => {
-                               const vaultKey = `superadmin_drive_vault_${year}`;
-                               const filtered = vaultData.filter((f: any) => f.id !== file.id);
-                               localStorage.setItem(vaultKey, JSON.stringify(filtered));
-                               setVaultData(filtered); 
-                            }} className="w-10 h-10 flex items-center justify-center bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all border border-rose-100 shadow-sm">
-                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
-                         </div>
-                      </div>
-                    )) : (
-                      <div className="col-span-full py-20 text-center">
-                        <p className="text-slate-400 font-black uppercase tracking-widest text-xs">No synced files in storage yet</p>
-                      </div>
-                    )}
-                 </div>
+                      )) : (
+                        <div className="col-span-full py-20 text-center">
+                          <p className="text-slate-400 font-black uppercase tracking-widest text-xs">No unit folders created yet</p>
+                        </div>
+                      )}
+                   </div>
+                 ) : (
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                      {filteredVaultFiles.length > 0 ? filteredVaultFiles.map((file: any) => (
+                        <div key={file.id} className="p-6 bg-slate-50 border border-slate-200 rounded-[2rem] hover:border-emerald-500 transition-all group flex flex-col justify-between shadow-sm hover:shadow-xl">
+                           <div>
+                              <div className="flex items-center gap-4 mb-4">
+                                 <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-slate-100 group-hover:scale-110 transition-transform">
+                                    {getFileIcon(file.type)}
+                                 </div>
+                                 <div className="flex-1 min-w-0">
+                                    <p className="font-black text-slate-900 truncate text-sm">{file.name}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{file.unitName}</p>
+                                 </div>
+                              </div>
+                              <div className="space-y-2 mb-6">
+                                 <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                    <span>Synced From</span>
+                                    <span className="text-slate-900">{file.piId}</span>
+                                 </div>
+                                 <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                    <span>Date</span>
+                                    <span className="text-slate-900">{new Date(file.syncedAt).toLocaleDateString()}</span>
+                                 </div>
+                              </div>
+                           </div>
+                           <div className="flex gap-2">
+                              <a href={file.url} download={file.name} className="flex-1 bg-white border border-slate-200 hover:border-emerald-500 hover:text-emerald-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-center gap-2">
+                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> View Link
+                              </a>
+                              <button onClick={() => {
+                                 const vaultKey = `superadmin_drive_vault_${year}`;
+                                 const filtered = vaultData.filter((f: any) => f.id !== file.id);
+                                 localStorage.setItem(vaultKey, JSON.stringify(filtered));
+                                 setVaultData(filtered); 
+                              }} className="w-10 h-10 flex items-center justify-center bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all border border-rose-100 shadow-sm">
+                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                           </div>
+                        </div>
+                      )) : (
+                        <div className="col-span-full py-20 text-center">
+                          <p className="text-slate-400 font-black uppercase tracking-widest text-xs">No files synced in this folder</p>
+                        </div>
+                      )}
+                   </div>
+                 )}
               </div>
            </div>
         </div>
