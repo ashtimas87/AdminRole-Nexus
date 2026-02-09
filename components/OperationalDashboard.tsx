@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import pptxgen from "pptxgenjs";
@@ -48,14 +49,24 @@ const getSharedFiles = (prefix: string, year: string, userId: string, piId: stri
 const createMonthsForActivity = (prefix: string, year: string, userId: string, piId: string, activityId: string, defaultValues: number[], role: UserRole, isConsolidated: boolean, units: User[]): MonthData[] => {
   return Array.from({ length: 12 }).map((_, mIdx) => {
     let value = 0;
-    if (prefix === 'accomplishment' && isConsolidated && units.length > 0) {
+    
+    // Check if there is an explicit value stored for this user (e.g. from import or manual edit)
+    // This allows manual overrides or imported data to take precedence over consolidation logic
+    const key = `${prefix}_data_${year}_${userId}_${piId}_${activityId}_${mIdx}`;
+    const stored = localStorage.getItem(key);
+
+    if (stored !== null) {
+      value = parseInt(stored, 10);
+    } else if (prefix === 'accomplishment' && isConsolidated && units.length > 0) {
+      // Fallback to consolidation if no explicit value
       value = units.reduce((sum, unit) => {
-        const key = `${prefix}_data_${year}_${unit.id}_${piId}_${activityId}_${mIdx}`;
-        const val = localStorage.getItem(key);
+        const unitKey = `${prefix}_data_${year}_${unit.id}_${piId}_${activityId}_${mIdx}`;
+        const val = localStorage.getItem(unitKey);
         return sum + (val ? parseInt(val, 10) : 0);
       }, 0);
     } else {
-      value = getSharedDataValue(prefix, year, userId, piId, activityId, mIdx, defaultValues[mIdx] || 0);
+      // Fallback to default
+      value = defaultValues[mIdx] || 0;
     }
 
     return {
@@ -576,9 +587,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         if (piId && aid) {
           foundPIs.add(piId);
           if (!piActivitiesMap[piId]) piActivitiesMap[piId] = [];
-          piActivitiesMap[piId].push(aid);
+          if (!piActivitiesMap[piId].includes(aid)) {
+             piActivitiesMap[piId].push(aid);
+          }
 
-          // Save names and indicators from file to local storage
           if (activityName) {
             localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, activityName);
           }
@@ -586,12 +598,20 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicatorName);
           }
 
-          // Save monthly data values
-          MONTHS.forEach((m, i) => { 
-            if (row[m] !== undefined) {
-              saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0); 
-            }
-          });
+          const isAggregationDashboard = subjectUser.role === UserRole.SUPER_ADMIN || subjectUser.role === UserRole.SUB_ADMIN;
+
+          if (!isAggregationDashboard) {
+            MONTHS.forEach((m, i) => { 
+              // Force save for every month. If undefined in excel, save as 0.
+              // This ensures the dashboard displays exactly what was uploaded,
+              // overriding any underlying consolidation logic.
+              const rawVal = row[m];
+              const val = (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') 
+                ? (parseInt(rawVal, 10) || 0) 
+                : 0;
+              saveDataWithSync(piId, aid, i, val); 
+            });
+          }
         }
       });
 
