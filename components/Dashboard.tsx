@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
 import { User, UserRole } from '../types';
 import { ROLE_LABELS, MOCK_USERS } from '../constants';
@@ -240,9 +239,15 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
       subAdminUsers = [];
     }
 
-    if (user.role === UserRole.CHQ && selectedYear !== '2023') {
-      chqUsers = chqUsers.filter(u => u.id === user.id);
+    if (user.role === UserRole.CHQ) {
+      // For CHQ users, only show their own unit or all CHQ units if in 2023 consolidation
+      // and strictly hide station/special units in oversight view.
+      stationUsers = [];
+      specialUsers = [];
       subAdminUsers = [];
+      if (selectedYear !== '2023') {
+        chqUsers = chqUsers.filter(u => u.id === user.id);
+      }
     }
 
     return { subAdminUsers, chqUsers, specialUsers, stationUsers };
@@ -275,7 +280,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           ))}
         </div>
 
-        {(isAdmin || (user.role === UserRole.CHQ && selectedYear === '2023')) && (
+        {(isAdmin || (user.role === UserRole.CHQ && (selectedYear === '2023' || chqUsers.length > 0))) && (
           <div className="space-y-4">
             <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-600"></div>
@@ -411,7 +416,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           ))}
         </div>
 
-        {(isAdmin || (user.role === UserRole.CHQ && selectedYear === '2023')) && (
+        {(isAdmin || (user.role === UserRole.CHQ && (selectedYear === '2023' || chqUsers.length > 0))) && (
           <div className="space-y-4">
             {user.role === UserRole.SUPER_ADMIN && (
               <div 

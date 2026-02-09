@@ -718,8 +718,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                 {activeTab} - {currentPI?.title}
               </h2>
               <p className="text-slate-400 text-xs font-bold tracking-widest uppercase flex items-center gap-2">
-                Unit: {subjectUser.name} • Drive Terminal: {year}
-                {isAdmin && <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[8px] border border-emerald-500/30 font-black">DRIVE SYNC ACTIVE</span>}
+                Unit: {subjectUser.name} • Terminal: {year}
+                {isAdmin && <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[8px] border border-emerald-500/30 font-black uppercase tracking-widest">Global Drive Oversight</span>}
               </p>
             </div>
             {canModifyData && (
@@ -821,9 +821,15 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         <div className="flex flex-wrap gap-2">
           {currentUser.role === UserRole.SUPER_ADMIN && (
             <>
-              <button onClick={() => setVaultOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2">
-                <GoogleDriveIcon /> Unit Drive Vault
-              </button>
+              <div className="flex bg-emerald-600 rounded-2xl shadow-lg overflow-hidden transition hover:bg-emerald-700">
+                <button onClick={() => setVaultOpen(true)} className="text-white px-5 py-3 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border-r border-white/10">
+                  <GoogleDriveIcon /> Unit Drive Vault
+                </button>
+                <a href="https://drive.google.com" target="_blank" rel="noopener noreferrer" className="text-white px-3 py-3 hover:bg-white/10 transition flex items-center gap-2" title="Launch barvickrunch@gmail.com Storage">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                  <span className="text-[10px] font-black">DRIVE</span>
+                </a>
+              </div>
               <button onClick={handleRestoreAllTabs} className="bg-slate-100 hover:bg-slate-200 text-slate-900 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2 border border-slate-200"><RestoreHiddenIcon /> Restore Tabs</button>
               <button onClick={handleExportMasterTemplate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><TemplateExportIcon /> Export Master Template</button>
               <button onClick={() => masterImportRef.current?.click()} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><UploadIcon /> Import Master Template</button>
@@ -859,11 +865,25 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                     <h3 className="text-3xl font-black tracking-tighter uppercase flex items-center gap-4">
                        <GoogleDriveIcon /> Super Admin Cloud Vault
                     </h3>
-                    <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest mt-2">Storage: barvickrunch@gmail.com • Centralized monitoring of all unit MOV uploads • {year}</p>
+                    <div className="flex flex-col gap-1 mt-2">
+                      <div className="flex items-center gap-2">
+                        <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest">DRIVE STORAGE: </p>
+                        <a href="https://drive.google.com" target="_blank" rel="noopener noreferrer" className="text-white text-xs font-black uppercase tracking-widest hover:text-emerald-300 transition underline underline-offset-4 decoration-emerald-500/50">barvickrunch@gmail.com</a>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest">MASTER FOLDER: </p>
+                        <span className="text-white text-xs font-black uppercase tracking-widest">CPSMU MONITORING STORAGE</span>
+                      </div>
+                    </div>
                  </div>
-                 <button onClick={() => setVaultOpen(false)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-colors border border-white/10">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                 </button>
+                 <div className="flex items-center gap-3">
+                   <a href="https://drive.google.com" target="_blank" rel="noopener noreferrer" className="bg-emerald-500 hover:bg-emerald-400 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition flex items-center gap-2 shadow-lg active:scale-95">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg> Launch Storage Root
+                   </a>
+                   <button onClick={() => setVaultOpen(false)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-colors border border-white/10">
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                   </button>
+                 </div>
               </div>
               <div className="p-10 flex-1 overflow-y-auto no-scrollbar">
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -923,9 +943,17 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
                   Unit: {subjectUser.name} • {MONTHS[activeFileCell.monthIdx]} {year}
                </p>
-               <div className="mt-4 flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
-                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{isSyncing ? 'Synchronizing Cloud Vault...' : 'Auto-Sync to barvickrunch@gmail.com Verified'}</span>
+               <div className="mt-4 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{isSyncing ? 'Synchronizing Cloud Vault...' : 'Auto-Sync Active: Individual User Google Storage & barvickrunch@gmail.com Drive'}</span>
+                  </div>
+                  {!isSyncing && (
+                    <div className="flex items-center gap-2 ml-4">
+                      <svg className="w-3 h-3 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                      <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Target Folder: CPSMU MONITORING STORAGE</span>
+                    </div>
+                  )}
                </div>
             </div>
 
@@ -940,7 +968,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                         </div>
                         <div className="truncate">
                           <p className="text-sm font-black text-slate-900 truncate">{file.name}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">DRIVE SYNC ID: {file.id.toUpperCase()}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">SYNC ID: {file.id.toUpperCase()}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

@@ -1,4 +1,3 @@
-
 import { User, UserRole } from './types';
 
 const CHQ_NAMES = [
