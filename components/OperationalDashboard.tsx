@@ -404,7 +404,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const [isSyncing, setIsSyncing] = useState(false);
   const [vaultData, setVaultData] = useState<any[]>([]); // Reactive vault data
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const structureImportRef = useRef<HTMLInputElement>(null);
   const masterImportRef = useRef<HTMLInputElement>(null);
   const [editingActivityField, setEditingActivityField] = useState<{ aid: string; field: 'activity' | 'indicator' } | null>(null);
   const [editFieldName, setEditFieldName] = useState<string>('');
@@ -555,27 +554,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     refresh();
   };
 
-  const handleImportTemplate = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const bstr = evt.target?.result;
-      const wb = XLSX.read(bstr, { type: 'binary' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const data: any[] = XLSX.utils.sheet_to_json(ws);
-      data.forEach(row => {
-        const piId = row['PI ID'];
-        const aid = row['Activity ID'];
-        if (piId && aid) {
-          MONTHS.forEach((m, i) => { if (row[m] !== undefined) saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0); });
-        }
-      });
-      refresh();
-    };
-    reader.readAsBinaryString(file);
-  };
-
   const handleImportMasterTemplate = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -623,7 +601,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const ws = XLSX.utils.json_to_sheet(allData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Master Template");
-    XLSX.writeFile(wb, `Master_Template_${year}.xlsx`);
+    
+    let filename = `Master_Template_${year}.xlsx`;
+    // Specific rename requirement for CHQ CARMU 2026 Accomplishment
+    if (subjectUser.name === 'CHQ CARMU' && year === '2026' && prefix === 'accomplishment') {
+      filename = `CARMU_ACCOMPLISHMENT_2026.xlsx`;
+    }
+    
+    XLSX.writeFile(wb, filename);
   };
 
   const handleMoveTab = (e: React.MouseEvent, piId: string, direction: 'left' | 'right') => {
@@ -878,7 +863,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
       {isFilesModalOpen && activeFileCell && currentPI && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
+          <div className="bg-white w-full max-xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
             <div className="bg-slate-50 p-8 border-b border-slate-100 relative">
                <div className="absolute top-8 right-8 flex items-center gap-4">
                   {isAdmin && <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm"><GoogleDriveIcon /><span className="text-[10px] font-black text-slate-900">DRIVE SYNC</span></div>}
