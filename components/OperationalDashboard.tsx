@@ -8,8 +8,12 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 /**
  * Returns the effective ID for storage, ensuring each unit and dashboard type has its own scope.
+ * Maps SUB_ADMIN to 'sa-1' (Super Admin) for Target Outlook to share data.
  */
-const getEffectiveUserId = (userId: string): string => {
+const getEffectiveUserId = (userId: string, role?: UserRole, prefix?: string): string => {
+  if (role === UserRole.SUB_ADMIN && prefix === 'target') {
+    return 'sa-1';
+  }
   return userId;
 };
 
@@ -77,7 +81,7 @@ const createMonthsForActivity = (prefix: string, year: string, userId: string, p
 };
 
 const getPIDefinitions = (prefix: string, year: string, userId: string, role: UserRole, isConsolidated: boolean, units: User[], ignoreHidden = false) => {
-  const effectiveId = getEffectiveUserId(userId);
+  const effectiveId = getEffectiveUserId(userId, role, prefix);
   const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
   const hiddenPIs: string[] = JSON.parse(localStorage.getItem(hiddenPIsKey) || '[]');
   const orderKey = `${prefix}_pi_order_${year}_${effectiveId}`;
@@ -425,7 +429,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const year = useMemo(() => title.match(/\d{4}/)?.[0] || '2026', [title]);
   const isTargetOutlook = useMemo(() => title.toUpperCase().includes("TARGET OUTLOOK"), [title]);
   const prefix = isTargetOutlook ? 'target' : 'accomplishment';
-  const effectiveId = useMemo(() => getEffectiveUserId(subjectUser.id), [subjectUser.id]);
+  // Map SUB_ADMIN to 'sa-1' only for Target Outlook to share the Super Admin's data
+  const effectiveId = useMemo(() => getEffectiveUserId(subjectUser.id, subjectUser.role, prefix), [subjectUser.id, subjectUser.role, prefix]);
   
   const isAdmin = currentUser.role === UserRole.SUPER_ADMIN || currentUser.role === UserRole.SUB_ADMIN;
   const isOwner = currentUser.id === subjectUser.id;
@@ -908,7 +913,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                                <div className="flex-1 min-w-0">
                                   <p className="font-black text-slate-900 truncate text-sm">{file.name}</p>
                                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{file.unitName}</p>
-                               </div>
+                                </div>
                             </div>
                             <div className="space-y-2 mb-6">
                                <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
