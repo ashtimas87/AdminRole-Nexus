@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { User, UserRole } from '../types';
 import { ROLE_LABELS, MOCK_USERS } from '../constants';
@@ -282,7 +283,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
 
         {(isAdmin || (user.role === UserRole.CHQ && (selectedYear === '2023' || chqUsers.length > 0))) && (
           <div className="space-y-4">
-            <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight flex items-center gap-2">
+            <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">
               <div className="w-2 h-2 rounded-full bg-emerald-600"></div>
               {user.role === UserRole.CHQ ? 'CHQ Units Consolidation' : 'Consolidation of CHQ & Tactical'}
             </h3>
@@ -576,7 +577,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           </button>
         )}
 
-        {(user.role === UserRole.SUPER_ADMIN || user.role === UserRole.CHQ || user.role === UserRole.STATION) && (
+        {(user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN || user.role === UserRole.CHQ || user.role === UserRole.STATION) && (
           <button 
             onClick={() => { setView('target-outlook-landing'); }}
             className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'target-outlook' || view === 'target-outlook-landing' ? 'bg-amber-600 text-white shadow-lg shadow-amber-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
