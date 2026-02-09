@@ -24,7 +24,7 @@ const YEAR_CONFIG = [
 
 const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogout }) => {
   const [view, setView] = useState<ViewType>(() => {
-    if (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN) return 'accounts';
+    if (user.role === UserRole.SUPER_ADMIN) return 'accounts';
     return 'status-terminal';
   });
 
@@ -547,7 +547,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
       </div>
       
       <div className="space-y-4">
-        {isAdmin && (
+        {user.role === UserRole.SUPER_ADMIN && (
           <button 
             onClick={() => setView('accounts')}
             className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'accounts' ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
