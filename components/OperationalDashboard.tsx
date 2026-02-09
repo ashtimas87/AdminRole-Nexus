@@ -553,13 +553,29 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const wb = XLSX.read(bstr, { type: 'binary' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const data: any[] = XLSX.utils.sheet_to_json(ws);
+      
+      const foundPIs = new Set<string>();
       data.forEach(row => {
         const piId = row['PI ID'];
         const aid = row['Activity ID'];
         if (piId && aid) {
+          foundPIs.add(piId);
           MONTHS.forEach((m, i) => { if (row[m] !== undefined) saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0); });
         }
       });
+
+      // Show Activities on the list and hide PI tab not on the list for unit users
+      if (currentUser.role !== UserRole.SUPER_ADMIN) {
+        const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
+        const allPossiblePIs = Object.keys({
+          PI1:1, PI2:1, PI3:1, PI4:1, PI5:1, PI6:1, PI7:1, PI8:1, PI9:1, PI10:1,
+          PI11:1, PI12:1, PI13:1, PI14:1, PI15:1, PI16:1, PI17:1, PI18:1, PI19:1, PI20:1,
+          PI21:1, PI22:1, PI23:1, PI24:1, PI25:1, PI26:1, PI27:1, PI28:1, PI29:1
+        });
+        const newHidden = allPossiblePIs.filter(id => !foundPIs.has(id));
+        localStorage.setItem(hiddenPIsKey, JSON.stringify(newHidden));
+      }
+
       refresh();
     };
     reader.readAsBinaryString(file);
@@ -756,18 +772,20 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           <div className="flex flex-col gap-1"><h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">{title}</h1><p className="text-slate-500 text-xs font-bold uppercase tracking-widest opacity-60">Operations & Accomplishment Control</p></div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {currentUser.role === UserRole.SUPER_ADMIN && (
+          {(currentUser.role === UserRole.SUPER_ADMIN || currentUser.role === UserRole.CHQ || currentUser.role === UserRole.STATION) && (
             <>
-              <div className="flex bg-emerald-600 rounded-2xl shadow-lg overflow-hidden transition hover:bg-emerald-700">
-                <button onClick={() => { setVaultOpen(true); refresh(); }} className="text-white px-5 py-3 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border-r border-white/10">
-                  <GoogleDriveIcon /> Unit Drive Vault
-                </button>
-                <a href="https://drive.google.com" target="_blank" rel="noopener noreferrer" className="text-white px-3 py-3 hover:bg-white/10 transition flex items-center gap-2" title="Launch barvickrunch@gmail.com Storage">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                  <span className="text-[10px] font-black">DRIVE</span>
-                </a>
-              </div>
-              <button onClick={handleRestoreAllTabs} className="bg-slate-100 hover:bg-slate-200 text-slate-900 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2 border border-slate-200"><RestoreHiddenIcon /> Restore Tabs</button>
+              {currentUser.role === UserRole.SUPER_ADMIN && (
+                <div className="flex bg-emerald-600 rounded-2xl shadow-lg overflow-hidden transition hover:bg-emerald-700">
+                  <button onClick={() => { setVaultOpen(true); refresh(); }} className="text-white px-5 py-3 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border-r border-white/10">
+                    <GoogleDriveIcon /> Unit Drive Vault
+                  </button>
+                  <a href="https://drive.google.com" target="_blank" rel="noopener noreferrer" className="text-white px-3 py-3 hover:bg-white/10 transition flex items-center gap-2" title="Launch barvickrunch@gmail.com Storage">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                    <span className="text-[10px] font-black">DRIVE</span>
+                  </a>
+                </div>
+              )}
+              {currentUser.role === UserRole.SUPER_ADMIN && <button onClick={handleRestoreAllTabs} className="bg-slate-100 hover:bg-slate-200 text-slate-900 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2 border border-slate-200"><RestoreHiddenIcon /> Restore Tabs</button>}
               <button onClick={handleExportMasterTemplate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Export Master</button>
               <button onClick={() => masterImportRef.current?.click()} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><UploadIcon /> Import Master</button>
               <input type="file" ref={masterImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportMasterTemplate} />
