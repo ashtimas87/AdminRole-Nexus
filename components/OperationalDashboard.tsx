@@ -605,7 +605,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       data.forEach(row => {
         const piId = row['PI ID'];
         const aid = row['Activity ID'];
-        const activityName = row['Strategic Activity'];
+        // Use 'Activity' as the standard key, fallback to 'Strategic Activity' for backward compatibility
+        const activityName = row['Activity'] || row['Strategic Activity'];
         const indicatorName = row['Performance Indicator'];
 
         if (piId && aid) {
@@ -660,7 +661,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const handleExportExcel = () => {
     if (!currentPI) return;
     const exportData = currentPI.activities.map(act => {
-      const row: any = { 'Strategic Activity': act.activity, 'Performance Indicator': act.indicator };
+      // Changed export header key to 'Activity'
+      const row: any = { 'Activity': act.activity, 'Performance Indicator': act.indicator };
       MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
       row['Total'] = act.total;
       return row;
@@ -675,7 +677,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const allData: any[] = [];
     piData.forEach(pi => {
       pi.activities.forEach(act => {
-        const row: any = { 'PI ID': pi.id, 'Activity ID': act.id, 'Strategic Activity': act.activity, 'Performance Indicator': act.indicator };
+        // Changed export header key to 'Activity'
+        const row: any = { 'PI ID': pi.id, 'Activity ID': act.id, 'Activity': act.activity, 'Performance Indicator': act.indicator };
         MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
         allData.push(row);
       });
@@ -774,7 +777,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
                 {canEditStructure && <th className="px-6 py-4 w-12"></th>}
-                <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[200px]">Strategic Activity</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[200px]">Activity</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[150px]">Performance Indicator</th>
                 {MONTHS.map(m => ( <th key={m} className="px-3 py-4 text-center text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[70px]">{m}</th> ))}
                 <th className="px-6 py-4 text-center text-[10px] font-black uppercase text-slate-900 tracking-widest min-w-[80px]">Total</th>
