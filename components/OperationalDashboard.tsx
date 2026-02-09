@@ -354,6 +354,16 @@ const UploadIcon = () => (
   </svg>
 );
 
+const TemplateExportIcon = () => (
+  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="512" height="512" rx="120" fill="#6366f1" />
+    <path d="M160 120V392H352V200L272 120H160Z" stroke="white" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M210 240H302" stroke="white" strokeWidth="32" strokeLinecap="round" />
+    <path d="M210 290H302" stroke="white" strokeWidth="32" strokeLinecap="round" />
+    <path d="M210 340H260" stroke="white" strokeWidth="32" strokeLinecap="round" />
+  </svg>
+);
+
 const RestoreHiddenIcon = () => (
   <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect width="512" height="512" rx="120" fill="black" />
@@ -555,26 +565,47 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const data: any[] = XLSX.utils.sheet_to_json(ws);
       
       const foundPIs = new Set<string>();
+      const piActivitiesMap: Record<string, string[]> = {};
+
       data.forEach(row => {
         const piId = row['PI ID'];
         const aid = row['Activity ID'];
+        const activityName = row['Strategic Activity'];
+        const indicatorName = row['Performance Indicator'];
+
         if (piId && aid) {
           foundPIs.add(piId);
-          MONTHS.forEach((m, i) => { if (row[m] !== undefined) saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0); });
+          if (!piActivitiesMap[piId]) piActivitiesMap[piId] = [];
+          piActivitiesMap[piId].push(aid);
+
+          // Save names and indicators from file to local storage
+          if (activityName) {
+            localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, activityName);
+          }
+          if (indicatorName) {
+            localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicatorName);
+          }
+
+          // Save monthly data values
+          MONTHS.forEach((m, i) => { 
+            if (row[m] !== undefined) {
+              saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0); 
+            }
+          });
         }
       });
 
-      // Show Activities on the list and hide PI tab not on the list for unit users
-      if (currentUser.role !== UserRole.SUPER_ADMIN) {
-        const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
-        const allPossiblePIs = Object.keys({
-          PI1:1, PI2:1, PI3:1, PI4:1, PI5:1, PI6:1, PI7:1, PI8:1, PI9:1, PI10:1,
-          PI11:1, PI12:1, PI13:1, PI14:1, PI15:1, PI16:1, PI17:1, PI18:1, PI19:1, PI20:1,
-          PI21:1, PI22:1, PI23:1, PI24:1, PI25:1, PI26:1, PI27:1, PI28:1, PI29:1
-        });
-        const newHidden = allPossiblePIs.filter(id => !foundPIs.has(id));
-        localStorage.setItem(hiddenPIsKey, JSON.stringify(newHidden));
-      }
+      // Synchronize the activity structure for each PI based on the Excel list
+      Object.entries(piActivitiesMap).forEach(([piId, aids]) => {
+        const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
+        localStorage.setItem(actIdsKey, JSON.stringify(aids));
+      });
+
+      // Strict visibility control: Hide all tabs NOT present in the import list
+      const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
+      const allPossiblePIs = Array.from({length: 29}, (_, i) => `PI${i+1}`);
+      const newHidden = allPossiblePIs.filter(id => !foundPIs.has(id));
+      localStorage.setItem(hiddenPIsKey, JSON.stringify(newHidden));
 
       refresh();
     };
