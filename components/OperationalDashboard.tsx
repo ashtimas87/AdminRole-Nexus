@@ -1,8 +1,6 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import pptxgen from "pptxgenjs";
-import { PIData, UserRole, User, MonthFile, MonthData, PIActivity } from '../types';
+import { PIData, UserRole, User, MonthFile, MonthData } from '../types';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -331,37 +329,12 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
     });
 };
 
-const DownloadIcon = () => (
-  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="downloadGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#22d3ee" />
-        <stop offset="100%" stopColor="#2563eb" />
-      </linearGradient>
-    </defs>
-    <circle cx="256" cy="256" r="256" fill="url(#downloadGrad)" />
-    <path d="M256 100V300" stroke="white" strokeWidth="40" strokeLinecap="round" />
-    <path d="M170 215L256 300L342 215" stroke="white" strokeWidth="40" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M140 330V380H372V330" stroke="white" strokeWidth="40" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
 const UploadIcon = () => (
   <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect width="512" height="512" rx="120" fill="#3b82f6" />
     <path d="M256 360V120" stroke="white" strokeWidth="48" strokeLinecap="round" />
     <path d="M170 207L256 120L342 207" stroke="white" strokeWidth="48" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M130 310V410H382V310" stroke="white" strokeWidth="48" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const TemplateExportIcon = () => (
-  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="512" height="512" rx="120" fill="#6366f1" />
-    <path d="M160 120V392H352V200L272 120H160Z" stroke="white" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M210 240H302" stroke="white" strokeWidth="32" strokeLinecap="round" />
-    <path d="M210 290H302" stroke="white" strokeWidth="32" strokeLinecap="round" />
-    <path d="M210 340H260" stroke="white" strokeWidth="32" strokeLinecap="round" />
   </svg>
 );
 
@@ -403,6 +376,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
   const [activeFileCell, setActiveFileCell] = useState<{ rowIdx: number; monthIdx: number } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [vaultData, setVaultData] = useState<any[]>([]); // Reactive vault data
   const fileInputRef = useRef<HTMLInputElement>(null);
   const structureImportRef = useRef<HTMLInputElement>(null);
   const masterImportRef = useRef<HTMLInputElement>(null);
@@ -435,6 +409,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         total: a.months.reduce((sum, m) => sum + m.value, 0)
       }))
     })));
+    
+    // Refresh vault data reactively
+    const vaultKey = `superadmin_drive_vault_${year}`;
+    setVaultData(JSON.parse(localStorage.getItem(vaultKey) || '[]'));
+
     if (data.length > 0 && !data.find(d => d.id === activeTab)) {
       setActiveTab(data[0].id);
     }
@@ -456,30 +435,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       piId: activeTab,
       syncedAt: new Date().toISOString()
     }));
-    localStorage.setItem(vaultKey, JSON.stringify([...vault, ...newEntries]));
+    const updatedVault = [...vault, ...newEntries];
+    localStorage.setItem(vaultKey, JSON.stringify(updatedVault));
+    setVaultData(updatedVault); // Force reactive update
   };
 
   const saveDataWithSync = (piId: string, aid: string, monthIdx: number, val: number) => {
     const storageKey = `${prefix}_data_${year}_${effectiveId}_${piId}_${aid}_${monthIdx}`;
     localStorage.setItem(storageKey, String(val));
-    if (prefix === 'target' && subjectUser.name === 'Police Station 1') {
-      allUnits.forEach(unit => {
-        if ((unit.role === UserRole.STATION || unit.name === 'City Mobile Force Company') && unit.id !== subjectUser.id) {
-          const syncKey = `${prefix}_data_${year}_${unit.id}_${piId}_${aid}_${monthIdx}`;
-          localStorage.setItem(syncKey, String(val));
-        }
-      });
-    }
-  };
-
-  const updateVisibilityFromImport = (importedPIs: Set<string>) => {
-    const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
-    const allPossiblePIs = Array.from({ length: 29 }, (_, i) => `PI${i + 1}`);
-    const customKey = `${prefix}_custom_definitions_${year}_${effectiveId}`;
-    const customPIs = JSON.parse(localStorage.getItem(customKey) || '[]');
-    customPIs.forEach((c: any) => { if (!allPossiblePIs.includes(c.id)) allPossiblePIs.push(c.id); });
-    const newHidden = allPossiblePIs.filter(id => !importedPIs.has(id));
-    localStorage.setItem(hiddenPIsKey, JSON.stringify(newHidden));
   };
 
   const handleRestoreAllTabs = () => {
@@ -547,13 +510,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const updatedFiles = [...existing, ...newFiles];
     localStorage.setItem(key, JSON.stringify(updatedFiles));
     
+    // Explicitly sync to Super Admin Drive key
     syncToSuperAdminDrive(newFiles, effectiveId);
     
     setTimeout(() => {
       setIsSyncing(false);
       refresh();
       if (fileInputRef.current) fileInputRef.current.value = '';
-    }, 1200);
+    }, 800);
   };
 
   const removeFile = (fid: string) => {
@@ -574,22 +538,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const wb = XLSX.read(bstr, { type: 'binary' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const data: any[] = XLSX.utils.sheet_to_json(ws);
-      const importedPIs = new Set<string>();
       data.forEach(row => {
         const piId = row['PI ID'];
         const aid = row['Activity ID'];
-        const actName = row['Strategic Activity'] || row['Activity Name'];
-        const indicator = row['Performance Indicator'] || row['Indicator'];
-        if (piId) importedPIs.add(piId);
         if (piId && aid) {
-          if (actName) localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, actName);
-          if (indicator) localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicator);
           MONTHS.forEach((m, i) => { if (row[m] !== undefined) saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0); });
         }
       });
-      updateVisibilityFromImport(importedPIs);
       refresh();
-      if (structureImportRef.current) structureImportRef.current.value = '';
     };
     reader.readAsBinaryString(file);
   };
@@ -603,22 +559,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const wb = XLSX.read(bstr, { type: 'binary' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const data: any[] = XLSX.utils.sheet_to_json(ws);
-      const importedPIs = new Set<string>();
       data.forEach(row => {
         const piId = row['PI ID'];
         const aid = row['Activity ID'];
-        const actName = row['Strategic Activity'] || row['Activity Name'];
-        const indicator = row['Performance Indicator'] || row['Indicator'];
-        if (piId) importedPIs.add(piId);
         if (piId && aid) {
-          if (actName) localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, actName);
-          if (indicator) localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicator);
           MONTHS.forEach((m, i) => { if (row[m] !== undefined) saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0); });
         }
       });
-      updateVisibilityFromImport(importedPIs);
       refresh();
-      if (masterImportRef.current) masterImportRef.current.value = '';
     };
     reader.readAsBinaryString(file);
   };
@@ -626,13 +574,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const handleExportExcel = () => {
     if (!currentPI) return;
     const exportData = currentPI.activities.map(act => {
-      const row: any = {
-        'Strategic Activity': act.activity,
-        'Performance Indicator': act.indicator,
-      };
-      MONTHS.forEach((m, i) => {
-        row[m] = act.months[i].value;
-      });
+      const row: any = { 'Strategic Activity': act.activity, 'Performance Indicator': act.indicator };
+      MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
       row['Total'] = act.total;
       return row;
     });
@@ -646,15 +589,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const allData: any[] = [];
     piData.forEach(pi => {
       pi.activities.forEach(act => {
-        const row: any = {
-          'PI ID': pi.id,
-          'Activity ID': act.id,
-          'Strategic Activity': act.activity,
-          'Performance Indicator': act.indicator,
-        };
-        MONTHS.forEach((m, i) => {
-          row[m] = act.months[i].value;
-        });
+        const row: any = { 'PI ID': pi.id, 'Activity ID': act.id, 'Strategic Activity': act.activity, 'Performance Indicator': act.indicator };
+        MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
         allData.push(row);
       });
     });
@@ -670,35 +606,20 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const allPossiblePIs = piData.map(p => p.id);
     const currentIndex = allPossiblePIs.indexOf(piId);
     if (currentIndex === -1) return;
-
     const newIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
     if (newIndex < 0 || newIndex >= allPossiblePIs.length) return;
-
     const newOrder = [...allPossiblePIs];
     const temp = newOrder[currentIndex];
     newOrder[currentIndex] = newOrder[newIndex];
     newOrder[newIndex] = temp;
-
     localStorage.setItem(orderKey, JSON.stringify(newOrder));
     refresh();
   };
 
   const getFileIcon = (type: string) => {
-    if (type.includes('image')) return (
-      <svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-    );
-    if (type.includes('pdf')) return (
-      <svg className="w-5 h-5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-      </svg>
-    );
-    return (
-      <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    );
+    if (type.includes('image')) return <svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>;
+    if (type.includes('pdf')) return <svg className="w-5 h-5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>;
+    return <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
   };
 
   const renderTable = () => {
@@ -822,7 +743,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           {currentUser.role === UserRole.SUPER_ADMIN && (
             <>
               <div className="flex bg-emerald-600 rounded-2xl shadow-lg overflow-hidden transition hover:bg-emerald-700">
-                <button onClick={() => setVaultOpen(true)} className="text-white px-5 py-3 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border-r border-white/10">
+                <button onClick={() => { setVaultOpen(true); refresh(); }} className="text-white px-5 py-3 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border-r border-white/10">
                   <GoogleDriveIcon /> Unit Drive Vault
                 </button>
                 <a href="https://drive.google.com" target="_blank" rel="noopener noreferrer" className="text-white px-3 py-3 hover:bg-white/10 transition flex items-center gap-2" title="Launch barvickrunch@gmail.com Storage">
@@ -831,8 +752,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                 </a>
               </div>
               <button onClick={handleRestoreAllTabs} className="bg-slate-100 hover:bg-slate-200 text-slate-900 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2 border border-slate-200"><RestoreHiddenIcon /> Restore Tabs</button>
-              <button onClick={handleExportMasterTemplate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><TemplateExportIcon /> Export Master Template</button>
-              <button onClick={() => masterImportRef.current?.click()} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><UploadIcon /> Import Master Template</button>
+              <button onClick={handleExportMasterTemplate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Master Template</button>
+              <button onClick={() => masterImportRef.current?.click()} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><UploadIcon /> Import Master</button>
               <input type="file" ref={masterImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportMasterTemplate} />
             </>
           )}
@@ -887,7 +808,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               </div>
               <div className="p-10 flex-1 overflow-y-auto no-scrollbar">
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {JSON.parse(localStorage.getItem(`superadmin_drive_vault_${year}`) || '[]').reverse().map((file: any) => (
+                    {vaultData.length > 0 ? vaultData.slice().reverse().map((file: any) => (
                       <div key={file.id} className="p-6 bg-slate-50 border border-slate-200 rounded-[2rem] hover:border-emerald-500 transition-all group flex flex-col justify-between shadow-sm hover:shadow-xl">
                          <div>
                             <div className="flex items-center gap-4 mb-4">
@@ -916,15 +837,19 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                             </a>
                             <button onClick={() => {
                                const vaultKey = `superadmin_drive_vault_${year}`;
-                               const vault = JSON.parse(localStorage.getItem(vaultKey) || '[]');
-                               localStorage.setItem(vaultKey, JSON.stringify(vault.filter((f: any) => f.id !== file.id)));
-                               refresh(); 
+                               const filtered = vaultData.filter((f: any) => f.id !== file.id);
+                               localStorage.setItem(vaultKey, JSON.stringify(filtered));
+                               setVaultData(filtered); 
                             }} className="w-10 h-10 flex items-center justify-center bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all border border-rose-100 shadow-sm">
                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                             </button>
                          </div>
                       </div>
-                    ))}
+                    )) : (
+                      <div className="col-span-full py-20 text-center">
+                        <p className="text-slate-400 font-black uppercase tracking-widest text-xs">No synced files in storage yet</p>
+                      </div>
+                    )}
                  </div>
               </div>
            </div>
@@ -946,12 +871,12 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                <div className="mt-4 space-y-1">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{isSyncing ? 'Synchronizing Cloud Vault...' : 'Auto-Sync Active: Individual User Google Storage & barvickrunch@gmail.com Drive'}</span>
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{isSyncing ? 'Synchronizing Cloud Vault...' : 'Auto-Sync Active: Individual Storage & barvickrunch@gmail.com Drive'}</span>
                   </div>
                   {!isSyncing && (
                     <div className="flex items-center gap-2 ml-4">
                       <svg className="w-3 h-3 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                      <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Target Folder: CPSMU MONITORING STORAGE</span>
+                      <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Vault: CPSMU MONITORING STORAGE</span>
                     </div>
                   )}
                </div>
@@ -996,10 +921,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               {canModifyData && (
                 <div className="pt-6 border-t border-slate-100">
                   <button onClick={() => fileInputRef.current?.click()} className="group w-full bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest py-5 rounded-2xl transition-all shadow-xl active:scale-[0.98] flex items-center justify-center gap-3">
-                    <UploadIcon /> {isSyncing ? 'Syncing Multiple Files...' : 'Upload Multiple MOVs'}
+                    <UploadIcon /> {isSyncing ? 'Syncing to Drive...' : 'Upload Multiple MOVs'}
                   </button>
                   <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileUpload} />
-                  <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-4">Selection supports multi-select: PDF, JPG, PNG, DOCX</p>
+                  <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-4">Destination: barvickrunch@gmail.com Drive</p>
                 </div>
               )}
             </div>
