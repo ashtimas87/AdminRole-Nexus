@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { PIData, UserRole, User, MonthFile, MonthData } from '../types';
+import pptxgen from "pptxgenjs";
+import { PIData, UserRole, User, MonthFile, MonthData, PIActivity } from '../types';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -329,12 +330,37 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
     });
 };
 
+const DownloadIcon = () => (
+  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="downloadGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#22d3ee" />
+        <stop offset="100%" stopColor="#2563eb" />
+      </linearGradient>
+    </defs>
+    <circle cx="256" cy="256" r="256" fill="url(#downloadGrad)" />
+    <path d="M256 100V300" stroke="white" strokeWidth="40" strokeLinecap="round" />
+    <path d="M170 215L256 300L342 215" stroke="white" strokeWidth="40" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M140 330V380H372V330" stroke="white" strokeWidth="40" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const UploadIcon = () => (
   <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect width="512" height="512" rx="120" fill="#3b82f6" />
     <path d="M256 360V120" stroke="white" strokeWidth="48" strokeLinecap="round" />
     <path d="M170 207L256 120L342 207" stroke="white" strokeWidth="48" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M130 310V410H382V310" stroke="white" strokeWidth="48" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const TemplateExportIcon = () => (
+  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="512" height="512" rx="120" fill="#6366f1" />
+    <path d="M160 120V392H352V200L272 120H160Z" stroke="white" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M210 240H302" stroke="white" strokeWidth="32" strokeLinecap="round" />
+    <path d="M210 290H302" stroke="white" strokeWidth="32" strokeLinecap="round" />
+    <path d="M210 340H260" stroke="white" strokeWidth="32" strokeLinecap="round" />
   </svg>
 );
 
@@ -643,12 +669,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                 {isAdmin && <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[8px] border border-emerald-500/30 font-black uppercase tracking-widest">Global Drive Oversight</span>}
               </p>
             </div>
-            {canModifyData && (
-              <div className="flex gap-3">
-                <button onClick={() => structureImportRef.current?.click()} className="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center gap-2"><UploadIcon /> Import Structure</button>
-                <input type="file" ref={structureImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportTemplate} />
-              </div>
-            )}
           </div>
         </div>
         <div className="overflow-x-auto no-scrollbar">
