@@ -14,10 +14,10 @@ const CHQ_NAMES = [
 ];
 
 export const MOCK_USERS: User[] = [
-  // 1 Super Admin with the requested password and updated email
+  // Updated Super Admin email to barvickrunch@gmail.com
   {
     id: 'sa-1',
-    email: 'superadmin@gmail.com',
+    email: 'barvickrunch@gmail.com',
     password: 'Josepidal99',
     name: 'Super Admin',
     role: UserRole.SUPER_ADMIN,

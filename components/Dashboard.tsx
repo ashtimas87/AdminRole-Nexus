@@ -39,7 +39,6 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({ name: '', email: '', password: '', role: UserRole.STATION });
 
-  // Add state to trigger total updates when data changes
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const roleConfig = ROLE_LABELS[user.role];
@@ -50,7 +49,6 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
     localStorage.setItem('adminrole_users_list', JSON.stringify(usersList));
   }, [usersList]);
 
-  // Helper to calculate totals for display
   const calculateUserTotal = (userId: string, year: string, prefix: 'target' | 'accomplishment') => {
     let total = 0;
     const matchPrefix = `${prefix}_data_${year}_${userId}_`;
@@ -253,7 +251,11 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
   const renderUnitOversight = () => {
     if (!canSeeOversight) return null;
     const { subAdminUsers, chqUsers, specialUsers, stationUsers } = getFilteredUnits();
-    const allRelevantUnits = [...chqUsers, ...stationUsers, ...specialUsers];
+    
+    // For CHQ Users, consolidation should NOT reflect data from stations.
+    const relevantForConsolidation = user.role === UserRole.CHQ 
+      ? chqUsers 
+      : [...chqUsers, ...stationUsers, ...specialUsers];
 
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -277,7 +279,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           <div className="space-y-4">
             <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-600"></div>
-              Consolidation of CHQ & Tactical
+              {user.role === UserRole.CHQ ? 'CHQ Units Consolidation' : 'Consolidation of CHQ & Tactical'}
             </h3>
             <div 
               onClick={() => { setSelectedOverviewUser(user); setView('operational-dashboard'); }} 
@@ -287,13 +289,13 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
               </div>
               <div className="flex-1">
-                <p className="text-xl font-black text-white">CHQ & Tactical Consolidated {selectedYear}</p>
+                <p className="text-xl font-black text-white">{user.role === UserRole.CHQ ? `CHQ Accomplishment ${selectedYear}` : `CHQ & Tactical Consolidated ${selectedYear}`}</p>
                 <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">ACTIVITY DATA ACCOMPLISHMENT</p>
               </div>
               <div className="text-right">
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Accomplishment</p>
                 <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg font-black text-lg">
-                  {calculateConsolidatedTotal(allRelevantUnits, selectedYear, 'accomplishment').toLocaleString()}
+                  {calculateConsolidatedTotal(relevantForConsolidation, selectedYear, 'accomplishment').toLocaleString()}
                 </div>
               </div>
             </div>
@@ -379,7 +381,11 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
 
   const renderTargetOutlookLanding = () => {
     const { subAdminUsers, chqUsers, specialUsers, stationUsers } = getFilteredUnits();
-    const allRelevantUnits = [...chqUsers, ...stationUsers, ...specialUsers];
+    
+    // For CHQ Users, consolidation should NOT reflect data from stations.
+    const relevantForConsolidation = user.role === UserRole.CHQ 
+      ? chqUsers 
+      : [...chqUsers, ...stationUsers, ...specialUsers];
 
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -428,7 +434,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
               </div>
             )}
 
-            <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">Consolidation of CHQ & Tactical</h3>
+            <h3 className="text-lg font-black border-b pb-2 text-slate-800 uppercase tracking-tight">{user.role === UserRole.CHQ ? 'CHQ Units Target Consolidation' : 'Consolidation of CHQ & Tactical'}</h3>
             <div 
               onClick={() => { setSelectedOverviewUser(user); setView('target-outlook'); }} 
               className="w-full flex items-center gap-5 p-6 bg-amber-900 rounded-3xl border-2 border-amber-800 hover:border-amber-400 transition-all text-left cursor-pointer shadow-xl group"
@@ -437,13 +443,13 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
               </div>
               <div className="flex-1">
-                <p className="text-xl font-black text-white">Operational Target Outlook {selectedYear}</p>
+                <p className="text-xl font-black text-white">{user.role === UserRole.CHQ ? `CHQ Target Outlook ${selectedYear}` : `Operational Target Outlook ${selectedYear}`}</p>
                 <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">OFFICE MASTER PROJECTIONS</p>
               </div>
               <div className="text-right">
                 <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Total Target</p>
                 <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3 py-1 rounded-lg font-black text-lg">
-                  {calculateConsolidatedTotal(allRelevantUnits, selectedYear, 'target').toLocaleString()}
+                  {calculateConsolidatedTotal(relevantForConsolidation, selectedYear, 'target').toLocaleString()}
                 </div>
               </div>
             </div>
@@ -616,7 +622,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
         if (user.role === UserRole.CHQ) return `CHQ ${year} Accomplishment`;
       }
       if (isSubAdminUnit || (isSelf && user.role === UserRole.SUPER_ADMIN)) {
-        return `CHQ & Tactical Consolidation ${year} Accomplishment`;
+        return user.role === UserRole.CHQ ? `CHQ Units Accomplishment ${year}` : `CHQ & Tactical Consolidation ${year} Accomplishment`;
       }
       const typeLabel = targetUser.role === UserRole.STATION ? 'Tactical Accomplishment' : 'CHQ Accomplishment';
       return `${targetUser.name} ${year} ${typeLabel}`;
@@ -653,7 +659,10 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
               onBack={() => { setView(canSeeOversight ? 'unit-oversight' : 'status-terminal'); setRefreshTrigger(t => t + 1); }} 
               currentUser={user} 
               subjectUser={selectedOverviewUser}
-              allUnits={usersList.filter(u => u.role === UserRole.STATION || u.role === UserRole.CHQ)} 
+              allUnits={usersList.filter(u => {
+                if (user.role === UserRole.CHQ) return u.role === UserRole.CHQ;
+                return u.role === UserRole.STATION || u.role === UserRole.CHQ;
+              })} 
             />
           )}
           {view === 'target-outlook' && selectedOverviewUser && (
@@ -662,7 +671,10 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
               onBack={() => { setView('target-outlook-landing'); setRefreshTrigger(t => t + 1); }} 
               currentUser={user} 
               subjectUser={selectedOverviewUser} 
-              allUnits={usersList.filter(u => u.role === UserRole.STATION || u.role === UserRole.CHQ)} 
+              allUnits={usersList.filter(u => {
+                if (user.role === UserRole.CHQ) return u.role === UserRole.CHQ;
+                return u.role === UserRole.STATION || u.role === UserRole.CHQ;
+              })} 
             />
           )}
         </div>

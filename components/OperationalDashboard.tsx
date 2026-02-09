@@ -423,7 +423,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const canModifyData = isOwner || currentUser.role === UserRole.SUPER_ADMIN || (currentUser.role === UserRole.SUB_ADMIN && subjectUser.role === UserRole.STATION);
   const canEditStructure = currentUser.role === UserRole.SUPER_ADMIN;
 
-  // File access control: Only owner, Super Admin, or Sub Admin can view files.
   const canAccessFiles = isOwner || isAdmin;
 
   const refresh = () => {
@@ -446,10 +445,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const currentPI = useMemo(() => piData.find(pi => pi.id === activeTab) || piData[0], [piData, activeTab]);
   const isPercent = useMemo(() => ["PI4", "PI9", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(activeTab), [activeTab]);
 
-  /**
-   * Simulated Google Drive automatic sync logic.
-   * Super Admin has access to the Drive Vault which records all unit uploads.
-   */
   const syncToSuperAdminDrive = (files: MonthFile[], unitId: string) => {
     const vaultKey = `superadmin_drive_vault_${year}`;
     const vault: any[] = JSON.parse(localStorage.getItem(vaultKey) || '[]');
@@ -520,7 +515,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     setIsFilesModalOpen(true);
   };
 
-  // Fixed handleFileUpload type casting to resolve unknown type errors
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !activeFileCell || !currentPI) return;
@@ -553,7 +547,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const updatedFiles = [...existing, ...newFiles];
     localStorage.setItem(key, JSON.stringify(updatedFiles));
     
-    // Automatic sync to drive vault
     syncToSuperAdminDrive(newFiles, effectiveId);
     
     setTimeout(() => {
@@ -630,7 +623,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     reader.readAsBinaryString(file);
   };
 
-  // Implemented missing handleExportExcel function
   const handleExportExcel = () => {
     if (!currentPI) return;
     const exportData = currentPI.activities.map(act => {
@@ -650,7 +642,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     XLSX.writeFile(wb, `${subjectUser.name}_${activeTab}_${year}.xlsx`);
   };
 
-  // Implemented missing handleExportMasterTemplate function
   const handleExportMasterTemplate = () => {
     const allData: any[] = [];
     piData.forEach(pi => {
@@ -673,7 +664,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     XLSX.writeFile(wb, `Master_Template_${year}.xlsx`);
   };
 
-  // Implemented missing handleMoveTab function
   const handleMoveTab = (e: React.MouseEvent, piId: string, direction: 'left' | 'right') => {
     e.stopPropagation();
     const orderKey = `${prefix}_pi_order_${year}_${effectiveId}`;
@@ -869,7 +859,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                     <h3 className="text-3xl font-black tracking-tighter uppercase flex items-center gap-4">
                        <GoogleDriveIcon /> Super Admin Cloud Vault
                     </h3>
-                    <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest mt-2">Centralized monitoring of all unit MOV uploads • {year}</p>
+                    <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest mt-2">Storage: barvickrunch@gmail.com • Centralized monitoring of all unit MOV uploads • {year}</p>
                  </div>
                  <button onClick={() => setVaultOpen(false)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-colors border border-white/10">
                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -908,7 +898,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                                const vaultKey = `superadmin_drive_vault_${year}`;
                                const vault = JSON.parse(localStorage.getItem(vaultKey) || '[]');
                                localStorage.setItem(vaultKey, JSON.stringify(vault.filter((f: any) => f.id !== file.id)));
-                               refresh(); // Force re-render of vault list
+                               refresh(); 
                             }} className="w-10 h-10 flex items-center justify-center bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all border border-rose-100 shadow-sm">
                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                             </button>
@@ -921,7 +911,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         </div>
       )}
 
-      {/* Monthly Files/MOVs Modal */}
       {isFilesModalOpen && activeFileCell && currentPI && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
@@ -936,7 +925,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                </p>
                <div className="mt-4 flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
-                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{isSyncing ? 'Synchronizing Cloud Vault...' : 'Auto-Sync Verified to Super Admin Account'}</span>
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{isSyncing ? 'Synchronizing Cloud Vault...' : 'Auto-Sync to barvickrunch@gmail.com Verified'}</span>
                </div>
             </div>
 
@@ -951,7 +940,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                         </div>
                         <div className="truncate">
                           <p className="text-sm font-black text-slate-900 truncate">{file.name}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">CLOUD SYNC ID: {file.id.toUpperCase()}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">DRIVE SYNC ID: {file.id.toUpperCase()}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
