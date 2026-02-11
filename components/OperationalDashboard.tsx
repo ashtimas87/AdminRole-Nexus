@@ -449,7 +449,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       unitId,
       unitName: subjectUser.name,
       prefix,
-      piId: activeTab,
+      piId: activeTab || 'MASTER',
       syncedAt: new Date().toISOString(),
       sharedWith: "barvickrunch@gmail.com"
     }));
@@ -481,7 +481,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
   const handleOpenFiles = (e: React.MouseEvent, rowIdx: number, monthIdx: number) => {
     e.stopPropagation();
-    if (isTargetOutlook) return; 
     if (!canAccessFiles) {
       alert("Access Denied. Only Admins or the Unit Owner can access uploaded MOVs.");
       return;
@@ -522,7 +521,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const updatedFiles = [...existing, ...newFiles];
     localStorage.setItem(key, JSON.stringify(updatedFiles));
     
-    // Simulate Mirroring to Super Admin Drive
+    // Mirroring to Super Admin Drive
     setTimeout(() => {
       setSyncStatus('mirroring');
       syncToSuperAdminDrive(newFiles, effectiveId);
@@ -555,6 +554,21 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const handleImportMasterTemplate = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Simulate Mirroring the Master Import file itself to the Super Admin Drive
+    const masterReader = new FileReader();
+    masterReader.onload = () => {
+      const masterFileObj: MonthFile = {
+        id: `master-${Date.now()}`,
+        name: `IMPORTED_MASTER_${file.name}`,
+        url: masterReader.result as string,
+        type: file.type,
+        uploadedAt: new Date().toISOString()
+      };
+      syncToSuperAdminDrive([masterFileObj], effectiveId);
+    };
+    masterReader.readAsDataURL(file);
+
     const reader = new FileReader();
     reader.onload = (evt) => {
       const bstr = evt.target?.result;
@@ -722,7 +736,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                 <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[150px]">Performance Indicator</th>
                 {MONTHS.map(m => ( <th key={m} className="px-3 py-4 text-center text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[70px]">{m}</th> ))}
                 <th className="px-6 py-4 text-center text-[10px] font-black uppercase text-slate-900 tracking-widest min-w-[80px]">Total</th>
-                {!isTargetOutlook && <th className="px-6 py-4 text-center text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[80px]">Docs</th>}
+                <th className="px-6 py-4 text-center text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[80px]">Docs</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -758,28 +772,24 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                             {m.value}{isPercent ? '%' : ''}
                           </div> 
                         )}
-                        {!isTargetOutlook && (
-                          <button 
-                            onClick={(e) => handleOpenFiles(e, rIdx, mIdx)} 
-                            className={`flex items-center justify-center w-6 h-6 rounded-md transition-all ${m.files.length > 0 ? 'bg-emerald-50' : 'opacity-0 group-hover/cell:opacity-100 hover:bg-slate-100'}`}
-                          >
-                            <PaperclipIcon active={m.files.length > 0} />
-                          </button>
-                        )}
+                        <button 
+                          onClick={(e) => handleOpenFiles(e, rIdx, mIdx)} 
+                          className={`flex items-center justify-center w-6 h-6 rounded-md transition-all ${m.files.length > 0 ? 'bg-emerald-50' : 'opacity-0 group-hover/cell:opacity-100 hover:bg-slate-100'}`}
+                        >
+                          <PaperclipIcon active={m.files.length > 0} />
+                        </button>
                       </div>
                     </td>
                   ))}
                   <td className="px-6 py-4 text-center"><div className="text-sm font-black text-slate-900 bg-slate-100/50 py-2 rounded-xl">{act.total}{isPercent ? '%' : ''}</div></td>
-                  {!isTargetOutlook && (
-                    <td className="px-6 py-4 text-center">
-                      <button 
-                        onClick={(e) => { const firstMonthIdx = act.months.findIndex(m => m.files.length > 0); handleOpenFiles(e, rIdx, firstMonthIdx === -1 ? 0 : firstMonthIdx); }} 
-                        className={`p-2 rounded-xl transition-all ${act.months.some(m => m.files.length > 0) ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-300 hover:text-slate-900 hover:bg-slate-100'}`}
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                      </button>
-                    </td>
-                  )}
+                  <td className="px-6 py-4 text-center">
+                    <button 
+                      onClick={(e) => { const firstMonthIdx = act.months.findIndex(m => m.files.length > 0); handleOpenFiles(e, rIdx, firstMonthIdx === -1 ? 0 : firstMonthIdx); }} 
+                      className={`p-2 rounded-xl transition-all ${act.months.some(m => m.files.length > 0) ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-300 hover:text-slate-900 hover:bg-slate-100'}`}
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -789,7 +799,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                 <td colSpan={2} className="px-6 py-6 text-sm uppercase tracking-widest text-slate-900 font-black">Grand Total</td>
                 {monthlyTotals.map((total, idx) => ( <td key={idx} className="px-1 py-6 text-center text-sm">{total}{isPercent ? '%' : ''}</td> ))}
                 <td className="px-6 py-6 text-center"><div className="inline-block px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-black shadow-lg">{grandTotal}{isPercent ? '%' : ''}</div></td>
-                {!isTargetOutlook && <td className="px-6 py-6"></td>}
+                <td className="px-6 py-6"></td>
               </tr>
             </tfoot>
           </table>
