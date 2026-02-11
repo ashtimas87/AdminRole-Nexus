@@ -55,21 +55,18 @@ const createMonthsForActivity = (prefix: string, year: string, userId: string, p
     let value = 0;
     
     // Check if there is an explicit value stored for this user (e.g. from import or manual edit)
-    // This allows manual overrides or imported data to take precedence over consolidation logic
     const key = `${prefix}_data_${year}_${userId}_${piId}_${activityId}_${mIdx}`;
     const stored = localStorage.getItem(key);
 
     if (stored !== null) {
       value = parseInt(stored, 10);
     } else if ((prefix === 'accomplishment' || prefix === 'target') && isConsolidated && units.length > 0) {
-      // Fallback to consolidation if no explicit value. Now supports both Accomplishment and Target.
       value = units.reduce((sum, unit) => {
         const unitKey = `${prefix}_data_${year}_${unit.id}_${piId}_${activityId}_${mIdx}`;
         const val = localStorage.getItem(unitKey);
         return sum + (val ? parseInt(val, 10) : 0);
       }, 0);
     } else {
-      // Fallback to default
       value = defaultValues[mIdx] || 0;
     }
 
@@ -324,8 +321,6 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
       const activities = activityIds.map(aid => {
         const base = pi.activities.find((a: any) => a.id === aid);
         
-        // Zero out defaults for Accomplishment and Target dashboards when using specific roles,
-        // to prevent hardcoded defaults from appearing as valid data.
         let effectiveDefaults = base?.defaults || Array(12).fill(0);
         if ((prefix === 'accomplishment' || prefix === 'target') && (role === UserRole.CHQ || role === UserRole.STATION)) {
           effectiveDefaults = Array(12).fill(0);
@@ -347,48 +342,6 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
     });
 };
 
-const DownloadIcon = () => (
-  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="downloadGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#22d3ee" />
-        <stop offset="100%" stopColor="#2563eb" />
-      </linearGradient>
-    </defs>
-    <circle cx="256" cy="256" r="256" fill="url(#downloadGrad)" />
-    <path d="M256 100V300" stroke="white" strokeWidth="40" strokeLinecap="round" />
-    <path d="M170 215L256 300L342 215" stroke="white" strokeWidth="40" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M140 330V380H372V330" stroke="white" strokeWidth="40" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const UploadIcon = () => (
-  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="512" height="512" rx="120" fill="#3b82f6" />
-    <path d="M256 360V120" stroke="white" strokeWidth="48" strokeLinecap="round" />
-    <path d="M170 207L256 120L342 207" stroke="white" strokeWidth="48" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M130 310V410H382V310" stroke="white" strokeWidth="48" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const TemplateExportIcon = () => (
-  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="512" height="512" rx="120" fill="#6366f1" />
-    <path d="M160 120V392H352V200L272 120H160Z" stroke="white" strokeWidth="32" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M210 240H302" stroke="white" strokeWidth="32" strokeLinecap="round" />
-    <path d="M210 290H302" stroke="white" strokeWidth="32" strokeLinecap="round" />
-    <path d="M210 340H260" stroke="white" strokeWidth="32" strokeLinecap="round" />
-  </svg>
-);
-
-const RestoreHiddenIcon = () => (
-  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="512" height="512" rx="120" fill="black" />
-    <path d="M360 152L152 360" stroke="white" strokeWidth="56" strokeLinecap="round" />
-    <path d="M152 240V360H272" stroke="white" strokeWidth="56" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
 const PaperclipIcon = ({ active }: { active?: boolean }) => (
   <svg className={`w-3.5 h-3.5 ${active ? 'text-emerald-500' : 'text-slate-300 group-hover/cell:text-slate-400'} transition-colors`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
@@ -409,6 +362,23 @@ const FolderIcon = () => (
   </svg>
 );
 
+const UploadIcon = () => (
+  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="512" height="512" rx="120" fill="#3b82f6" />
+    <path d="M256 360V120" stroke="white" strokeWidth="48" strokeLinecap="round" />
+    <path d="M170 207L256 120L342 207" stroke="white" strokeWidth="48" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M130 310V410H382V310" stroke="white" strokeWidth="48" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const RestoreHiddenIcon = () => (
+  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="512" height="512" rx="120" fill="black" />
+    <path d="M360 152L152 360" stroke="white" strokeWidth="56" strokeLinecap="round" />
+    <path d="M152 240V360H272" stroke="white" strokeWidth="56" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 interface OperationalDashboardProps {
   title: string;
   onBack: () => void;
@@ -424,8 +394,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const [editValue, setEditValue] = useState<string>('');
   const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
   const [activeFileCell, setActiveFileCell] = useState<{ rowIdx: number; monthIdx: number } | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [vaultData, setVaultData] = useState<any[]>([]); // Reactive vault data
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'local' | 'mirroring' | 'complete'>('idle');
+  const [vaultData, setVaultData] = useState<any[]>([]); 
   const [vaultFolder, setVaultFolder] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const masterImportRef = useRef<HTMLInputElement>(null);
@@ -436,22 +406,18 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const year = useMemo(() => title.match(/\d{4}/)?.[0] || '2026', [title]);
   const isTargetOutlook = useMemo(() => title.toUpperCase().includes("TARGET OUTLOOK"), [title]);
   const prefix = isTargetOutlook ? 'target' : 'accomplishment';
-  // Map SUB_ADMIN to 'sa-1' only for Target Outlook to share the Super Admin's data
   const effectiveId = useMemo(() => getEffectiveUserId(subjectUser.id, subjectUser.role, prefix), [subjectUser.id, subjectUser.role, prefix]);
   
   const isAdmin = currentUser.role === UserRole.SUPER_ADMIN || currentUser.role === UserRole.SUB_ADMIN;
   const isOwner = currentUser.id === subjectUser.id;
   const isHeadOfficeView = subjectUser.id === currentUser.id || subjectUser.role === UserRole.SUB_ADMIN;
-  // Enable consolidation for both Accomplishment and Target Outlook when in a head office/aggregated view
   const isConsolidated = (prefix === 'accomplishment' || prefix === 'target') && isHeadOfficeView;
   
   const canModifyData = isOwner || currentUser.role === UserRole.SUPER_ADMIN || (currentUser.role === UserRole.SUB_ADMIN && subjectUser.role === UserRole.STATION);
   const canEditStructure = currentUser.role === UserRole.SUPER_ADMIN;
-
   const canAccessFiles = isOwner || isAdmin;
 
   const refresh = () => {
-    // Pass units to consolidate for both Accomplishment and Target Outlook
     const unitsToConsolidate = (prefix === 'accomplishment' || prefix === 'target') ? allUnits : [];
     const data = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate);
     setPiData(data.map(d => ({
@@ -462,7 +428,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       }))
     })));
     
-    // Refresh vault data reactively
     const vaultKey = `superadmin_drive_vault_${year}`;
     setVaultData(JSON.parse(localStorage.getItem(vaultKey) || '[]'));
 
@@ -485,23 +450,17 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       unitName: subjectUser.name,
       prefix,
       piId: activeTab,
-      syncedAt: new Date().toISOString()
+      syncedAt: new Date().toISOString(),
+      sharedWith: "barvickrunch@gmail.com"
     }));
     const updatedVault = [...vault, ...newEntries];
     localStorage.setItem(vaultKey, JSON.stringify(updatedVault));
-    setVaultData(updatedVault); // Force reactive update
+    setVaultData(updatedVault); 
   };
 
   const saveDataWithSync = (piId: string, aid: string, monthIdx: number, val: number) => {
     const storageKey = `${prefix}_data_${year}_${effectiveId}_${piId}_${aid}_${monthIdx}`;
     localStorage.setItem(storageKey, String(val));
-  };
-
-  const handleRestoreAllTabs = () => {
-    if (!confirm('Restore all hidden Performance Indicator tabs?')) return;
-    const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
-    localStorage.removeItem(hiddenPIsKey);
-    refresh();
   };
 
   const handleCellClick = (rowIdx: number, monthIdx: number, val: number) => {
@@ -522,7 +481,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
   const handleOpenFiles = (e: React.MouseEvent, rowIdx: number, monthIdx: number) => {
     e.stopPropagation();
-    if (isTargetOutlook) return; // Disable file open in Target Outlook
+    if (isTargetOutlook) return; 
     if (!canAccessFiles) {
       alert("Access Denied. Only Admins or the Unit Owner can access uploaded MOVs.");
       return;
@@ -535,7 +494,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const files = e.target.files;
     if (!files || files.length === 0 || !activeFileCell || !currentPI) return;
     
-    setIsSyncing(true);
+    setSyncStatus('local');
     const aid = currentPI.activities[activeFileCell.rowIdx].id;
     const key = `${prefix}_files_${year}_${effectiveId}_${activeTab}_${aid}_${activeFileCell.monthIdx}`;
     const existing: MonthFile[] = JSON.parse(localStorage.getItem(key) || '[]');
@@ -563,13 +522,17 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const updatedFiles = [...existing, ...newFiles];
     localStorage.setItem(key, JSON.stringify(updatedFiles));
     
-    // Explicitly sync to Super Admin Drive key
-    syncToSuperAdminDrive(newFiles, effectiveId);
-    
+    // Simulate Mirroring to Super Admin Drive
     setTimeout(() => {
-      setIsSyncing(false);
-      refresh();
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setSyncStatus('mirroring');
+      syncToSuperAdminDrive(newFiles, effectiveId);
+      
+      setTimeout(() => {
+        setSyncStatus('complete');
+        refresh();
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        setTimeout(() => setSyncStatus('idle'), 2000);
+      }, 1000);
     }, 800);
   };
 
@@ -580,7 +543,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const existing: MonthFile[] = JSON.parse(localStorage.getItem(key) || '[]');
     localStorage.setItem(key, JSON.stringify(existing.filter(f => f.id !== fid)));
 
-    // Sync deletion to Super Admin Drive Vault
     const vaultKey = `superadmin_drive_vault_${year}`;
     const vault: any[] = JSON.parse(localStorage.getItem(vaultKey) || '[]');
     const updatedVault = vault.filter((f: any) => f.id !== fid);
@@ -606,7 +568,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       data.forEach(row => {
         const piId = row['PI ID'];
         const aid = row['Activity ID'];
-        // Use 'Activity' as the standard key, fallback to 'Strategic Activity' for backward compatibility
         const activityName = row['Activity'] || row['Strategic Activity'];
         const indicatorName = row['Performance Indicator'];
 
@@ -626,12 +587,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
           const isAggregationDashboard = subjectUser.role === UserRole.SUPER_ADMIN || subjectUser.role === UserRole.SUB_ADMIN;
 
-          // Allow importing data if it's not an aggregation dashboard (standard unit behavior)
-          // OR if it is a 'target' dashboard (allowing Admins to upload Master Targets including values)
           if (!isAggregationDashboard || prefix === 'target') {
             MONTHS.forEach((m, i) => { 
-              // Force save for every month. If undefined in excel, save as 0.
-              // This ensures the dashboard displays exactly what was uploaded.
               const rawVal = row[m];
               const val = (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') 
                 ? (parseInt(rawVal, 10) || 0) 
@@ -642,13 +599,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         }
       });
 
-      // Synchronize the activity structure for each PI based on the Excel list
       Object.entries(piActivitiesMap).forEach(([piId, aids]) => {
         const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
         localStorage.setItem(actIdsKey, JSON.stringify(aids));
       });
 
-      // Strict visibility control: Hide all tabs NOT present in the import list
       const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
       const allPossiblePIs = Array.from({length: 29}, (_, i) => `PI${i+1}`);
       const newHidden = allPossiblePIs.filter(id => !foundPIs.has(id));
@@ -662,7 +617,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const handleExportExcel = () => {
     if (!currentPI) return;
     const exportData = currentPI.activities.map(act => {
-      // Changed export header key to 'Activity'
       const row: any = { 'Activity': act.activity, 'Performance Indicator': act.indicator };
       MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
       row['Total'] = act.total;
@@ -678,7 +632,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const allData: any[] = [];
     piData.forEach(pi => {
       pi.activities.forEach(act => {
-        // Changed export header key to 'Activity'
         const row: any = { 'PI ID': pi.id, 'Activity ID': act.id, 'Activity': act.activity, 'Performance Indicator': act.indicator };
         MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
         allData.push(row);
@@ -689,29 +642,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     XLSX.utils.book_append_sheet(wb, ws, "Master Template");
     
     let filename = `Master_Template_${year}.xlsx`;
-    // Consistent and dynamic renaming logic for professional 2026 exports
     if (year === '2026') {
-      const isAccom = prefix === 'accomplishment';
-      const suffix = isAccom ? 'ACCOMPLISHMENT_2026' : 'TARGET_OUTLOOK_2026';
-      
-      let cleanName = subjectUser.name.toUpperCase();
-      
-      // Formatting based on terminal navigation context
-      if (cleanName.startsWith('CHQ ')) {
-        // "CHQ CARMU" -> "CARMU"
-        cleanName = cleanName.substring(4);
-      }
-      
-      if (cleanName.startsWith('POLICE STATION')) {
-        // "POLICE STATION 1" -> "POLICE_STATION1"
-        cleanName = cleanName.replace('POLICE STATION ', 'POLICE_STATION');
-      } else if (cleanName === 'CITY MOBILE FORCE COMPANY') {
-        cleanName = 'FORCE_COMPANY';
-      } else {
-        // "SUPER_ADMIN", "LOGISTICS", etc.
-        cleanName = cleanName.replace(/\s+/g, '_');
-      }
-      
+      const suffix = prefix === 'accomplishment' ? 'ACCOMPLISHMENT_2026' : 'TARGET_OUTLOOK_2026';
+      let cleanName = subjectUser.name.toUpperCase().replace(/\s+/g, '_');
       filename = `${cleanName}_${suffix}.xlsx`;
     }
     
@@ -731,6 +664,13 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     newOrder[currentIndex] = newOrder[newIndex];
     newOrder[newIndex] = temp;
     localStorage.setItem(orderKey, JSON.stringify(newOrder));
+    refresh();
+  };
+
+  // Restores all hidden tabs by removing the hidden PIs key from storage
+  const handleRestoreAllTabs = () => {
+    const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
+    localStorage.removeItem(hiddenPIsKey);
     refresh();
   };
 
@@ -796,7 +736,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                         localStorage.setItem(actIdsKey, JSON.stringify(currentIds.filter((id:any) => id !== act.id)));
                         refresh();
                       }
-                    }} className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></td>
+                    }} className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition text-sm font-black uppercase">Remove</button></td>
                   )}
                   <td className="px-6 py-4">
                     {editingActivityField?.aid === act.id && editingActivityField?.field === 'activity' ? (
@@ -885,7 +825,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               <input type="file" ref={masterImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportMasterTemplate} />
             </>
           )}
-          <button onClick={handleExportExcel} className="bg-white hover:bg-emerald-50 text-slate-900 hover:text-emerald-700 border border-slate-200 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Export Current PI</button>
+          <button onClick={handleExportExcel} className="bg-white hover:bg-emerald-50 text-slate-900 hover:text-emerald-700 border border-slate-200 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2 text-xs">Export Current PI</button>
         </div>
       </div>
       
@@ -919,35 +859,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                         <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest">DRIVE STORAGE: </p>
                         <a href="https://drive.google.com" target="_blank" rel="noopener noreferrer" className="text-white text-xs font-black uppercase tracking-widest hover:text-emerald-300 transition underline underline-offset-4 decoration-emerald-500/50">barvickrunch@gmail.com</a>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {vaultFolder ? (
-                           <div className="flex items-center gap-2">
-                             <span onClick={() => setVaultFolder(null)} className="text-white/60 hover:text-white cursor-pointer text-xs font-black uppercase tracking-widest transition">ROOT</span>
-                             <span className="text-white/40">/</span>
-                             <span className="text-white text-xs font-black uppercase tracking-widest">{vaultFolder}</span>
-                           </div>
-                        ) : (
-                          <>
-                            <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest">MASTER FOLDER: </p>
-                            <span className="text-white text-xs font-black uppercase tracking-widest">CPSMU MONITORING STORAGE</span>
-                          </>
-                        )}
-                      </div>
                     </div>
                  </div>
-                 <div className="flex items-center gap-3">
-                   {vaultFolder && (
-                     <button onClick={() => setVaultFolder(null)} className="bg-white/10 hover:bg-white/20 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition flex items-center gap-2 border border-white/10">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg> BACK
-                     </button>
-                   )}
-                   <a href="https://drive.google.com" target="_blank" rel="noopener noreferrer" className="bg-emerald-500 hover:bg-emerald-400 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition flex items-center gap-2 shadow-lg active:scale-95">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg> Launch Storage Root
-                   </a>
-                   <button onClick={() => setVaultOpen(false)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-colors border border-white/10">
-                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                   </button>
-                 </div>
+                 <button onClick={() => setVaultOpen(false)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-colors border border-white/10">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                 </button>
               </div>
               <div className="p-10 flex-1 overflow-y-auto no-scrollbar">
                  {!vaultFolder ? (
@@ -969,49 +885,26 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                       )}
                    </div>
                  ) : (
-                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                      {filteredVaultFiles.length > 0 ? filteredVaultFiles.map((file: any) => (
-                        <div key={file.id} className="p-6 bg-slate-50 border border-slate-200 rounded-[2rem] hover:border-emerald-500 transition-all group flex flex-col justify-between shadow-sm hover:shadow-xl">
-                           <div>
-                              <div className="flex items-center gap-4 mb-4">
-                                 <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-slate-100 group-hover:scale-110 transition-transform">
-                                    {getFileIcon(file.type)}
-                                 </div>
-                                 <div className="flex-1 min-w-0">
-                                    <p className="font-black text-slate-900 truncate text-sm">{file.name}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{file.unitName}</p>
-                                 </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filteredVaultFiles.map((file: any) => (
+                        <div key={file.id} className="p-6 bg-slate-50 border border-slate-200 rounded-[2rem] hover:border-emerald-500 transition-all flex flex-col justify-between">
+                           <div className="flex items-center gap-4 mb-4">
+                              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-blue-500 border">
+                                 {getFileIcon(file.type)}
                               </div>
-                              <div className="space-y-2 mb-6">
-                                 <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                    <span>Synced From</span>
-                                    <span className="text-slate-900">{file.piId}</span>
-                                 </div>
-                                 <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                    <span>Date</span>
-                                    <span className="text-slate-900">{new Date(file.syncedAt).toLocaleDateString()}</span>
-                                 </div>
+                              <div className="flex-1 min-w-0">
+                                 <p className="font-black text-slate-900 truncate text-sm">{file.name}</p>
+                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{file.unitName}</p>
                               </div>
                            </div>
-                           <div className="flex gap-2">
-                              <a href={file.url} download={file.name} className="flex-1 bg-white border border-slate-200 hover:border-emerald-500 hover:text-emerald-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-center gap-2">
-                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> View Link
-                              </a>
-                              <button onClick={() => {
-                                 const vaultKey = `superadmin_drive_vault_${year}`;
-                                 const filtered = vaultData.filter((f: any) => f.id !== file.id);
-                                 localStorage.setItem(vaultKey, JSON.stringify(filtered));
-                                 setVaultData(filtered); 
-                              }} className="w-10 h-10 flex items-center justify-center bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all border border-rose-100 shadow-sm">
-                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              </button>
-                           </div>
+                           <button onClick={() => {
+                              const vaultKey = `superadmin_drive_vault_${year}`;
+                              const filtered = vaultData.filter((f: any) => f.id !== file.id);
+                              localStorage.setItem(vaultKey, JSON.stringify(filtered));
+                              setVaultData(filtered); 
+                           }} className="text-rose-500 text-[10px] font-black uppercase tracking-widest">Delete</button>
                         </div>
-                      )) : (
-                        <div className="col-span-full py-20 text-center">
-                          <p className="text-slate-400 font-black uppercase tracking-widest text-xs">No files synced in this folder</p>
-                        </div>
-                      )}
+                      ))}
                    </div>
                  )}
               </div>
@@ -1024,49 +917,54 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           <div className="bg-white w-full max-xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
             <div className="bg-slate-50 p-8 border-b border-slate-100 relative">
                <div className="absolute top-8 right-8 flex items-center gap-4">
-                  {isAdmin && <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm"><GoogleDriveIcon /><span className="text-[10px] font-black text-slate-900">DRIVE SYNC</span></div>}
-                  <button onClick={() => setIsFilesModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 transition-colors bg-white border border-slate-200 rounded-xl shadow-sm"><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                  {isAdmin && <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm"><GoogleDriveIcon /><span className="text-[10px] font-black text-slate-900 uppercase">Dual Mirror System</span></div>}
+                  <button onClick={() => setIsFilesModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 transition-colors bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-black">CLOSE</button>
                </div>
                <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">MOVs & Documents</h3>
                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
                   Unit: {subjectUser.name} • {MONTHS[activeFileCell.monthIdx]} {year}
                </p>
-               <div className="mt-4 space-y-1">
+               <div className="mt-4 space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{isSyncing ? 'Synchronizing Cloud Vault...' : 'Auto-Sync Active: Individual Storage & barvickrunch@gmail.com Drive'}</span>
+                    <div className={`w-2 h-2 rounded-full ${syncStatus === 'idle' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}></div>
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                      {syncStatus === 'idle' && 'All files synced to personal Gmail & Shared to Super Admin'}
+                      {syncStatus === 'local' && 'Saving to Unit Storage...'}
+                      {syncStatus === 'mirroring' && 'Mirroring to Super Admin Drive (barvickrunch@gmail.com)...'}
+                      {syncStatus === 'complete' && 'Dual Sync Complete!'}
+                    </span>
                   </div>
-                  {!isSyncing && (
-                    <div className="flex items-center gap-2 ml-4">
-                      <svg className="w-3 h-3 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                      <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Vault: CPSMU MONITORING STORAGE</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 ml-4">
+                    <svg className="w-3 h-3 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                    <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Global Vault: barvickrunch@gmail.com / Monitoring Storage</span>
+                  </div>
                </div>
             </div>
 
-            <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
+            <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
               {currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.length > 0 ? (
                 <div className="grid grid-cols-1 gap-3">
                   {currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.map(file => (
                     <div key={file.id} className="group p-5 bg-white border border-slate-100 rounded-[1.5rem] flex items-center justify-between hover:border-indigo-500 hover:bg-slate-50/50 transition-all shadow-sm">
                       <div className="flex items-center gap-4 flex-1 min-w-0">
-                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-blue-500 shadow-sm border border-slate-100 group-hover:scale-105 transition-transform">
+                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-blue-500 shadow-sm border border-slate-100">
                           {getFileIcon(file.type)}
                         </div>
                         <div className="truncate">
                           <p className="text-sm font-black text-slate-900 truncate">{file.name}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">SYNC ID: {file.id.toUpperCase()}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">ID: {file.id.toUpperCase()}</span>
+                            <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase tracking-widest flex items-center gap-1">
+                              <svg className="w-2 h-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg>
+                              Mirror Secure
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <a href={file.url} download={file.name} className="p-2.5 text-slate-400 hover:text-indigo-600 transition bg-white rounded-xl border border-transparent hover:border-slate-100 shadow-none hover:shadow-sm">
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                        </a>
+                        <a href={file.url} download={file.name} className="p-2.5 text-slate-400 hover:text-indigo-600 transition bg-white rounded-xl border border-transparent hover:border-slate-100 text-xs font-black uppercase">LINK</a>
                         {canModifyData && (
-                          <button onClick={() => removeFile(file.id)} className="p-2.5 text-slate-400 hover:text-rose-600 transition bg-white rounded-xl border border-transparent hover:border-slate-100 shadow-none hover:shadow-sm">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
+                          <button onClick={() => removeFile(file.id)} className="p-2.5 text-slate-400 hover:text-rose-600 transition bg-white rounded-xl border border-transparent hover:border-slate-100 text-xs font-black uppercase">DELETE</button>
                         )}
                       </div>
                     </div>
@@ -1074,9 +972,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                 </div>
               ) : (
                 <div className="py-12 border-2 border-dashed border-slate-100 rounded-3xl text-center">
-                  <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                  </div>
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">No MOVs Found for this month</p>
                 </div>
               )}
@@ -1084,10 +979,12 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               {canModifyData && (
                 <div className="pt-6 border-t border-slate-100">
                   <button onClick={() => fileInputRef.current?.click()} className="group w-full bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest py-5 rounded-2xl transition-all shadow-xl active:scale-[0.98] flex items-center justify-center gap-3">
-                    <UploadIcon /> {isSyncing ? 'Syncing to Drive...' : 'Upload Multiple MOVs'}
+                    <UploadIcon /> {syncStatus === 'idle' ? 'Upload to Gmail Storage & Sync to Super Admin' : 'Synchronizing Dual Storage...'}
                   </button>
                   <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileUpload} />
-                  <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-4">Destination: barvickrunch@gmail.com Drive</p>
+                  <p className="text-center text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mt-4 opacity-50">
+                    Files are stored in respective Unit Drives and mirrored to barvickrunch@gmail.com
+                  </p>
                 </div>
               )}
             </div>
