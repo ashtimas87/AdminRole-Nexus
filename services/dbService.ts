@@ -15,8 +15,20 @@ export interface SavePayload {
 
 export const dbService = {
   /**
+   * Triggers the initial table setup in MySQL.
+   */
+  async setupDatabase() {
+    try {
+      const response = await fetch('/api/setup_db.php');
+      return await response.json();
+    } catch (error) {
+      console.error('Database setup request failed:', error);
+      return { status: 'error', message: 'Terminal connection failed. Check API folder.' };
+    }
+  },
+
+  /**
    * Fetches all activity data for a specific unit and year from the Hostinger MySQL database.
-   * Ensures return value is always an array.
    */
   async fetchUnitData(prefix: string, year: string, userId: string) {
     try {
@@ -48,7 +60,7 @@ export const dbService = {
   },
 
   /**
-   * Uploads physical files (Excel or MOV) to the Hostinger File Manager storage.
+   * Uploads physical files to the Hostinger File Manager storage.
    */
   async uploadFileToServer(file: File, metadata: { userId: string; type: string }) {
     const formData = new FormData();
@@ -63,7 +75,7 @@ export const dbService = {
       });
       if (!response.ok) return null;
       const result = await response.json();
-      return result.fileUrl; // Public URL on the Hostinger server
+      return result.fileUrl;
     } catch (error) {
       console.error('Hostinger File Upload Error:', error);
       return null;

@@ -1,13 +1,13 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { PIData, UserRole, User, MonthFile, MonthData, PIActivity } from '../types';
+import { PIData, UserRole, User, MonthFile, PIActivity } from '../types';
 import { dbService } from '../services/dbService';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
- * Hardened sanitization to prevent "undefined" or "null" strings.
+ * Robust sanitization to prevent "undefined", "null", or empty strings.
  */
 const sanitize = (val: any, fallback: string): string => {
   if (val === null || val === undefined) return fallback;
@@ -17,8 +17,22 @@ const sanitize = (val: any, fallback: string): string => {
 };
 
 /**
- * Maps users to a shared Super Admin ID for Target Outlook views.
+ * Intelligent header matching for various Excel formats.
  */
+const getExcelValue = (row: any, keywords: string[], fallback: string): string => {
+  const rowKeys = Object.keys(row);
+  for (const keyword of keywords) {
+    const foundKey = rowKeys.find(k => 
+      k.toLowerCase().replace(/[^a-z0-9]/g, '') === keyword.toLowerCase().replace(/[^a-z0-9]/g, '')
+    );
+    if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null) {
+      const val = String(row[foundKey]).trim();
+      if (val && val.toLowerCase() !== 'undefined' && val.toLowerCase() !== 'null') return val;
+    }
+  }
+  return fallback;
+};
+
 const getEffectiveUserId = (userId: string, role?: UserRole, prefix?: string): string => {
   if (prefix === 'target' && (role === UserRole.SUB_ADMIN || role === UserRole.SUPER_ADMIN)) {
     return 'sa-1';
@@ -50,7 +64,7 @@ interface OperationalDashboardProps {
 }
 
 const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBack, currentUser, subjectUser, allUnits = [] }) => {
-  const [activeTab, setActiveTab] = useState('PI1');
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const [piData, setPiData] = useState<PIData[]>([]);
   const [editingCell, setEditingCell] = useState<{ rowIdx: number; monthIdx: number } | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -77,20 +91,35 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         dbMap[key] = row;
       });
 
-      const basePIs = Array.from({ length: 29 }, (_, i) => `PI${i + 1}`);
-      const structuredData: PIData[] = basePIs.map(piId => {
+      // Dynamically discover PIs from DB and local storage
+      const dbPiIds = dbRows.map(r => String(r.pi_id));
+      const localPrefix = `${prefix}_pi_act_ids_${year}_${effectiveId}_`;
+      const localPiIds: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(localPrefix)) {
+          localPiIds.push(key.replace(localPrefix, ''));
+        }
+      }
+
+      const uniquePiIds = Array.from(new Set([...dbPiIds, ...localPiIds])).sort((a, b) => {
+        // Natural sort for PI1, PI2, PI10
+        return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+      });
+
+      const structuredData: PIData[] = uniquePiIds.map(piId => {
         const dbActivityIds = dbRows.filter((r: any) => r.pi_id === piId).map((r: any) => String(r.activity_id));
-        
         const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
         let localIds: string[] = [];
-        try {
-          localIds = JSON.parse(localStorage.getItem(actIdsKey) || '[]');
-        } catch(e) { localIds = []; }
-
+        try { localIds = JSON.parse(localStorage.getItem(actIdsKey) || '[]'); } catch(e) { localIds = []; }
+        
         const combinedActivityIds = Array.from(new Set([...dbActivityIds, ...localIds])).filter(id => id && id !== 'undefined');
 
         const activities: PIActivity[] = combinedActivityIds.map(aid => {
-          const meta = dbRows.find((r: any) => r.pi_id === piId && r.activity_id === aid);
+          const meta = dbRows.find((r: any) => 
+            r.pi_id === piId && r.activity_id === aid && r.activity_name && r.activity_name !== 'Unnamed Activity'
+          ) || dbRows.find((r: any) => r.pi_id === piId && r.activity_id === aid);
+          
           const localActName = localStorage.getItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`);
           const localIndName = localStorage.getItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`);
 
@@ -102,33 +131,30 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               const rowKey = `${piId}_${aid}_${mIdx}`;
               const rowData = dbMap[rowKey];
               const val = rowData?.value || 0;
-              let files: MonthFile[] = [];
-              try {
-                files = rowData?.files_json ? JSON.parse(rowData.files_json) : JSON.parse(localStorage.getItem(`${prefix}_files_${year}_${effectiveId}_${piId}_${aid}_${mIdx}`) || '[]');
-              } catch(e) { files = []; }
-              return {
-                value: typeof val === 'number' ? val : parseInt(val, 10) || 0,
-                files: Array.isArray(files) ? files : []
-              };
+              let files = [];
+              try { files = rowData?.files_json ? JSON.parse(rowData.files_json) : JSON.parse(localStorage.getItem(`${prefix}_files_${year}_${effectiveId}_${piId}_${aid}_${mIdx}`) || '[]'); } catch(e) { files = []; }
+              return { value: parseInt(val, 10) || 0, files: Array.isArray(files) ? files : [] };
             }),
             total: 0
           };
         });
 
-        const piMeta = dbRows.find((r: any) => r.pi_id === piId);
+        const piMeta = dbRows.find((r: any) => r.pi_id === piId && r.pi_title);
         const localTitle = localStorage.getItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`);
         
         return {
           id: piId,
           title: sanitize(piMeta?.pi_title || localTitle, `Performance Indicator ${piId}`),
-          activities: activities.map(a => ({
-            ...a,
-            total: a.months.reduce((sum, m) => sum + (m.value || 0), 0)
-          }))
+          activities: activities.map(a => ({ ...a, total: a.months.reduce((sum, m) => sum + (m.value || 0), 0) }))
         };
       });
 
       setPiData(structuredData);
+      
+      // Auto-select first tab if none selected or if current one disappeared
+      if (!activeTab || !uniquePiIds.includes(activeTab)) {
+        setActiveTab(uniquePiIds.length > 0 ? uniquePiIds[0] : null);
+      }
     } catch (err) {
       console.error("Dashboard load failure:", err);
     } finally {
@@ -137,11 +163,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   };
 
   useEffect(() => { loadData(); }, [prefix, year, effectiveId]);
-
-  // Only show PI tabs that have activities OR the currently active tab
-  const visibleTabs = useMemo(() => {
-    return piData.filter(pi => pi.activities.length > 0 || pi.id === activeTab);
-  }, [piData, activeTab]);
 
   const currentPI = useMemo(() => {
     if (piData.length === 0) return null;
@@ -154,8 +175,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
     setSyncStatus('syncing');
     
-    dbService.uploadFileToServer(file, { userId: effectiveId, type: 'master' }).catch(() => {});
-
     const reader = new FileReader();
     reader.onload = async (evt) => {
       const bstr = evt.target?.result;
@@ -164,20 +183,18 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const data: any[] = XLSX.utils.sheet_to_json(ws);
 
       for (const row of data) {
-        // Robust header detection
-        const rawPiId = row['PI ID'] || row['pi_id'] || row['PI'] || '';
-        const piId = sanitize(rawPiId, '').toUpperCase();
-        
-        const rawAid = row['Activity ID'] || row['activity_id'] || row['ID'] || '';
-        const aid = sanitize(rawAid, '');
-        
-        const activityName = sanitize(row['Activity'] || row['Activity Name'] || row['Description'] || row['Activity Description'], 'Unnamed Activity');
-        const indicatorName = sanitize(row['Performance Indicator'] || row['Indicator'] || row['Indicator Name'] || row['Units'], 'Units');
-        const piTitle = sanitize(row['PI Title'] || row['Strategic Goal'] || row['Strategic Objective'] || row['Goal'], `Performance Indicator ${piId}`);
+        let rawPi = getExcelValue(row, ['piid', 'pi', 'pi_id', 'performanceindicatorid'], '').toUpperCase();
+        if (rawPi && !rawPi.startsWith('PI') && !isNaN(parseInt(rawPi))) {
+          rawPi = 'PI' + rawPi;
+        }
+        const piId = rawPi;
+        const aid = getExcelValue(row, ['activityid', 'aid', 'id', 'activity_id', 'taskid'], '');
+        const activityName = getExcelValue(row, ['activity', 'activityname', 'description', 'activitydescription', 'task'], 'Unnamed Activity');
+        const indicatorName = getExcelValue(row, ['indicator', 'performanceindicator', 'indicatorname', 'units', 'measure'], 'Units');
+        const piTitle = getExcelValue(row, ['pititle', 'strategicgoal', 'strategicobjective', 'goal', 'pi_title'], `Performance Indicator ${piId}`);
 
-        if (!piId || !aid || piId === '' || aid === '') continue;
+        if (!piId || !aid) continue;
 
-        // Save metadata locally first for instant UI response
         localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, activityName);
         localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicatorName);
         localStorage.setItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`, piTitle);
@@ -192,7 +209,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         const savePromises = [];
         for (let i = 0; i < 12; i++) {
           const mName = MONTHS[i];
-          const val = parseInt(row[mName], 10) || 0;
+          const val = parseInt(row[mName] || row[mName.toUpperCase()] || row[mName.toLowerCase()], 10) || 0;
           savePromises.push(dbService.saveActivityValue({
             prefix, year, userId: effectiveId, piId, activityId: aid, monthIdx: i, value: val,
             activityName, indicatorName, piTitle
@@ -216,7 +233,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     
     setSyncStatus('syncing');
     await dbService.saveActivityValue({
-      prefix, year, userId: effectiveId, piId: activeTab, activityId: act.id, monthIdx: editingCell.monthIdx, value: val,
+      prefix, year, userId: effectiveId, piId: activeTab || currentPI.id, activityId: act.id, monthIdx: editingCell.monthIdx, value: val,
       filesJson: JSON.stringify(act.months[editingCell.monthIdx].files),
       activityName: act.activity, indicatorName: act.indicator, piTitle: currentPI.title
     });
@@ -236,18 +253,12 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     for (const file of Array.from(files)) {
       const url = await dbService.uploadFileToServer(file, { userId: effectiveId, type: 'evidence' });
       if (url) {
-        currentFiles.push({ 
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9), 
-          name: file.name, 
-          url, 
-          type: file.type, 
-          uploadedAt: new Date().toISOString() 
-        });
+        currentFiles.push({ id: Date.now().toString() + Math.random().toString(36).substr(2, 9), name: file.name, url, type: file.type, uploadedAt: new Date().toISOString() });
       }
     }
 
     await dbService.saveActivityValue({
-      prefix, year, userId: effectiveId, piId: activeTab, activityId: aid, 
+      prefix, year, userId: effectiveId, piId: activeTab || currentPI.id, activityId: aid, 
       monthIdx: activeFileCell.monthIdx, 
       value: act.months[activeFileCell.monthIdx].value,
       filesJson: JSON.stringify(currentFiles),
@@ -284,7 +295,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       </div>
 
       <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-        {visibleTabs.map(pi => (
+        {piData.map(pi => (
           <button
             key={pi.id}
             onClick={() => setActiveTab(pi.id)}
@@ -293,39 +304,42 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             {pi.id}
           </button>
         ))}
-        {visibleTabs.length === 0 && (
-          <div className="px-4 py-2 text-[10px] font-black text-slate-300 uppercase tracking-widest">Initialize Terminal by Importing Excel</div>
+        {piData.length === 0 && (
+          <div className="px-4 py-2 text-[10px] font-black text-slate-300 uppercase tracking-widest italic">Terminal Ready: Waiting for Master Import</div>
         )}
       </div>
 
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
-        <table className="w-full text-left">
+        <table className="w-full text-left table-fixed">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest w-1/4">Activity & Indicator</th>
-              {MONTHS.map(m => <th key={m} className="px-3 py-4 text-center text-[10px] font-black uppercase text-slate-400 tracking-widest">{m}</th>)}
-              <th className="px-6 py-4 text-center text-[10px] font-black uppercase text-slate-900 tracking-widest">Total</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest w-[220px]">Activity</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest w-[160px]">Performance Indicator</th>
+              {MONTHS.map(m => <th key={m} className="px-1 py-4 text-center text-[10px] font-black uppercase text-slate-400 tracking-widest w-[48px]">{m}</th>)}
+              <th className="px-6 py-4 text-center text-[10px] font-black uppercase text-slate-900 tracking-widest w-[80px]">Total</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {!currentPI || currentPI.activities.length === 0 ? (
               <tr>
-                <td colSpan={14} className="px-6 py-24 text-center">
+                <td colSpan={15} className="px-6 py-24 text-center">
                   <div className="max-w-xs mx-auto space-y-3">
-                    <p className="text-slate-400 text-xs font-black uppercase tracking-widest">No Activity Records for {activeTab}</p>
-                    <p className="text-[10px] text-slate-300 font-bold uppercase tracking-tight">Import an Excel template with the PI ID "{activeTab}" to populate this section.</p>
+                    <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Terminal View Empty</p>
+                    <p className="text-[10px] text-slate-300 font-bold uppercase tracking-tight leading-relaxed">Please import an Excel file containing Activity data to populate the Operational Hub.</p>
                   </div>
                 </td>
               </tr>
             ) : (
               currentPI.activities.map((act, rIdx) => (
                 <tr key={act.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-bold text-slate-900 leading-tight">{act.activity}</div>
-                    <div className="text-[10px] font-black text-slate-400 uppercase mt-1 tracking-wider opacity-60">{act.indicator}</div>
+                  <td className="px-6 py-4 align-top border-r border-slate-50">
+                    <div className="text-sm font-bold text-slate-900 leading-tight break-words">{act.activity}</div>
+                  </td>
+                  <td className="px-6 py-4 align-top border-r border-slate-50">
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider opacity-60 leading-normal break-words">{act.indicator}</div>
                   </td>
                   {act.months.map((m, mIdx) => (
-                    <td key={mIdx} className="px-1 py-4 text-center">
+                    <td key={mIdx} className="px-0 py-4 text-center">
                       {editingCell?.rowIdx === rIdx && editingCell?.monthIdx === mIdx ? (
                         <input
                           autoFocus
@@ -334,20 +348,20 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                           onChange={e => setEditValue(e.target.value)}
                           onBlur={saveEdit}
                           onKeyDown={e => e.key === 'Enter' && saveEdit()}
-                          className="w-12 px-1 py-1 bg-white border-2 border-slate-900 rounded text-center text-xs font-black shadow-lg"
+                          className="w-10 px-1 py-1 bg-white border-2 border-slate-900 rounded text-center text-xs font-black shadow-lg"
                         />
                       ) : (
                         <div className="relative inline-block">
                           <div
                             onClick={() => { if(canModifyData) { setEditingCell({ rowIdx: rIdx, monthIdx: mIdx }); setEditValue(String(m.value)); } }}
-                            className={`w-10 h-10 flex items-center justify-center rounded-xl text-xs font-black transition-all cursor-pointer hover:bg-slate-100 ${m.value > 0 ? 'text-slate-900' : 'text-slate-300'}`}
+                            className={`w-9 h-9 flex items-center justify-center rounded-lg text-xs font-black transition-all cursor-pointer hover:bg-slate-100 ${m.value > 0 ? 'text-slate-900' : 'text-slate-300'}`}
                           >
                             {m.value}
                           </div>
                           {m.files.length > 0 && (
                             <div 
                               onClick={(e) => { e.stopPropagation(); setActiveFileCell({ rowIdx: rIdx, monthIdx: mIdx }); setIsFilesModalOpen(true); }}
-                              className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-md cursor-pointer"
+                              className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-md cursor-pointer scale-75"
                             >
                               <PaperclipIcon active />
                             </div>
