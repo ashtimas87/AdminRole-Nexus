@@ -3,7 +3,8 @@ header("Content-Type: application/json; charset=UTF-8");
 include_once 'db_config.php';
 
 try {
-    // SQL statement to create the monitoring_data table
+    // SQL statement to create/update the monitoring_data table
+    // Added files_json to store evidence attachments permanently
     $sql = "CREATE TABLE IF NOT EXISTS monitoring_data (
         id INT AUTO_INCREMENT PRIMARY KEY,
         prefix VARCHAR(50) NOT NULL,
@@ -13,6 +14,7 @@ try {
         activity_id VARCHAR(100) NOT NULL,
         month_idx INT NOT NULL,
         value INT DEFAULT 0,
+        files_json LONGTEXT,
         activity_name TEXT,
         indicator_name TEXT,
         pi_title TEXT,
@@ -23,19 +25,25 @@ try {
 
     $conn->exec($sql);
 
+    // Ensure files_json column exists if table was created by older script
+    $checkColumn = $conn->query("SHOW COLUMNS FROM monitoring_data LIKE 'files_json'");
+    if (!$checkColumn->fetch()) {
+        $conn->exec("ALTER TABLE monitoring_data ADD COLUMN files_json LONGTEXT AFTER value");
+    }
+
     echo json_encode([
         "status" => "success",
-        "message" => "Database table 'monitoring_data' is ready.",
+        "message" => "Database table 'monitoring_data' is fully synchronized and ready.",
         "details" => [
             "database" => $db_name,
-            "table_created" => true,
-            "unique_index" => "active"
+            "table_ready" => true,
+            "storage_v2" => "enabled"
         ]
     ]);
 } catch(PDOException $e) {
     echo json_encode([
         "status" => "error",
-        "message" => "Table creation failed: " . $e->getMessage()
+        "message" => "Table setup failed: " . $e->getMessage()
     ]);
 }
 ?>

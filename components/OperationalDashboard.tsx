@@ -60,7 +60,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const loadData = async () => {
     setSyncStatus('syncing');
     try {
-      // 1. Fetch values and metadata from Hostinger MySQL (guaranteed array from dbService)
+      // 1. Fetch values and metadata from Hostinger MySQL
       const dbRows = await dbService.fetchUnitData(prefix, year, effectiveId);
       
       // Transform DB rows into a lookup map
@@ -73,12 +73,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       // 2. Build the UI structure
       const basePIs = Array.from({ length: 29 }, (_, i) => `PI${i + 1}`);
       const structuredData: PIData[] = basePIs.map(piId => {
-        // Find all unique activity IDs
         const activityIds: string[] = Array.from(new Set(
           dbRows.filter((r: any) => r.pi_id === piId).map((r: any) => String(r.activity_id))
         ));
 
-        // Local fallback for activity IDs
+        // Fallback for activity IDs if DB empty
         if (activityIds.length === 0) {
           const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
           const localIds: string[] = JSON.parse(localStorage.getItem(actIdsKey) || '[]');
@@ -94,11 +93,13 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             indicator: meta?.indicator_name || localStorage.getItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`) || "Units",
             months: Array.from({ length: 12 }).map((_, mIdx) => {
               const rowKey = `${piId}_${aid}_${mIdx}`;
-              const val = dbMap[rowKey]?.value || 0;
-              const fileKey = `${prefix}_files_${year}_${effectiveId}_${piId}_${aid}_${mIdx}`;
+              const rowData = dbMap[rowKey];
+              const val = rowData?.value || 0;
+              // Priority: DB files -> Local fallback (for backward compatibility)
+              const files = rowData?.files_json ? JSON.parse(rowData.files_json) : JSON.parse(localStorage.getItem(`${prefix}_files_${year}_${effectiveId}_${piId}_${aid}_${mIdx}`) || '[]');
               return {
                 value: val,
-                files: JSON.parse(localStorage.getItem(fileKey) || '[]')
+                files: Array.isArray(files) ? files : []
               };
             }),
             total: 0
@@ -133,11 +134,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     if (!file) return;
 
     setSyncStatus('syncing');
-    
-    // 1. Permanent Mirror: Upload physical Excel file to Hostinger File Manager (ALWAYS Super Admin Storage sa-1)
     await dbService.uploadFileToServer(file, { userId: 'sa-1', type: 'master' });
 
-    // 2. Parse and Save individual rows to MySQL
     const reader = new FileReader();
     reader.onload = async (evt) => {
       const bstr = evt.target?.result;
@@ -154,7 +152,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
         if (!piId || !aid) continue;
 
-        // Save metadata locally
+        // Save local metadata keys for structural lookups
         localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, String(activityName));
         localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, String(indicatorName));
         localStorage.setItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`, String(piTitle));
@@ -191,6 +189,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     setSyncStatus('syncing');
     await dbService.saveActivityValue({
       prefix, year, userId: effectiveId, piId: activeTab, activityId: act.id, monthIdx: editingCell.monthIdx, value: val,
+      filesJson: JSON.stringify(act.months[editingCell.monthIdx].files),
       activityName: act.activity, indicatorName: act.indicator, piTitle: currentPI.title
     });
     setEditingCell(null);
@@ -202,16 +201,32 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     if (!files || files.length === 0 || !activeFileCell || !currentPI) return;
     
     setSyncStatus('syncing');
-    const aid = currentPI.activities[activeFileCell.rowIdx].id;
+    const act = currentPI.activities[activeFileCell.rowIdx];
+    const aid = act.id;
+    const currentFiles = [...act.months[activeFileCell.monthIdx].files];
 
     for (const file of Array.from(files)) {
       const url = await dbService.uploadFileToServer(file, { userId: effectiveId, type: 'mov' });
       if (url) {
-        const key = `${prefix}_files_${year}_${effectiveId}_${activeTab}_${aid}_${activeFileCell.monthIdx}`;
-        const existing = JSON.parse(localStorage.getItem(key) || '[]');
-        localStorage.setItem(key, JSON.stringify([...existing, { id: Date.now().toString(), name: file.name, url, type: file.type, uploadedAt: new Date().toISOString() }]));
+        currentFiles.push({ 
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9), 
+          name: file.name, 
+          url, 
+          type: file.type, 
+          uploadedAt: new Date().toISOString() 
+        });
       }
     }
+
+    // Push updated file list to Database Cell
+    await dbService.saveActivityValue({
+      prefix, year, userId: effectiveId, piId: activeTab, activityId: aid, 
+      monthIdx: activeFileCell.monthIdx, 
+      value: act.months[activeFileCell.monthIdx].value,
+      filesJson: JSON.stringify(currentFiles),
+      activityName: act.activity, indicatorName: act.indicator, piTitle: currentPI.title
+    });
+
     setSyncStatus('idle');
     loadData();
   };
@@ -327,23 +342,28 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               <h3 className="text-2xl font-black uppercase text-slate-900 tracking-tight">Hostinger File Vault</h3>
               <button onClick={() => setIsFilesModalOpen(false)} className="text-slate-400 font-black hover:text-slate-900 transition-colors">CLOSE</button>
             </div>
-            <div className="space-y-4">
-              {currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.map(f => (
-                <div key={f.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <span className="text-sm font-bold text-slate-900 truncate flex-1 pr-4">{f.name}</span>
-                  <a href={f.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 text-[10px] font-black uppercase tracking-widest hover:underline">View</a>
-                </div>
-              ))}
-              <div className="p-10 border-2 border-dashed border-slate-100 rounded-[2.5rem] text-center bg-slate-50/50">
-                <button 
-                  disabled={syncStatus === 'syncing'}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`w-full py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${syncStatus === 'syncing' ? 'bg-slate-100 text-slate-400' : 'bg-slate-900 text-white shadow-xl hover:bg-slate-800'}`}
-                >
-                  {syncStatus === 'syncing' ? 'Syncing...' : 'Upload New Evidence'}
-                </button>
-                <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileUpload} />
-              </div>
+            <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+              {currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.length === 0 ? (
+                 <p className="text-center text-slate-300 text-[10px] font-black uppercase py-8">No evidence uploaded yet.</p>
+              ) : (
+                currentPI.activities[activeFileCell.rowIdx].months[activeFileCell.monthIdx].files.map(f => (
+                  <div key={f.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group hover:border-slate-300 transition-colors">
+                    <span className="text-sm font-bold text-slate-900 truncate flex-1 pr-4">{f.name}</span>
+                    <a href={f.url} target="_blank" rel="noopener noreferrer" className="bg-white border px-3 py-1 rounded-lg text-indigo-600 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm">View</a>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="p-10 border-2 border-dashed border-slate-100 rounded-[2.5rem] text-center bg-slate-50/50">
+              <button 
+                disabled={syncStatus === 'syncing' || !canModifyData}
+                onClick={() => fileInputRef.current?.click()}
+                className={`w-full py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${syncStatus === 'syncing' ? 'bg-slate-100 text-slate-400' : 'bg-slate-900 text-white shadow-xl hover:bg-slate-800'}`}
+              >
+                {syncStatus === 'syncing' ? 'Syncing...' : 'Upload New Evidence'}
+              </button>
+              <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileUpload} />
+              {!canModifyData && <p className="text-[9px] font-black text-slate-400 uppercase mt-4">Viewing Mode (Read-Only)</p>}
             </div>
           </div>
         </div>

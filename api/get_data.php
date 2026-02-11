@@ -14,7 +14,7 @@ if(empty($prefix) || empty($year) || empty($userId)) {
 }
 
 try {
-    $query = "SELECT pi_id, activity_id, month_idx, value, activity_name, indicator_name, pi_title 
+    $query = "SELECT pi_id, activity_id, month_idx, value, files_json, activity_name, indicator_name, pi_title 
               FROM monitoring_data 
               WHERE prefix = :prefix AND year = :year AND user_id = :userId";
 
@@ -30,7 +30,6 @@ try {
         echo json_encode([]);
     }
 } catch (PDOException $e) {
-    // If table doesn't exist, return empty array instead of error to keep UI stable
     echo json_encode([]);
 }
 ?>

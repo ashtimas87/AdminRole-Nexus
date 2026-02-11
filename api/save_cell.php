@@ -16,10 +16,11 @@ if(empty($data)) {
 if(!empty($data->prefix) && !empty($data->year) && !empty($data->userId) && !empty($data->piId) && !empty($data->activityId)) {
     try {
         $query = "INSERT INTO monitoring_data 
-                  (prefix, year, user_id, pi_id, activity_id, month_idx, value, activity_name, indicator_name, pi_title) 
-                  VALUES (:prefix, :year, :userId, :piId, :activityId, :monthIdx, :value, :actName, :indName, :piTitle)
+                  (prefix, year, user_id, pi_id, activity_id, month_idx, value, files_json, activity_name, indicator_name, pi_title) 
+                  VALUES (:prefix, :year, :userId, :piId, :activityId, :monthIdx, :value, :filesJson, :actName, :indName, :piTitle)
                   ON DUPLICATE KEY UPDATE 
                   value = VALUES(value), 
+                  files_json = VALUES(files_json),
                   activity_name = VALUES(activity_name), 
                   indicator_name = VALUES(indicator_name), 
                   pi_title = VALUES(pi_title)";
@@ -33,6 +34,7 @@ if(!empty($data->prefix) && !empty($data->year) && !empty($data->userId) && !emp
         $stmt->bindParam(':activityId', $data->activityId);
         $stmt->bindParam(':monthIdx', $data->monthIdx);
         $stmt->bindParam(':value', $data->value);
+        $stmt->bindParam(':filesJson', $data->filesJson);
         $stmt->bindParam(':actName', $data->activityName);
         $stmt->bindParam(':indName', $data->indicatorName);
         $stmt->bindParam(':piTitle', $data->piTitle);
@@ -47,6 +49,6 @@ if(!empty($data->prefix) && !empty($data->year) && !empty($data->userId) && !emp
         echo json_encode(["status" => "error", "message" => "Database Exception: " . $e->getMessage()]);
     }
 } else {
-    echo json_encode(["status" => "error", "message" => "Incomplete parameters.", "received" => $data]);
+    echo json_encode(["status" => "error", "message" => "Incomplete parameters."]);
 }
 ?>

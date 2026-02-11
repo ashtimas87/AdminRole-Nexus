@@ -7,6 +7,7 @@ export interface SavePayload {
   activityId: string;
   monthIdx: number;
   value: number;
+  filesJson?: string;
   activityName?: string;
   indicatorName?: string;
   piTitle?: string;
@@ -30,7 +31,7 @@ export const dbService = {
   },
 
   /**
-   * Saves a single cell value and its associated labels to the permanent MySQL storage.
+   * Saves a single cell value, its attachments, and labels to the permanent MySQL storage.
    */
   async saveActivityValue(payload: SavePayload) {
     try {
