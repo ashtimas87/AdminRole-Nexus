@@ -435,6 +435,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const vaultKey = `superadmin_drive_vault_${year}`;
     setVaultData(JSON.parse(localStorage.getItem(vaultKey) || '[]'));
 
+    // Reset active tab if the imported file hid the current one
     if (data.length > 0 && !data.find(d => d.id === activeTab)) {
       setActiveTab(data[0].id);
     }
@@ -595,12 +596,18 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       
       const foundPIs = new Set<string>();
       const piActivitiesMap: Record<string, string[]> = {};
+      const customPIsMap: Record<string, { id: string; title: string; activities: any[] }> = {};
+      const standardPIIds = Array.from({length: 29}, (_, i) => `PI${i+1}`);
 
       data.forEach(row => {
-        const piId = row['PI ID'];
-        const aid = row['Activity ID'];
+        const piIdRaw = row['PI ID'];
+        const piId = piIdRaw ? String(piIdRaw).trim().toUpperCase() : null;
+        const aidRaw = row['Activity ID'];
+        const aid = aidRaw ? String(aidRaw).trim() : null;
+        
         const activityName = row['Activity'] || row['Strategic Activity'];
         const indicatorName = row['Performance Indicator'];
+        const piTitle = row['PI Title'] || row['Strategic Priority'] || row['Strategic Goal'] || `Performance Indicator ${piId}`;
 
         if (piId && aid) {
           foundPIs.add(piId);
@@ -609,15 +616,28 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
              piActivitiesMap[piId].push(aid);
           }
 
-          // Strictly upload Activity and Indicator data to the list
+          // Ensure name exact mapping
           if (activityName) {
             localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, activityName);
           }
           if (indicatorName) {
             localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicatorName);
           }
+          if (piTitle) {
+            localStorage.setItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`, piTitle);
+          }
 
-          // Also upload numeric month data (especially for Target Outlook Master setup)
+          // Detect custom PIs
+          if (!standardPIIds.includes(piId)) {
+            if (!customPIsMap[piId]) {
+              customPIsMap[piId] = { id: piId, title: piTitle, activities: [] };
+            }
+            if (!customPIsMap[piId].activities.find(a => a.id === aid)) {
+              customPIsMap[piId].activities.push({ id: aid });
+            }
+          }
+
+          // Upload month data Jan to Dec
           MONTHS.forEach((m, i) => { 
             const rawVal = row[m];
             const val = (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') 
@@ -628,16 +648,20 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         }
       });
 
-      // Update the structure of IDs for each PI
+      // Save list structure for each PI
       Object.entries(piActivitiesMap).forEach(([piId, aids]) => {
         const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
         localStorage.setItem(actIdsKey, JSON.stringify(aids));
       });
 
-      // Update visibility (only show PIs present in the imported file)
+      // Update custom definitions key for rendering non-standard PIs
+      const customKeyToSave = `${prefix}_custom_definitions_${year}_${effectiveId}`;
+      localStorage.setItem(customKeyToSave, JSON.stringify(Object.values(customPIsMap)));
+
+      // Synchronize hidden PIs based on "exact" list from file
       const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
-      const allPossiblePIs = Array.from({length: 29}, (_, i) => `PI${i+1}`);
-      const newHidden = allPossiblePIs.filter(id => !foundPIs.has(id));
+      // In "exact" mode, hide anything NOT in the file from the standard set
+      const newHidden = standardPIIds.filter(id => !foundPIs.has(id));
       localStorage.setItem(hiddenPIsKey, JSON.stringify(newHidden));
 
       refresh();
@@ -659,11 +683,27 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     XLSX.writeFile(wb, `${subjectUser.name}_${activeTab}_${year}.xlsx`);
   };
 
+  const handleExportAllTabs = () => {
+    const wb = XLSX.utils.book_new();
+    piData.forEach(pi => {
+      const sheetData = pi.activities.map(act => {
+        const row: any = { 'Activity': act.activity, 'Performance Indicator': act.indicator };
+        MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
+        row['Total'] = act.total;
+        return row;
+      });
+      const ws = XLSX.utils.json_to_sheet(sheetData);
+      XLSX.utils.book_append_sheet(wb, ws, pi.id);
+    });
+    const cleanName = subjectUser.name.replace(/\s+/g, '_');
+    XLSX.writeFile(wb, `${cleanName}_All_PIs_${year}.xlsx`);
+  };
+
   const handleExportMasterTemplate = () => {
     const allData: any[] = [];
     piData.forEach(pi => {
       pi.activities.forEach(act => {
-        const row: any = { 'PI ID': pi.id, 'Activity ID': act.id, 'Activity': act.activity, 'Performance Indicator': act.indicator };
+        const row: any = { 'PI ID': pi.id, 'PI Title': pi.title, 'Activity ID': act.id, 'Activity': act.activity, 'Performance Indicator': act.indicator };
         MONTHS.forEach((m, i) => { row[m] = act.months[i].value; });
         allData.push(row);
       });
@@ -851,10 +891,13 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               {currentUser.role === UserRole.SUPER_ADMIN && <button onClick={handleRestoreAllTabs} className="bg-slate-100 hover:bg-slate-200 text-slate-900 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2 border border-slate-200"><RestoreHiddenIcon /> Restore Tabs</button>}
               <button onClick={handleExportMasterTemplate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Export Master</button>
               <button onClick={() => masterImportRef.current?.click()} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><UploadIcon /> Import Master</button>
-              <input type="file" ref={masterImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportMasterTemplate} />
+              <input type="file" min-width="150px" ref={masterImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportMasterTemplate} />
             </>
           )}
           <button onClick={handleExportExcel} className="bg-white hover:bg-emerald-50 text-slate-900 hover:text-emerald-700 border border-slate-200 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-sm flex items-center gap-2 text-xs">Export Current PI</button>
+          {currentUser.role === UserRole.SUPER_ADMIN && (
+            <button onClick={handleExportAllTabs} className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2">Export All Tab PI's</button>
+          )}
         </div>
       </div>
       
