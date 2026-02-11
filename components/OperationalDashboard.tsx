@@ -7,13 +7,23 @@ import { dbService } from '../services/dbService';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
- * Maps users to a shared Super Admin ID for Target Outlook views if needed.
+ * Hardened sanitization to prevent "undefined" or "null" strings.
+ */
+const sanitize = (val: any, fallback: string): string => {
+  if (val === null || val === undefined) return fallback;
+  const s = String(val).trim();
+  if (s === '' || s.toLowerCase() === 'undefined' || s.toLowerCase() === 'null') return fallback;
+  return s;
+};
+
+/**
+ * Maps users to a shared Super Admin ID for Target Outlook views.
  */
 const getEffectiveUserId = (userId: string, role?: UserRole, prefix?: string): string => {
-  if (role === UserRole.SUB_ADMIN && prefix === 'target') {
+  if (prefix === 'target' && (role === UserRole.SUB_ADMIN || role === UserRole.SUPER_ADMIN)) {
     return 'sa-1';
   }
-  return userId;
+  return userId || 'unknown';
 };
 
 const PaperclipIcon = ({ active }: { active?: boolean }) => (
@@ -60,45 +70,46 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const loadData = async () => {
     setSyncStatus('syncing');
     try {
-      // 1. Fetch values and metadata from Hostinger MySQL
       const dbRows = await dbService.fetchUnitData(prefix, year, effectiveId);
-      
-      // Transform DB rows into a lookup map
       const dbMap: Record<string, any> = {};
       dbRows.forEach((row: any) => {
         const key = `${row.pi_id}_${row.activity_id}_${row.month_idx}`;
         dbMap[key] = row;
       });
 
-      // 2. Build the UI structure
       const basePIs = Array.from({ length: 29 }, (_, i) => `PI${i + 1}`);
       const structuredData: PIData[] = basePIs.map(piId => {
-        const activityIds: string[] = Array.from(new Set(
-          dbRows.filter((r: any) => r.pi_id === piId).map((r: any) => String(r.activity_id))
-        ));
+        // Collect all activity IDs associated with this PI
+        const dbActivityIds = dbRows.filter((r: any) => r.pi_id === piId).map((r: any) => String(r.activity_id));
+        
+        // Also check local storage for structural markers
+        const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
+        let localIds: string[] = [];
+        try {
+          localIds = JSON.parse(localStorage.getItem(actIdsKey) || '[]');
+        } catch(e) { localIds = []; }
 
-        // Fallback for activity IDs if DB empty
-        if (activityIds.length === 0) {
-          const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
-          const localIds: string[] = JSON.parse(localStorage.getItem(actIdsKey) || '[]');
-          localIds.forEach((id: string) => activityIds.push(id));
-        }
+        const combinedActivityIds = Array.from(new Set([...dbActivityIds, ...localIds])).filter(id => id && id !== 'undefined');
 
-        const activities: PIActivity[] = activityIds.map(aid => {
+        const activities: PIActivity[] = combinedActivityIds.map(aid => {
           const meta = dbRows.find((r: any) => r.pi_id === piId && r.activity_id === aid);
-          
+          const localActName = localStorage.getItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`);
+          const localIndName = localStorage.getItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`);
+
           return {
             id: aid,
-            activity: meta?.activity_name || localStorage.getItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`) || "Unnamed Activity",
-            indicator: meta?.indicator_name || localStorage.getItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`) || "Units",
+            activity: sanitize(meta?.activity_name || localActName, "Unnamed Activity"),
+            indicator: sanitize(meta?.indicator_name || localIndName, "Units"),
             months: Array.from({ length: 12 }).map((_, mIdx) => {
               const rowKey = `${piId}_${aid}_${mIdx}`;
               const rowData = dbMap[rowKey];
               const val = rowData?.value || 0;
-              // Priority: DB files -> Local fallback (for backward compatibility)
-              const files = rowData?.files_json ? JSON.parse(rowData.files_json) : JSON.parse(localStorage.getItem(`${prefix}_files_${year}_${effectiveId}_${piId}_${aid}_${mIdx}`) || '[]');
+              let files: MonthFile[] = [];
+              try {
+                files = rowData?.files_json ? JSON.parse(rowData.files_json) : JSON.parse(localStorage.getItem(`${prefix}_files_${year}_${effectiveId}_${piId}_${aid}_${mIdx}`) || '[]');
+              } catch(e) { files = []; }
               return {
-                value: val,
+                value: typeof val === 'number' ? val : parseInt(val, 10) || 0,
                 files: Array.isArray(files) ? files : []
               };
             }),
@@ -107,34 +118,42 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         });
 
         const piMeta = dbRows.find((r: any) => r.pi_id === piId);
+        const localTitle = localStorage.getItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`);
+        
         return {
           id: piId,
-          title: piMeta?.pi_title || localStorage.getItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`) || `Performance Indicator ${piId}`,
+          title: sanitize(piMeta?.pi_title || localTitle, `Performance Indicator ${piId}`),
           activities: activities.map(a => ({
             ...a,
-            total: a.months.reduce((sum, m) => sum + m.value, 0)
+            total: a.months.reduce((sum, m) => sum + (m.value || 0), 0)
           }))
         };
       });
 
-      setPiData(structuredData.filter(pi => pi.activities.length > 0 || pi.id === activeTab));
+      // Show PIs that have activities or the one currently selected
+      setPiData(structuredData);
     } catch (err) {
-      console.error("Dashboard component load failed:", err);
+      console.error("Dashboard load failure:", err);
     } finally {
       setSyncStatus('idle');
     }
   };
 
-  useEffect(() => { loadData(); }, [prefix, year, subjectUser.id]);
+  useEffect(() => { loadData(); }, [prefix, year, effectiveId]);
 
-  const currentPI = useMemo(() => piData.find(pi => pi.id === activeTab) || piData[0], [piData, activeTab]);
+  const currentPI = useMemo(() => {
+    if (piData.length === 0) return null;
+    return piData.find(pi => pi.id === activeTab) || piData[0];
+  }, [piData, activeTab]);
 
   const handleImportMasterTemplate = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setSyncStatus('syncing');
-    await dbService.uploadFileToServer(file, { userId: 'sa-1', type: 'master' });
+    
+    // Attempt background upload of master file to Hostinger
+    dbService.uploadFileToServer(file, { userId: effectiveId, type: 'master' }).catch(() => {});
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -144,34 +163,41 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const data: any[] = XLSX.utils.sheet_to_json(ws);
 
       for (const row of data) {
-        const piId = String(row['PI ID'] || row['pi_id'] || '').trim().toUpperCase();
-        const aid = String(row['Activity ID'] || row['activity_id'] || '').trim();
-        const activityName = row['Activity'] || row['Activity Name'];
-        const indicatorName = row['Performance Indicator'] || row['Indicator'];
-        const piTitle = row['PI Title'] || row['Strategic Goal'];
+        const rawPiId = row['PI ID'] || row['pi_id'] || '';
+        const piId = sanitize(rawPiId, '').toUpperCase();
+        
+        const rawAid = row['Activity ID'] || row['activity_id'] || '';
+        const aid = sanitize(rawAid, '');
+        
+        const activityName = sanitize(row['Activity'] || row['Activity Name'], 'Unnamed Activity');
+        const indicatorName = sanitize(row['Performance Indicator'] || row['Indicator'], 'Units');
+        const piTitle = sanitize(row['PI Title'] || row['Strategic Goal'], `Performance Indicator ${piId}`);
 
         if (!piId || !aid) continue;
 
-        // Save local metadata keys for structural lookups
-        localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, String(activityName));
-        localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, String(indicatorName));
-        localStorage.setItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`, String(piTitle));
+        // Persist structural labels locally for instant UI responsiveness
+        localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, activityName);
+        localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicatorName);
+        localStorage.setItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`, piTitle);
         
         const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
-        const currentIds = JSON.parse(localStorage.getItem(actIdsKey) || '[]');
+        let currentIds = [];
+        try { currentIds = JSON.parse(localStorage.getItem(actIdsKey) || '[]'); } catch(e) { currentIds = []; }
         if (!currentIds.includes(aid)) {
           localStorage.setItem(actIdsKey, JSON.stringify([...currentIds, aid]));
         }
 
-        // Save Jan to Dec values to MySQL
+        // Save data points for each month to MySQL
+        const savePromises = [];
         for (let i = 0; i < 12; i++) {
           const mName = MONTHS[i];
           const val = parseInt(row[mName], 10) || 0;
-          await dbService.saveActivityValue({
+          savePromises.push(dbService.saveActivityValue({
             prefix, year, userId: effectiveId, piId, activityId: aid, monthIdx: i, value: val,
-            activityName: String(activityName), indicatorName: String(indicatorName), piTitle: String(piTitle)
-          });
+            activityName, indicatorName, piTitle
+          }));
         }
+        await Promise.all(savePromises);
       }
       
       await loadData();
@@ -179,6 +205,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       setTimeout(() => setSyncStatus('idle'), 2000);
     };
     reader.readAsBinaryString(file);
+    // Clear the input so same file can be imported again if needed
+    if (masterImportRef.current) masterImportRef.current.value = '';
   };
 
   const saveEdit = async () => {
@@ -206,7 +234,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const currentFiles = [...act.months[activeFileCell.monthIdx].files];
 
     for (const file of Array.from(files)) {
-      const url = await dbService.uploadFileToServer(file, { userId: effectiveId, type: 'mov' });
+      const url = await dbService.uploadFileToServer(file, { userId: effectiveId, type: 'evidence' });
       if (url) {
         currentFiles.push({ 
           id: Date.now().toString() + Math.random().toString(36).substr(2, 9), 
@@ -218,7 +246,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       }
     }
 
-    // Push updated file list to Database Cell
     await dbService.saveActivityValue({
       prefix, year, userId: effectiveId, piId: activeTab, activityId: aid, 
       monthIdx: activeFileCell.monthIdx, 
@@ -229,6 +256,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
     setSyncStatus('idle');
     loadData();
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
@@ -243,13 +271,13 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${syncStatus === 'syncing' ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              {syncStatus === 'syncing' ? 'Syncing to Hostinger Database...' : 'Permanent MySQL Storage Connected'}
+              {syncStatus === 'syncing' ? 'Syncing to Hostinger Database...' : 'Hostinger MySQL Terminal Connected'}
             </span>
           </div>
         </div>
         <div className="flex gap-2">
           <button onClick={() => masterImportRef.current?.click()} className="bg-slate-900 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-xl hover:bg-slate-800 transition-all">
-            <UploadIcon /> Import Master (Auto-Save)
+            <UploadIcon /> Import Master (Excel)
           </button>
           <input type="file" ref={masterImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportMasterTemplate} />
         </div>
@@ -277,17 +305,17 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {currentPI?.activities.length === 0 ? (
+            {!currentPI || currentPI.activities.length === 0 ? (
               <tr>
                 <td colSpan={14} className="px-6 py-24 text-center">
                   <div className="max-w-xs mx-auto space-y-3">
-                    <p className="text-slate-400 text-xs font-black uppercase tracking-widest">No Unit Data Found</p>
-                    <p className="text-[10px] text-slate-300 font-bold uppercase tracking-tight">Import a Master Excel file to populate this Terminal with permanent data.</p>
+                    <p className="text-slate-400 text-xs font-black uppercase tracking-widest">No Activity Records</p>
+                    <p className="text-[10px] text-slate-300 font-bold uppercase tracking-tight">Import an Excel template to populate the terminal with indicators.</p>
                   </div>
                 </td>
               </tr>
             ) : (
-              currentPI?.activities.map((act, rIdx) => (
+              currentPI.activities.map((act, rIdx) => (
                 <tr key={act.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="text-sm font-bold text-slate-900 leading-tight">{act.activity}</div>
@@ -335,7 +363,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         </table>
       </div>
 
-      {isFilesModalOpen && activeFileCell && (
+      {isFilesModalOpen && activeFileCell && currentPI && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-xl rounded-[3rem] p-10 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center">
@@ -360,10 +388,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                 onClick={() => fileInputRef.current?.click()}
                 className={`w-full py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${syncStatus === 'syncing' ? 'bg-slate-100 text-slate-400' : 'bg-slate-900 text-white shadow-xl hover:bg-slate-800'}`}
               >
-                {syncStatus === 'syncing' ? 'Syncing...' : 'Upload New Evidence'}
+                {syncStatus === 'syncing' ? 'Syncing...' : 'Upload Evidence'}
               </button>
               <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileUpload} />
-              {!canModifyData && <p className="text-[9px] font-black text-slate-400 uppercase mt-4">Viewing Mode (Read-Only)</p>}
+              {!canModifyData && <p className="text-[9px] font-black text-slate-400 uppercase mt-4">Read-Only Mode</p>}
             </div>
           </div>
         </div>

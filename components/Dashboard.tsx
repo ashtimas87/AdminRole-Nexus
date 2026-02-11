@@ -56,7 +56,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
       const key = localStorage.key(i);
       if (key && key.startsWith(matchPrefix)) {
         const val = parseInt(localStorage.getItem(key) || '0', 10);
-        total += val;
+        if (!isNaN(val)) total += val;
       }
     }
     return total;
@@ -241,8 +241,6 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
     }
 
     if (user.role === UserRole.CHQ) {
-      // For CHQ users, only show their own unit or all CHQ units if in 2023 consolidation
-      // and strictly hide station/special units in oversight view.
       stationUsers = [];
       specialUsers = [];
       subAdminUsers = [];
@@ -257,8 +255,6 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
   const renderUnitOversight = () => {
     if (!canSeeOversight) return null;
     const { subAdminUsers, chqUsers, specialUsers, stationUsers } = getFilteredUnits();
-    
-    // For CHQ Users, consolidation should NOT reflect data from stations.
     const relevantForConsolidation = user.role === UserRole.CHQ 
       ? chqUsers 
       : [...chqUsers, ...stationUsers, ...specialUsers];
@@ -387,8 +383,6 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
 
   const renderTargetOutlookLanding = () => {
     const { subAdminUsers, chqUsers, specialUsers, stationUsers } = getFilteredUnits();
-    
-    // For CHQ Users, consolidation should NOT reflect data from stations.
     const relevantForConsolidation = user.role === UserRole.CHQ 
       ? chqUsers 
       : [...chqUsers, ...stationUsers, ...specialUsers];
@@ -577,7 +571,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           </button>
         )}
 
-        {(user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SUB_ADMIN || user.role === UserRole.CHQ || user.role === UserRole.STATION) && (
+        {canSeeOversight && (
           <button 
             onClick={() => { setView('target-outlook-landing'); }}
             className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'target-outlook' || view === 'target-outlook-landing' ? 'bg-amber-600 text-white shadow-lg shadow-amber-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
@@ -609,8 +603,10 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
   );
 
   const getDashboardTitle = (targetUser: User, year: string, isOutlook: boolean) => {
+    if (!targetUser) return `Operational ${year} Data`;
     const isSelf = targetUser.id === user.id;
     const isSubAdminUnit = targetUser.role === UserRole.SUB_ADMIN;
+    const userName = targetUser.name || 'Unit';
 
     if (isOutlook) {
       if (isSelf) {
@@ -620,9 +616,8 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
       if (isSubAdminUnit || (isSelf && user.role === UserRole.SUPER_ADMIN)) {
          return `Operational Target Outlook ${year}`;
       }
-      return `${targetUser.name} ${year} Target Outlook`;
+      return `${userName} ${year} Target Outlook`;
     } else {
-      // Accomplishment
       if (isSelf) {
         if (user.role === UserRole.STATION) return `Tactical ${year} Accomplishment`;
         if (user.role === UserRole.CHQ) return `CHQ ${year} Accomplishment`;
@@ -631,7 +626,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
         return user.role === UserRole.CHQ ? `CHQ Units Accomplishment ${year}` : `CHQ & Tactical Consolidation ${year} Accomplishment`;
       }
       const typeLabel = targetUser.role === UserRole.STATION ? 'Tactical Accomplishment' : 'CHQ Accomplishment';
-      return `${targetUser.name} ${year} ${typeLabel}`;
+      return `${userName} ${year} ${typeLabel}`;
     }
   };
 
