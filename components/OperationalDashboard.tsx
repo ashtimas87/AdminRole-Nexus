@@ -79,10 +79,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
       const basePIs = Array.from({ length: 29 }, (_, i) => `PI${i + 1}`);
       const structuredData: PIData[] = basePIs.map(piId => {
-        // Collect all activity IDs associated with this PI
         const dbActivityIds = dbRows.filter((r: any) => r.pi_id === piId).map((r: any) => String(r.activity_id));
         
-        // Also check local storage for structural markers
         const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
         let localIds: string[] = [];
         try {
@@ -130,7 +128,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         };
       });
 
-      // Show PIs that have activities or the one currently selected
       setPiData(structuredData);
     } catch (err) {
       console.error("Dashboard load failure:", err);
@@ -140,6 +137,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   };
 
   useEffect(() => { loadData(); }, [prefix, year, effectiveId]);
+
+  // Only show PI tabs that have activities OR the currently active tab
+  const visibleTabs = useMemo(() => {
+    return piData.filter(pi => pi.activities.length > 0 || pi.id === activeTab);
+  }, [piData, activeTab]);
 
   const currentPI = useMemo(() => {
     if (piData.length === 0) return null;
@@ -152,7 +154,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
     setSyncStatus('syncing');
     
-    // Attempt background upload of master file to Hostinger
     dbService.uploadFileToServer(file, { userId: effectiveId, type: 'master' }).catch(() => {});
 
     const reader = new FileReader();
@@ -163,19 +164,20 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const data: any[] = XLSX.utils.sheet_to_json(ws);
 
       for (const row of data) {
-        const rawPiId = row['PI ID'] || row['pi_id'] || '';
+        // Robust header detection
+        const rawPiId = row['PI ID'] || row['pi_id'] || row['PI'] || '';
         const piId = sanitize(rawPiId, '').toUpperCase();
         
-        const rawAid = row['Activity ID'] || row['activity_id'] || '';
+        const rawAid = row['Activity ID'] || row['activity_id'] || row['ID'] || '';
         const aid = sanitize(rawAid, '');
         
-        const activityName = sanitize(row['Activity'] || row['Activity Name'], 'Unnamed Activity');
-        const indicatorName = sanitize(row['Performance Indicator'] || row['Indicator'], 'Units');
-        const piTitle = sanitize(row['PI Title'] || row['Strategic Goal'], `Performance Indicator ${piId}`);
+        const activityName = sanitize(row['Activity'] || row['Activity Name'] || row['Description'] || row['Activity Description'], 'Unnamed Activity');
+        const indicatorName = sanitize(row['Performance Indicator'] || row['Indicator'] || row['Indicator Name'] || row['Units'], 'Units');
+        const piTitle = sanitize(row['PI Title'] || row['Strategic Goal'] || row['Strategic Objective'] || row['Goal'], `Performance Indicator ${piId}`);
 
-        if (!piId || !aid) continue;
+        if (!piId || !aid || piId === '' || aid === '') continue;
 
-        // Persist structural labels locally for instant UI responsiveness
+        // Save metadata locally first for instant UI response
         localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, activityName);
         localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicatorName);
         localStorage.setItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`, piTitle);
@@ -187,7 +189,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           localStorage.setItem(actIdsKey, JSON.stringify([...currentIds, aid]));
         }
 
-        // Save data points for each month to MySQL
         const savePromises = [];
         for (let i = 0; i < 12; i++) {
           const mName = MONTHS[i];
@@ -205,7 +206,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       setTimeout(() => setSyncStatus('idle'), 2000);
     };
     reader.readAsBinaryString(file);
-    // Clear the input so same file can be imported again if needed
     if (masterImportRef.current) masterImportRef.current.value = '';
   };
 
@@ -284,7 +284,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       </div>
 
       <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-        {piData.map(pi => (
+        {visibleTabs.map(pi => (
           <button
             key={pi.id}
             onClick={() => setActiveTab(pi.id)}
@@ -293,6 +293,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             {pi.id}
           </button>
         ))}
+        {visibleTabs.length === 0 && (
+          <div className="px-4 py-2 text-[10px] font-black text-slate-300 uppercase tracking-widest">Initialize Terminal by Importing Excel</div>
+        )}
       </div>
 
       <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
@@ -309,8 +312,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               <tr>
                 <td colSpan={14} className="px-6 py-24 text-center">
                   <div className="max-w-xs mx-auto space-y-3">
-                    <p className="text-slate-400 text-xs font-black uppercase tracking-widest">No Activity Records</p>
-                    <p className="text-[10px] text-slate-300 font-bold uppercase tracking-tight">Import an Excel template to populate the terminal with indicators.</p>
+                    <p className="text-slate-400 text-xs font-black uppercase tracking-widest">No Activity Records for {activeTab}</p>
+                    <p className="text-[10px] text-slate-300 font-bold uppercase tracking-tight">Import an Excel template with the PI ID "{activeTab}" to populate this section.</p>
                   </div>
                 </td>
               </tr>
