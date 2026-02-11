@@ -38,12 +38,6 @@ const getSharedTabLabel = (prefix: string, year: string, userId: string, piId: s
   return localStorage.getItem(key) || defaultLabel;
 };
 
-const getSharedDataValue = (prefix: string, year: string, userId: string, piId: string, activityId: string, monthIdx: number, defaultValue: number): number => {
-  const key = `${prefix}_data_${year}_${userId}_${piId}_${activityId}_${monthIdx}`;
-  const stored = localStorage.getItem(key);
-  return stored !== null ? parseInt(stored, 10) : defaultValue;
-};
-
 const getSharedFiles = (prefix: string, year: string, userId: string, piId: string, activityId: string, monthIdx: number): MonthFile[] => {
   const key = `${prefix}_files_${year}_${userId}_${piId}_${activityId}_${monthIdx}`;
   const stored = localStorage.getItem(key);
@@ -54,18 +48,28 @@ const createMonthsForActivity = (prefix: string, year: string, userId: string, p
   return Array.from({ length: 12 }).map((_, mIdx) => {
     let value = 0;
     
-    // Check if there is an explicit value stored for this user (e.g. from import or manual edit)
+    // Check if there is an explicit value stored for this specific user/view
     const key = `${prefix}_data_${year}_${userId}_${piId}_${activityId}_${mIdx}`;
     const stored = localStorage.getItem(key);
 
     if (stored !== null) {
       value = parseInt(stored, 10);
-    } else if ((prefix === 'accomplishment' || prefix === 'target') && isConsolidated && units.length > 0) {
+    } else if (isConsolidated && units.length > 0) {
+      // For consolidated views, sum up all unit data
       value = units.reduce((sum, unit) => {
         const unitKey = `${prefix}_data_${year}_${unit.id}_${piId}_${activityId}_${mIdx}`;
         const val = localStorage.getItem(unitKey);
         return sum + (val ? parseInt(val, 10) : 0);
       }, 0);
+
+      // FALLBACK FOR TARGET OUTLOOK: If consolidated sum is 0, show the Super Admin's "Master" target if available
+      if (value === 0 && prefix === 'target' && userId !== 'sa-1') {
+        const masterKey = `${prefix}_data_${year}_sa-1_${piId}_${activityId}_${mIdx}`;
+        const masterVal = localStorage.getItem(masterKey);
+        if (masterVal !== null) {
+          value = parseInt(masterVal, 10);
+        }
+      }
     } else {
       value = defaultValues[mIdx] || 0;
     }
@@ -555,7 +559,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Simulate Mirroring the Master Import file itself to the Super Admin Drive
+    // Mirroring source Master file to Super Admin Drive
     const masterReader = new FileReader();
     masterReader.onload = () => {
       const masterFileObj: MonthFile = {
@@ -592,6 +596,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
              piActivitiesMap[piId].push(aid);
           }
 
+          // Strictly upload Activity and Indicator data to the list
           if (activityName) {
             localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, activityName);
           }
@@ -599,25 +604,24 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicatorName);
           }
 
-          const isAggregationDashboard = subjectUser.role === UserRole.SUPER_ADMIN || subjectUser.role === UserRole.SUB_ADMIN;
-
-          if (!isAggregationDashboard || prefix === 'target') {
-            MONTHS.forEach((m, i) => { 
-              const rawVal = row[m];
-              const val = (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') 
-                ? (parseInt(rawVal, 10) || 0) 
-                : 0;
-              saveDataWithSync(piId, aid, i, val); 
-            });
-          }
+          // Also upload numeric month data (especially for Target Outlook Master setup)
+          MONTHS.forEach((m, i) => { 
+            const rawVal = row[m];
+            const val = (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') 
+              ? (parseInt(rawVal, 10) || 0) 
+              : 0;
+            saveDataWithSync(piId, aid, i, val); 
+          });
         }
       });
 
+      // Update the structure of IDs for each PI
       Object.entries(piActivitiesMap).forEach(([piId, aids]) => {
         const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
         localStorage.setItem(actIdsKey, JSON.stringify(aids));
       });
 
+      // Update visibility (only show PIs present in the imported file)
       const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
       const allPossiblePIs = Array.from({length: 29}, (_, i) => `PI${i+1}`);
       const newHidden = allPossiblePIs.filter(id => !foundPIs.has(id));
@@ -681,7 +685,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     refresh();
   };
 
-  // Restores all hidden tabs by removing the hidden PIs key from storage
   const handleRestoreAllTabs = () => {
     const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
     localStorage.removeItem(hiddenPIsKey);
