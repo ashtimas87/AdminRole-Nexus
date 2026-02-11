@@ -443,7 +443,20 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   useEffect(() => { refresh(); }, [prefix, year, subjectUser.id, activeTab, allUnits]);
 
   const currentPI = useMemo(() => piData.find(pi => pi.id === activeTab) || piData[0], [piData, activeTab]);
-  const isPercent = useMemo(() => ["PI4", "PI9", "PI13", "PI15", "PI16", "PI18", "PI20", "PI21", "PI24", "PI25"].includes(activeTab), [activeTab]);
+
+  // Helper to determine if a performance indicator text implies a percentage value
+  const checkIsPercent = (indicator: string) => {
+    const lower = indicator.toLowerCase();
+    // Keywords that imply a percentage
+    if (lower.includes('percentage') || lower.includes('%') || lower.includes('rate') || lower.includes('ratio')) {
+       // Keywords that explicitly override and imply a count/number
+       if (lower.includes('no.') || lower.includes('number') || lower.includes('#') || lower.includes('count')) {
+          return false;
+       }
+       return true;
+    }
+    return false;
+  };
 
   const syncToSuperAdminDrive = (files: MonthFile[], unitId: string) => {
     const vaultKey = `superadmin_drive_vault_${year}`;
@@ -743,65 +756,68 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {currentPI?.activities.map((act, rIdx) => (
-                <tr key={act.id} className="hover:bg-slate-50/50 group transition-colors">
-                  {canEditStructure && (
-                    <td className="px-6 py-4"><button onClick={() => {
-                      if(confirm("Permanently remove this entry?")) {
-                        const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${activeTab}`;
-                        const currentIds = JSON.parse(localStorage.getItem(actIdsKey) || '[]');
-                        localStorage.setItem(actIdsKey, JSON.stringify(currentIds.filter((id:any) => id !== act.id)));
-                        refresh();
-                      }
-                    }} className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition text-sm font-black uppercase">Remove</button></td>
-                  )}
-                  <td className="px-6 py-4">
-                    {editingActivityField?.aid === act.id && editingActivityField?.field === 'activity' ? (
-                      <input autoFocus value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={() => { localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${activeTab}_${act.id}`, editFieldName); setEditingActivityField(null); refresh(); }} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-900 outline-none" />
-                    ) : ( <div onClick={() => canEditStructure && (setEditingActivityField({ aid: act.id, field: 'activity' }), setEditFieldName(act.activity))} className={`text-sm font-bold text-slate-900 leading-snug ${canEditStructure ? 'cursor-pointer hover:text-blue-600' : ''}`}>{act.activity}</div> )}
-                  </td>
-                  <td className="px-6 py-4">
-                    {editingActivityField?.aid === act.id && editingActivityField?.field === 'indicator' ? (
-                      <input autoFocus value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={() => { localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${activeTab}_${act.id}`, editFieldName); setEditingActivityField(null); refresh(); }} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-medium text-slate-500 outline-none" />
-                    ) : ( <div onClick={() => canEditStructure && (setEditingActivityField({ aid: act.id, field: 'indicator' }), setEditFieldName(act.indicator))} className={`text-xs font-medium text-slate-500 leading-relaxed ${canEditStructure ? 'cursor-pointer hover:text-blue-600' : ''}`}>{act.indicator}</div> )}
-                  </td>
-                  {act.months.map((m, mIdx) => (
-                    <td key={mIdx} className="px-1 py-4 group/cell">
-                      <div className="flex items-center justify-center gap-0.5">
-                        {editingCell?.rowIdx === rIdx && editingCell?.monthIdx === mIdx ? (
-                          <input autoFocus type="number" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e => e.key === 'Enter' && saveEdit()} className="w-12 mx-auto px-1 py-1 bg-white border-2 border-slate-900 rounded text-center text-xs font-black outline-none shadow-lg z-20" />
-                        ) : ( 
-                          <div onClick={() => handleCellClick(rIdx, mIdx, m.value)} className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-black transition-all ${canModifyData ? 'cursor-pointer hover:bg-slate-100' : ''} ${m.value > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
-                            {m.value}{isPercent ? '%' : ''}
-                          </div> 
-                        )}
-                        <button 
-                          onClick={(e) => handleOpenFiles(e, rIdx, mIdx)} 
-                          className={`flex items-center justify-center w-6 h-6 rounded-md transition-all ${m.files.length > 0 ? 'bg-emerald-50' : 'opacity-0 group-hover/cell:opacity-100 hover:bg-slate-100'}`}
-                        >
-                          <PaperclipIcon active={m.files.length > 0} />
-                        </button>
-                      </div>
+              {currentPI?.activities.map((act, rIdx) => {
+                const rowIsPercent = checkIsPercent(act.indicator);
+                return (
+                  <tr key={act.id} className="hover:bg-slate-50/50 group transition-colors">
+                    {canEditStructure && (
+                      <td className="px-6 py-4"><button onClick={() => {
+                        if(confirm("Permanently remove this entry?")) {
+                          const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${activeTab}`;
+                          const currentIds = JSON.parse(localStorage.getItem(actIdsKey) || '[]');
+                          localStorage.setItem(actIdsKey, JSON.stringify(currentIds.filter((id:any) => id !== act.id)));
+                          refresh();
+                        }
+                      }} className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition text-sm font-black uppercase">Remove</button></td>
+                    )}
+                    <td className="px-6 py-4">
+                      {editingActivityField?.aid === act.id && editingActivityField?.field === 'activity' ? (
+                        <input autoFocus value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={() => { localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${activeTab}_${act.id}`, editFieldName); setEditingActivityField(null); refresh(); }} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-900 outline-none" />
+                      ) : ( <div onClick={() => canEditStructure && (setEditingActivityField({ aid: act.id, field: 'activity' }), setEditFieldName(act.activity))} className={`text-sm font-bold text-slate-900 leading-snug ${canEditStructure ? 'cursor-pointer hover:text-blue-600' : ''}`}>{act.activity}</div> )}
                     </td>
-                  ))}
-                  <td className="px-6 py-4 text-center"><div className="text-sm font-black text-slate-900 bg-slate-100/50 py-2 rounded-xl">{act.total}{isPercent ? '%' : ''}</div></td>
-                  <td className="px-6 py-4 text-center">
-                    <button 
-                      onClick={(e) => { const firstMonthIdx = act.months.findIndex(m => m.files.length > 0); handleOpenFiles(e, rIdx, firstMonthIdx === -1 ? 0 : firstMonthIdx); }} 
-                      className={`p-2 rounded-xl transition-all ${act.months.some(m => m.files.length > 0) ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-300 hover:text-slate-900 hover:bg-slate-100'}`}
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    <td className="px-6 py-4">
+                      {editingActivityField?.aid === act.id && editingActivityField?.field === 'indicator' ? (
+                        <input autoFocus value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={() => { localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${activeTab}_${act.id}`, editFieldName); setEditingActivityField(null); refresh(); }} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-medium text-slate-500 outline-none" />
+                      ) : ( <div onClick={() => canEditStructure && (setEditingActivityField({ aid: act.id, field: 'indicator' }), setEditFieldName(act.indicator))} className={`text-xs font-medium text-slate-500 leading-relaxed ${canEditStructure ? 'cursor-pointer hover:text-blue-600' : ''}`}>{act.indicator}</div> )}
+                    </td>
+                    {act.months.map((m, mIdx) => (
+                      <td key={mIdx} className="px-1 py-4 group/cell">
+                        <div className="flex items-center justify-center gap-0.5">
+                          {editingCell?.rowIdx === rIdx && editingCell?.monthIdx === mIdx ? (
+                            <input autoFocus type="number" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e => e.key === 'Enter' && saveEdit()} className="w-12 mx-auto px-1 py-1 bg-white border-2 border-slate-900 rounded text-center text-xs font-black outline-none shadow-lg z-20" />
+                          ) : ( 
+                            <div onClick={() => handleCellClick(rIdx, mIdx, m.value)} className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-black transition-all ${canModifyData ? 'cursor-pointer hover:bg-slate-100' : ''} ${m.value > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
+                              {m.value}{rowIsPercent ? '%' : ''}
+                            </div> 
+                          )}
+                          <button 
+                            onClick={(e) => handleOpenFiles(e, rIdx, mIdx)} 
+                            className={`flex items-center justify-center w-6 h-6 rounded-md transition-all ${m.files.length > 0 ? 'bg-emerald-50' : 'opacity-0 group-hover/cell:opacity-100 hover:bg-slate-100'}`}
+                          >
+                            <PaperclipIcon active={m.files.length > 0} />
+                          </button>
+                        </div>
+                      </td>
+                    ))}
+                    <td className="px-6 py-4 text-center"><div className="text-sm font-black text-slate-900 bg-slate-100/50 py-2 rounded-xl">{act.total}{rowIsPercent ? '%' : ''}</div></td>
+                    <td className="px-6 py-4 text-center">
+                      <button 
+                        onClick={(e) => { const firstMonthIdx = act.months.findIndex(m => m.files.length > 0); handleOpenFiles(e, rIdx, firstMonthIdx === -1 ? 0 : firstMonthIdx); }} 
+                        className={`p-2 rounded-xl transition-all ${act.months.some(m => m.files.length > 0) ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-300 hover:text-slate-900 hover:bg-slate-100'}`}
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
             <tfoot className="border-t-2 border-slate-900 bg-slate-50/50">
               <tr className="font-black text-slate-900">
                 {canEditStructure && <td className="px-6 py-6"></td>}
                 <td colSpan={2} className="px-6 py-6 text-sm uppercase tracking-widest text-slate-900 font-black">Grand Total</td>
-                {monthlyTotals.map((total, idx) => ( <td key={idx} className="px-1 py-6 text-center text-sm">{total}{isPercent ? '%' : ''}</td> ))}
-                <td className="px-6 py-6 text-center"><div className="inline-block px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-black shadow-lg">{grandTotal}{isPercent ? '%' : ''}</div></td>
+                {monthlyTotals.map((total, idx) => ( <td key={idx} className="px-1 py-6 text-center text-sm">{total}</td> ))}
+                <td className="px-6 py-6 text-center"><div className="inline-block px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-black shadow-lg">{grandTotal}</div></td>
                 <td className="px-6 py-6"></td>
               </tr>
             </tfoot>
