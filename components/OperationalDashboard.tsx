@@ -328,64 +328,73 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data: any[] = XLSX.utils.sheet_to_json(ws);
         
-        const foundPIs = new Set<string>();
-        const piActivitiesMap: Record<string, string[]> = {};
+        // Propagation check: If subject is Police Station 1 (st-1) and mode is Target Outlook
+        const isStation1Target = prefix === 'target' && subjectUser.id === 'st-1';
+        const affectedUnits = isStation1Target 
+          ? allUnits.filter(u => u.role === UserRole.STATION && u.name !== 'City Mobile Force Company')
+          : [subjectUser];
 
-        data.forEach(row => {
-          const getVal = (possibleKeys: string[]) => {
-            const key = possibleKeys.find(k => {
-               const normalizedK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-               return Object.keys(row).some(rowKey => rowKey.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedK);
-            });
+        affectedUnits.forEach(unit => {
+          const unitEffectiveId = getEffectiveUserId(unit.id, unit.role, prefix);
+          const foundPIs = new Set<string>();
+          const piActivitiesMap: Record<string, string[]> = {};
+
+          data.forEach(row => {
+            const getVal = (possibleKeys: string[]) => {
+              const key = possibleKeys.find(k => {
+                 const normalizedK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                 return Object.keys(row).some(rowKey => rowKey.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedK);
+              });
+              
+              if (key) {
+                 const actualKey = Object.keys(row).find(rk => rk.toLowerCase().replace(/[^a-z0-9]/g, '') === key.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                 return actualKey ? String(row[actualKey]).trim() : '';
+              }
+              return '';
+            };
+
+            let piId = getVal(['PI ID', 'Indicator ID', 'PI', 'Tab Name', 'ID']);
+            if (!piId) return;
+
+            piId = piId.replace(/\s+/g, ' ').toUpperCase(); 
             
-            if (key) {
-               // Find the actual key in row that matched
-               const actualKey = Object.keys(row).find(rk => rk.toLowerCase().replace(/[^a-z0-9]/g, '') === key.toLowerCase().replace(/[^a-z0-9]/g, ''));
-               return actualKey ? String(row[actualKey]).trim() : '';
+            const aid = getVal(['Activity ID', 'Act ID', 'ID', 'Activity No']);
+            const activityName = getVal(['Activity', 'Activity Name', 'Action']);
+            const indicatorName = getVal(['Performance Indicator', 'Indicator', 'Indicator Name', 'PI Description']);
+            const piTitle = getVal(['PI Title', 'Indicator Title', 'Goal']);
+
+            if (piId && aid) {
+              foundPIs.add(piId);
+              if (!piActivitiesMap[piId]) piActivitiesMap[piId] = [];
+              if (!piActivitiesMap[piId].includes(aid)) piActivitiesMap[piId].push(aid);
+
+              if (activityName) localStorage.setItem(`${prefix}_pi_act_name_${year}_${unitEffectiveId}_${piId}_${aid}`, activityName);
+              if (indicatorName) localStorage.setItem(`${prefix}_pi_ind_name_${year}_${unitEffectiveId}_${piId}_${aid}`, indicatorName);
+              if (piTitle) localStorage.setItem(`${prefix}_pi_title_${year}_${unitEffectiveId}_${piId}`, piTitle);
+
+              MONTHS.forEach((m, i) => { 
+                const val = parseInt(getVal([m, m.substring(0, 3)]), 10) || 0;
+                localStorage.setItem(`${prefix}_data_${year}_${unitEffectiveId}_${piId}_${aid}_${i}`, String(val));
+              });
             }
-            return '';
-          };
+          });
 
-          // Flexible mapping for Indicator IDs
-          let piId = getVal(['PI ID', 'Indicator ID', 'PI', 'Tab Name', 'ID']);
-          if (!piId) return;
+          const sortedPIs = Array.from(foundPIs).sort(customPiSort);
+          localStorage.setItem(`${prefix}_imported_pi_list_${year}_${unitEffectiveId}`, JSON.stringify(sortedPIs));
 
-          piId = piId.replace(/\s+/g, ' ').toUpperCase(); 
-          
-          const aid = getVal(['Activity ID', 'Act ID', 'ID', 'Activity No']);
-          const activityName = getVal(['Activity', 'Activity Name', 'Action']);
-          const indicatorName = getVal(['Performance Indicator', 'Indicator', 'Indicator Name', 'PI Description']);
-          const piTitle = getVal(['PI Title', 'Indicator Title', 'Goal']);
+          Object.entries(piActivitiesMap).forEach(([piId, aids]) => {
+            localStorage.setItem(`${prefix}_pi_act_ids_${year}_${unitEffectiveId}_${piId}`, JSON.stringify(aids));
+          });
 
-          if (piId && aid) {
-            foundPIs.add(piId);
-            if (!piActivitiesMap[piId]) piActivitiesMap[piId] = [];
-            if (!piActivitiesMap[piId].includes(aid)) piActivitiesMap[piId].push(aid);
-
-            if (activityName) localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, activityName);
-            if (indicatorName) localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicatorName);
-            if (piTitle) localStorage.setItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`, piTitle);
-
-            MONTHS.forEach((m, i) => { 
-              const val = parseInt(getVal([m, m.substring(0, 3)]), 10) || 0;
-              localStorage.setItem(`${prefix}_data_${year}_${effectiveId}_${piId}_${aid}_${i}`, String(val));
-            });
-          }
+          localStorage.setItem(`${prefix}_hidden_pis_${year}_${unitEffectiveId}`, JSON.stringify([]));
         });
-
-        // Use our custom sort to prioritize PI over OD in the tab list
-        const sortedPIs = Array.from(foundPIs).sort(customPiSort);
-        
-        localStorage.setItem(`${prefix}_imported_pi_list_${year}_${effectiveId}`, JSON.stringify(sortedPIs));
-
-        Object.entries(piActivitiesMap).forEach(([piId, aids]) => {
-          localStorage.setItem(`${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`, JSON.stringify(aids));
-        });
-
-        localStorage.setItem(`${prefix}_hidden_pis_${year}_${effectiveId}`, JSON.stringify([]));
 
         refresh();
-        alert(`Registry Refreshed. Strictly imported ${sortedPIs.length} indicators with monthly data from the provided list.`);
+        if (isStation1Target) {
+          alert(`Master Registry Refreshed and Propagated to all Station Units (excluding Company).`);
+        } else {
+          alert(`Registry Refreshed for ${subjectUser.name}. Imported identifiers with monthly data.`);
+        }
       } catch (err) {
         console.error(err);
         alert("Import Failed: Ensure Excel columns match expected identifiers (Indicator ID, Activity, PI, etc.).");
