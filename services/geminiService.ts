@@ -1,6 +1,5 @@
-
 import { GoogleGenAI } from "@google/genai";
-import { UserRole } from "../types";
+import { UserRole } from "../types.ts";
 
 /**
  * Initialize the Google GenAI client following strict guidelines.

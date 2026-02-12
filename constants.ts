@@ -1,5 +1,4 @@
-
-import { User, UserRole } from './types';
+import { User, UserRole } from './types.ts';
 
 const CHQ_NAMES = [
   'CHQ CARMU',
@@ -14,7 +13,6 @@ const CHQ_NAMES = [
 ];
 
 export const MOCK_USERS: User[] = [
-  // Updated Super Admin email to barvickrunch@gmail.com
   {
     id: 'sa-1',
     email: 'barvickrunch@gmail.com',
@@ -23,7 +21,6 @@ export const MOCK_USERS: User[] = [
     role: UserRole.SUPER_ADMIN,
     avatar: 'https://picsum.photos/seed/sa1/100/100'
   },
-  // 1 Sub Admin - Updated email per request
   {
     id: 'sub-1',
     email: 'soldevilla.victor.pnpti@gmail.com',
@@ -32,7 +29,6 @@ export const MOCK_USERS: User[] = [
     role: UserRole.SUB_ADMIN,
     avatar: 'https://picsum.photos/seed/sub1/100/100'
   },
-  // CHQ Users
   ...CHQ_NAMES.map((name, i) => ({
     id: `chq-${i + 1}`,
     email: `${name.replace('CHQ ', '').replace('&', 'and').replace(/\s+/g, '').toLowerCase()}@gmail.com`,
@@ -41,24 +37,14 @@ export const MOCK_USERS: User[] = [
     role: UserRole.CHQ,
     avatar: `https://picsum.photos/seed/chq${i}/100/100`
   })),
-  // 11 Station Users
-  ...Array.from({ length: 11 }).map((_, i) => {
-    let email = `station${i + 1}@gmail.com`;
-    if (i === 0) {
-      email = 'ashtimasmalabanan@gmail.com';
-    } else if (i === 10) {
-      email = 'cocpocmfc@gmail.com';
-    }
-
-    return {
-      id: `st-${i + 1}`,
-      email: email,
-      password: 'admin123',
-      name: i === 10 ? 'City Mobile Force Company' : `Police Station ${i + 1}`,
-      role: UserRole.STATION,
-      avatar: `https://picsum.photos/seed/st${i}/100/100`
-    };
-  })
+  ...Array.from({ length: 11 }).map((_, i) => ({
+    id: `st-${i + 1}`,
+    email: i === 10 ? 'cocpocmfc@gmail.com' : `station${i + 1}@gmail.com`,
+    password: 'admin123',
+    name: i === 10 ? 'City Mobile Force Company' : `Police Station ${i + 1}`,
+    role: UserRole.STATION,
+    avatar: `https://picsum.photos/seed/st${i}/100/100`
+  }))
 ];
 
 export const ROLE_LABELS: Record<UserRole, { label: string; color: string; desc: string }> = {

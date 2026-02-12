@@ -1,8 +1,7 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
-import { User, UserRole } from '../types';
-import { ROLE_LABELS, MOCK_USERS } from '../constants';
-import OperationalDashboard from './OperationalDashboard';
+import { User, UserRole } from '../types.ts';
+import { ROLE_LABELS, MOCK_USERS } from '../constants.ts';
+import OperationalDashboard from './OperationalDashboard.tsx';
 
 type ViewType = 
   | 'accounts' 
@@ -241,8 +240,6 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
     }
 
     if (user.role === UserRole.CHQ) {
-      // For CHQ users, only show their own unit or all CHQ units if in 2023 consolidation
-      // and strictly hide station/special units in oversight view.
       stationUsers = [];
       specialUsers = [];
       subAdminUsers = [];
@@ -258,7 +255,6 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
     if (!canSeeOversight) return null;
     const { subAdminUsers, chqUsers, specialUsers, stationUsers } = getFilteredUnits();
     
-    // For CHQ Users, consolidation should NOT reflect data from stations.
     const relevantForConsolidation = user.role === UserRole.CHQ 
       ? chqUsers 
       : [...chqUsers, ...stationUsers, ...specialUsers];
@@ -388,7 +384,6 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
   const renderTargetOutlookLanding = () => {
     const { subAdminUsers, chqUsers, specialUsers, stationUsers } = getFilteredUnits();
     
-    // For CHQ Users, consolidation should NOT reflect data from stations.
     const relevantForConsolidation = user.role === UserRole.CHQ 
       ? chqUsers 
       : [...chqUsers, ...stationUsers, ...specialUsers];
@@ -454,7 +449,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
               </div>
               <div className="text-right">
                 <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Total Target</p>
-                <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3 py-1 rounded-lg font-black text-lg">
+                <div className="bg-amber-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg font-black text-lg">
                   {calculateConsolidatedTotal(relevantForConsolidation, selectedYear, 'target').toLocaleString()}
                 </div>
               </div>
@@ -622,7 +617,6 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
       }
       return `${targetUser.name} ${year} Target Outlook`;
     } else {
-      // Accomplishment
       if (isSelf) {
         if (user.role === UserRole.STATION) return `Tactical ${year} Accomplishment`;
         if (user.role === UserRole.CHQ) return `CHQ ${year} Accomplishment`;
