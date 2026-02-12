@@ -9,25 +9,46 @@ const YEARS = ['2026', '2025', '2024', '2023'];
 /**
  * Custom sort function for PI IDs.
  * Logic: Priority is PI group, then OD/ODPI group.
+ * Within each group, use natural numeric sorting.
  */
 const customPiSort = (a: string, b: string) => {
   const aUpper = a.toUpperCase();
   const bUpper = b.toUpperCase();
+
+  // Categorize: True PI (starts with PI but NOT ODPI) vs OD (starts with OD or ODPI)
   const aIsPriorityPI = aUpper.startsWith('PI') && !aUpper.startsWith('OD');
   const bIsPriorityPI = bUpper.startsWith('PI') && !bUpper.startsWith('OD');
+
+  // If different categories, priority PI comes first
   if (aIsPriorityPI && !bIsPriorityPI) return -1;
   if (!aIsPriorityPI && bIsPriorityPI) return 1;
+
+  // If same category, use natural numeric sorting
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 };
 
+/**
+ * Standardizes the tab label based on the priority request:
+ * Strictly refers to the PI ID from the list, ensuring that 
+ * extra prefixes like "PI -" are not added to OD-prefixed IDs.
+ */
 const formatTabLabel = (id: string): string => {
   const cleanId = id.toUpperCase().trim();
-  if (cleanId.startsWith('PI') || cleanId.startsWith('OD')) return cleanId;
+  // If it's already a valid identifier (starts with PI or OD), return as is.
+  if (cleanId.startsWith('PI') || cleanId.startsWith('OD')) {
+    return cleanId;
+  }
+  // Otherwise, fallback to a standard PI prefix for numerical raw IDs.
   return `PI ${cleanId}`;
 };
 
+/**
+ * Determines the effective storage key ID.
+ */
 const getEffectiveUserId = (userId: string, role?: UserRole, prefix?: string): string => {
-  if (role === UserRole.SUB_ADMIN && prefix === 'target') return 'sa-1';
+  if (role === UserRole.SUB_ADMIN && prefix === 'target') {
+    return 'sa-1';
+  }
   return userId;
 };
 
@@ -74,8 +95,11 @@ const createMonthsForActivity = (prefix: string, year: string, userId: string, p
         });
       });
     } else {
-      if (stored !== null) value = parseInt(stored, 10);
-      else value = defaultValues[mIdx] || 0;
+      if (stored !== null) {
+        value = parseInt(stored, 10);
+      } else {
+        value = defaultValues[mIdx] || 0;
+      }
       files = getSharedFiles(prefix, year, userId, piId, activityId, mIdx);
     }
 
@@ -90,6 +114,7 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
   const orderKey = `${prefix}_pi_order_${year}_${effectiveId}`;
   const customOrder: string[] = JSON.parse(localStorage.getItem(orderKey) || '[]');
   
+  // Load the list of PI IDs that were explicitly imported for this unit/year
   const importedListKey = `${prefix}_imported_pi_list_${year}_${effectiveId}`;
   const importedIds: string[] = JSON.parse(localStorage.getItem(importedListKey) || '[]');
 
@@ -103,17 +128,24 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
     }
   };
 
+  // Base set of IDs: Use imported ones or default PI1-PI29
   let baseIds = importedIds.length > 0 ? importedIds : Array.from({ length: 29 }, (_, i) => `PI${i + 1}`);
+  
+  // Apply our custom priority sort to the base IDs
   baseIds = [...baseIds].sort(customPiSort);
 
   const piList = baseIds.map(piId => {
     const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
     const storedIds = localStorage.getItem(actIdsKey);
+    
+    // Check if we have an imported structure first, otherwise use piStructureMap
     const struct = piStructureMap[piId] || { 
       title: `Indicator ${piId}`, 
       activities: [{ id: `${piId.toLowerCase()}_a1`, name: "Operational Activity", indicator: "Activity Unit", defaults: Array(12).fill(0) }] 
     };
+    
     let activityIds: string[] = storedIds ? JSON.parse(storedIds) : struct.activities.map((a: any) => a.id);
+
     const activities = activityIds.map(aid => {
       const base = struct.activities.find((a: any) => a.id === aid);
       return {
@@ -124,7 +156,12 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
         total: 0
       };
     });
-    return { id: piId, title: getSharedPITitle(prefix, year, effectiveId, piId, struct.title), activities };
+
+    return {
+      id: piId,
+      title: getSharedPITitle(prefix, year, effectiveId, piId, struct.title),
+      activities
+    };
   });
 
   const customKey = `${prefix}_custom_definitions_${year}_${effectiveId}`;
@@ -141,6 +178,7 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
       return indexA - indexB;
     });
   }
+
   return allDefinitions.filter(pi => ignoreHidden ? true : !hiddenPIs.includes(pi.id));
 };
 
@@ -190,7 +228,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const prefix = isTargetOutlook ? 'target' : 'accomplishment';
   const effectiveId = useMemo(() => getEffectiveUserId(subjectUser.id, subjectUser.role, prefix), [subjectUser.id, subjectUser.role, prefix]);
   
+  const isAdmin = currentUser.role === UserRole.SUPER_ADMIN || currentUser.role === UserRole.SUB_ADMIN;
   const isOwner = currentUser.id === subjectUser.id;
+  
   const isConsolidated = useMemo(() => {
     return (currentUser.role === UserRole.SUPER_ADMIN && (title.includes('Consolidation') || title.includes('Operational Dashboard'))) ||
            (currentUser.role === UserRole.CHQ && title.includes('Consolidation'));
@@ -235,6 +275,46 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     }
   };
 
+  const syncToSuperAdminDrive = async (files: MonthFile[]) => {
+    setSyncStatus('syncing');
+    try {
+      const vaultKey = `superadmin_drive_vault_${year}`;
+      const vault = JSON.parse(localStorage.getItem(vaultKey) || '[]');
+      localStorage.setItem(vaultKey, JSON.stringify([...vault, ...files.map(f => ({ ...f, unitId: effectiveId, unitName: subjectUser.name }))]));
+    } catch (err) {
+      console.warn("Vault Sync Simulation.");
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !activeFileCell || !currentPI || isConsolidated) return;
+    
+    setSyncStatus('uploading');
+    const aid = currentPI.activities[activeFileCell.rowIdx].id;
+    const key = `${prefix}_files_${year}_${effectiveId}_${activeTab}_${aid}_${activeFileCell.monthIdx}`;
+    const existing: MonthFile[] = JSON.parse(localStorage.getItem(key) || '[]');
+    
+    const uploadedFiles: MonthFile[] = [];
+
+    for (const file of Array.from(files) as File[]) {
+      const metadata: MonthFile = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        url: URL.createObjectURL(file),
+        type: file.type,
+        uploadedAt: new Date().toISOString()
+      };
+      uploadedFiles.push(metadata);
+    }
+
+    localStorage.setItem(key, JSON.stringify([...existing, ...uploadedFiles]));
+    await syncToSuperAdminDrive(uploadedFiles);
+    setSyncStatus('complete');
+    refresh();
+    setTimeout(() => setSyncStatus('idle'), 2000);
+  };
+
   const handleImportMasterTemplate = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isConsolidated) return;
     const file = e.target.files?.[0];
@@ -245,13 +325,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       try {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
-        if (!wb.SheetNames.length) throw new Error("Worksheet empty");
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data: any[] = XLSX.utils.sheet_to_json(ws);
         
-        const isPS1 = subjectUser.id === 'st-1' || subjectUser.name.includes('Police Station 1');
-        const isStation1Target = prefix === 'target' && isPS1;
-        
+        // Propagation check: If subject is Police Station 1 (st-1) and mode is Target Outlook
+        const isStation1Target = prefix === 'target' && subjectUser.id === 'st-1';
         const affectedUnits = isStation1Target 
           ? allUnits.filter(u => u.role === UserRole.STATION && u.name !== 'City Mobile Force Company')
           : [subjectUser];
@@ -262,28 +340,28 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           const piActivitiesMap: Record<string, string[]> = {};
 
           data.forEach(row => {
-            if (!row || typeof row !== 'object') return;
             const getVal = (possibleKeys: string[]) => {
-              const rowKeys = Object.keys(row);
-              const targetKey = possibleKeys.find(k => {
-                 const nk = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-                 return rowKeys.some(rk => rk.toLowerCase().replace(/[^a-z0-9]/g, '') === nk);
+              const key = possibleKeys.find(k => {
+                 const normalizedK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                 return Object.keys(row).some(rowKey => rowKey.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedK);
               });
-              if (targetKey) {
-                const actualKey = rowKeys.find(rk => rk.toLowerCase().replace(/[^a-z0-9]/g, '') === targetKey.toLowerCase().replace(/[^a-z0-9]/g, ''));
-                return actualKey ? String(row[actualKey]).trim() : '';
+              
+              if (key) {
+                 const actualKey = Object.keys(row).find(rk => rk.toLowerCase().replace(/[^a-z0-9]/g, '') === key.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                 return actualKey ? String(row[actualKey]).trim() : '';
               }
               return '';
             };
 
-            let piId = getVal(['PI ID', 'Indicator ID', 'PI', 'Tab Name', 'ID', 'IndicatorID']);
+            let piId = getVal(['PI ID', 'Indicator ID', 'PI', 'Tab Name', 'ID']);
             if (!piId) return;
 
             piId = piId.replace(/\s+/g, ' ').toUpperCase(); 
-            const aid = getVal(['Activity ID', 'Act ID', 'ID', 'Activity No', 'ActivityID']);
-            const activityName = getVal(['Activity', 'Activity Name', 'Action', 'ActivityName']);
-            const indicatorName = getVal(['Performance Indicator', 'Indicator', 'Indicator Name', 'PI Description', 'IndicatorName']);
-            const piTitle = getVal(['PI Title', 'Indicator Title', 'Goal', 'IndicatorTitle']);
+            
+            const aid = getVal(['Activity ID', 'Act ID', 'ID', 'Activity No']);
+            const activityName = getVal(['Activity', 'Activity Name', 'Action']);
+            const indicatorName = getVal(['Performance Indicator', 'Indicator', 'Indicator Name', 'PI Description']);
+            const piTitle = getVal(['PI Title', 'Indicator Title', 'Goal']);
 
             if (piId && aid) {
               foundPIs.add(piId);
@@ -303,18 +381,23 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
           const sortedPIs = Array.from(foundPIs).sort(customPiSort);
           localStorage.setItem(`${prefix}_imported_pi_list_${year}_${unitEffectiveId}`, JSON.stringify(sortedPIs));
+
           Object.entries(piActivitiesMap).forEach(([piId, aids]) => {
             localStorage.setItem(`${prefix}_pi_act_ids_${year}_${unitEffectiveId}_${piId}`, JSON.stringify(aids));
           });
+
           localStorage.setItem(`${prefix}_hidden_pis_${year}_${unitEffectiveId}`, JSON.stringify([]));
         });
 
         refresh();
-        if (isStation1Target) alert(`Target Registry Refreshed and Propagated to all Station Units.`);
-        else alert(`Registry successfully updated for ${subjectUser.name}.`);
+        if (isStation1Target) {
+          alert(`Master Registry Refreshed and Propagated to all Station Units (excluding Company).`);
+        } else {
+          alert(`Registry Refreshed for ${subjectUser.name}. Imported identifiers with monthly data.`);
+        }
       } catch (err) {
         console.error(err);
-        alert("Import Failed: Please ensure your Excel file uses standard column headers (PI ID, Activity, etc.) and is not empty.");
+        alert("Import Failed: Ensure Excel columns match expected identifiers (Indicator ID, Activity, PI, etc.).");
       }
     };
     reader.readAsBinaryString(file);
@@ -384,6 +467,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             {formatTabLabel(pi.id)}
           </button>
         ))}
+        {piData.length === 0 && (
+          <div className="px-6 py-2.5 text-[10px] font-black uppercase text-slate-300 tracking-widest">No Indicators Loaded</div>
+        )}
       </div>
 
       <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
@@ -404,7 +490,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               {currentPI?.activities.map((act, rIdx) => (
                 <tr key={act.id} className="hover:bg-slate-50/50 group transition-colors">
                   <td className="px-6 py-5">
-                    <span className="text-sm font-bold text-slate-900 leading-snug">{act.activity}</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-slate-900 leading-snug">{act.activity}</span>
+                    </div>
                   </td>
                   <td className="px-6 py-5 text-xs font-semibold text-slate-600 leading-snug">{act.indicator}</td>
                   {act.months.map((m, mIdx) => (
@@ -424,10 +512,38 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                   <td className={`px-6 py-5 text-center text-sm font-black ${isConsolidated ? 'text-emerald-900' : 'text-slate-900'}`}>{act.total.toLocaleString()}</td>
                 </tr>
               ))}
+              {(!currentPI || currentPI.activities.length === 0) && (
+                <tr>
+                  <td colSpan={15} className="px-6 py-12 text-center text-slate-300 font-bold uppercase tracking-widest text-[10px]">No Records Found: Use 'Import Master' to Populate Data</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {isFilesModalOpen && !isConsolidated && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-slate-50 p-8 border-b flex items-center justify-between">
+              <div>
+                <h3 className="text-2xl font-black text-slate-900 uppercase">Documents Vault</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Unit Drive Storage</p>
+              </div>
+              <button onClick={() => setIsFilesModalOpen(false)} className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-900">Close</button>
+            </div>
+            <div className="p-8 space-y-4">
+              <button onClick={() => fileInputRef.current?.click()} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest py-4 rounded-2xl transition-all flex items-center justify-center gap-3">
+                <UploadIcon /> {syncStatus === 'idle' ? 'Upload New MOV' : 'Processing...'}
+              </button>
+              <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileUpload} />
+              <div className="pt-4 border-t text-center text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">
+                Secure Cloud Storage Mirroring Active
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

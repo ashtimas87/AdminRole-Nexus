@@ -26,7 +26,7 @@ export const MOCK_USERS: User[] = [
   // 1 Sub Admin - Updated email per request
   {
     id: 'sub-1',
-    email: 'cpsmucocpo2022@gmail.com',
+    email: 'soldevilla.victor.pnpti@gmail.com',
     password: 'admin123',
     name: 'COCPO CPSMU',
     role: UserRole.SUB_ADMIN,
@@ -44,8 +44,9 @@ export const MOCK_USERS: User[] = [
   // 11 Station Users
   ...Array.from({ length: 11 }).map((_, i) => {
     let email = `station${i + 1}@gmail.com`;
-    // Explicitly handling the requested override for station 1 and the company email
-    if (i === 10) {
+    if (i === 0) {
+      email = 'ashtimasmalabanan@gmail.com';
+    } else if (i === 10) {
       email = 'cocpocmfc@gmail.com';
     }
 
