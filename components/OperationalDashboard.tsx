@@ -231,7 +231,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const isHeadOfficeView = subjectUser.id === currentUser.id || subjectUser.role === UserRole.SUB_ADMIN;
   const isConsolidated = (prefix === 'accomplishment' || prefix === 'target') && isHeadOfficeView;
   
-  // Consolidated accomplishment views are read-only for all users, including super admin.
+  // Consolidated accomplishment views are read-only for everyone, especially for Super Admin
   const isReadOnlyConsolidatedView = isConsolidated && prefix === 'accomplishment';
 
   const canModifyData = 
@@ -241,7 +241,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       (currentUser.role === UserRole.SUPER_ADMIN && (subjectUser.role === UserRole.STATION || subjectUser.role === UserRole.CHQ))
     );
   
-  const canEditStructure = currentUser.role === UserRole.SUPER_ADMIN; 
+  const canEditStructure = currentUser.role === UserRole.SUPER_ADMIN && !isReadOnlyConsolidatedView; 
   const canAccessFiles = isOwner || isAdmin;
 
   const refresh = () => {
@@ -420,8 +420,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   };
 
   const handleImportAllPIs = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (currentUser.role !== UserRole.SUPER_ADMIN) {
-        alert("Access Denied. Only Super Admins can import data.");
+    if (currentUser.role !== UserRole.SUPER_ADMIN || isReadOnlyConsolidatedView) {
+        alert("Access Denied. Only Super Admins can import data, and not on Consolidated Accomplishment views.");
         return;
     }
     const file = e.target.files?.[0];
@@ -467,8 +467,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   };
 
   const handleImportAllPIDescriptions = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (currentUser.role !== UserRole.SUPER_ADMIN) {
-        alert("Access Denied. Only Super Admins can perform this action.");
+    if (currentUser.role !== UserRole.SUPER_ADMIN || isReadOnlyConsolidatedView) {
+        alert("Access Denied. Only Super Admins can perform this action, and not on Consolidated Accomplishment views.");
         return;
     }
     const file = e.target.files?.[0];
@@ -577,8 +577,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   }, [vaultData, vaultFolder]);
 
   const showImportDescriptionsButton = useMemo(() => 
-    currentUser.role === UserRole.SUPER_ADMIN && (isTargetOutlook || (!isTargetOutlook && subjectUser.role === UserRole.CHQ)),
-  [currentUser.role, isTargetOutlook, subjectUser.role]);
+    currentUser.role === UserRole.SUPER_ADMIN && !isReadOnlyConsolidatedView && (isTargetOutlook || (!isTargetOutlook && subjectUser.role === UserRole.CHQ)),
+  [currentUser.role, isTargetOutlook, subjectUser.role, isReadOnlyConsolidatedView]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -589,7 +589,12 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             Return to Terminal
           </button>
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">{title}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">{title}</h1>
+              {isReadOnlyConsolidatedView && (
+                <span className="bg-rose-100 text-rose-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest animate-pulse">Read Only Consolidated View</span>
+              )}
+            </div>
             <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-2 opacity-60">Unit: {subjectUser.name}</p>
           </div>
         </div>
@@ -612,7 +617,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               Export All Tab PI's
             </button>
           )}
-          {currentUser.role === UserRole.SUPER_ADMIN && (isConsolidated || isTargetOutlook) && (
+          {currentUser.role === UserRole.SUPER_ADMIN && (isConsolidated || isTargetOutlook) && !isReadOnlyConsolidatedView && (
               <>
                   <button onClick={() => allPIsImportRef.current?.click()} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2">
                       <UploadIcon />
@@ -792,6 +797,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                     <UploadIcon /> {syncStatus === 'idle' ? 'Upload & Sync' : 'Synchronizing...'}
                   </button>
                   <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileUpload} />
+                </div>
+              )}
+              {isReadOnlyConsolidatedView && (
+                <div className="p-6 bg-slate-50 border-2 border-dashed rounded-[2rem] text-center">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Upload functions disabled for consolidated view</p>
                 </div>
               )}
             </div>
