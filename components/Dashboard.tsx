@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { User, UserRole } from '../types.ts';
-import { ROLE_LABELS, MOCK_USERS } from '../constants.ts';
-import OperationalDashboard from './OperationalDashboard.tsx';
+import { User, UserRole } from '../types';
+import { ROLE_LABELS, MOCK_USERS } from '../constants';
+import OperationalDashboard from './OperationalDashboard';
 
 type ViewType = 
   | 'accounts' 
@@ -12,6 +12,7 @@ type ViewType =
   | 'target-outlook'
   | 'target-outlook-landing'
   | 'unit-landing'
+  | 'master-template'
   | 'progress';
 
 const YEAR_CONFIG = [
@@ -383,7 +384,6 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
 
   const renderTargetOutlookLanding = () => {
     const { subAdminUsers, chqUsers, specialUsers, stationUsers } = getFilteredUnits();
-    
     const relevantForConsolidation = user.role === UserRole.CHQ 
       ? chqUsers 
       : [...chqUsers, ...stationUsers, ...specialUsers];
@@ -449,7 +449,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
               </div>
               <div className="text-right">
                 <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Total Target</p>
-                <div className="bg-amber-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg font-black text-lg">
+                <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3 py-1 rounded-lg font-black text-lg">
                   {calculateConsolidatedTotal(relevantForConsolidation, selectedYear, 'target').toLocaleString()}
                 </div>
               </div>
@@ -543,13 +543,22 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
       
       <div className="space-y-4">
         {user.role === UserRole.SUPER_ADMIN && (
-          <button 
-            onClick={() => setView('accounts')}
-            className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'accounts' ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
-          >
-            Account Management
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-          </button>
+          <>
+            <button 
+              onClick={() => setView('accounts')}
+              className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'accounts' ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+            >
+              Account Management
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+            </button>
+            <button 
+              onClick={() => setView('master-template')}
+              className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'master-template' ? 'bg-rose-600 text-white shadow-lg shadow-rose-200' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}`}
+            >
+              Master Template
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+            </button>
+          </>
         )}
 
         {!isAdmin && (
@@ -631,7 +640,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      <nav className="sticky top-0 z-30 bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm">
+      <nav className="sticky top-0 z-40 bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg">C</div>
           <h1 className="font-black text-slate-900 tracking-tighter text-lg">COCPO Hub</h1>
@@ -647,12 +656,39 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
       <div className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1 order-first">{renderSidebar()}</div>
         <div className="lg:col-span-2 space-y-6">
+          {/* Prominent Year Selector for Dashboards */}
+          {(view === 'operational-dashboard' || view === 'target-outlook' || view === 'master-template') && (
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2 animate-in fade-in duration-500">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 border-r border-slate-100 mr-2">Archive Selection</span>
+              {YEAR_CONFIG.map(cfg => (
+                <button
+                  key={cfg.year}
+                  onClick={() => { setSelectedYear(cfg.year); setRefreshTrigger(t => t + 1); }}
+                  className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${selectedYear === cfg.year ? 'bg-slate-900 text-white shadow-xl' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                >
+                  {cfg.year}
+                </button>
+              ))}
+            </div>
+          )}
+
           {view === 'accounts' && renderAccountManagement()}
           {view === 'deployment' && renderDeployment()}
           {view === 'progress' && isAdmin && renderProgress()}
           {view === 'status-terminal' && renderStatusTerminal()}
           {view === 'unit-oversight' && canSeeOversight && renderUnitOversight()}
           {view === 'target-outlook-landing' && renderTargetOutlookLanding()}
+          
+          {view === 'master-template' && user.role === UserRole.SUPER_ADMIN && (
+            <OperationalDashboard 
+              title={`MASTER TEMPLATE SOURCE - ${selectedYear}`} 
+              onBack={() => setView('accounts')}
+              currentUser={user}
+              subjectUser={user}
+              isTemplateMode={true}
+            />
+          )}
+
           {view === 'operational-dashboard' && selectedOverviewUser && (
             <OperationalDashboard 
               title={getDashboardTitle(selectedOverviewUser, selectedYear, false)} 

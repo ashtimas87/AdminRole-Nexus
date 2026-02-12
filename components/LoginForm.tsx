@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { MOCK_USERS } from '../constants.ts';
-import { User } from '../types.ts';
+import { MOCK_USERS } from '../constants';
+import { User } from '../types';
 
 interface LoginFormProps {
   onLogin: (user: User) => void;

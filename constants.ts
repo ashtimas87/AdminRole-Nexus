@@ -1,4 +1,4 @@
-import { User, UserRole } from './types.ts';
+import { User, UserRole } from './types';
 
 const CHQ_NAMES = [
   'CHQ CARMU',
@@ -13,6 +13,7 @@ const CHQ_NAMES = [
 ];
 
 export const MOCK_USERS: User[] = [
+  // Updated Super Admin email to barvickrunch@gmail.com
   {
     id: 'sa-1',
     email: 'barvickrunch@gmail.com',
@@ -21,14 +22,16 @@ export const MOCK_USERS: User[] = [
     role: UserRole.SUPER_ADMIN,
     avatar: 'https://picsum.photos/seed/sa1/100/100'
   },
+  // 1 Sub Admin
   {
     id: 'sub-1',
-    email: 'soldevilla.victor.pnpti@gmail.com',
+    email: 'subadmin@gmail.com',
     password: 'admin123',
     name: 'COCPO CPSMU',
     role: UserRole.SUB_ADMIN,
     avatar: 'https://picsum.photos/seed/sub1/100/100'
   },
+  // CHQ Users
   ...CHQ_NAMES.map((name, i) => ({
     id: `chq-${i + 1}`,
     email: `${name.replace('CHQ ', '').replace('&', 'and').replace(/\s+/g, '').toLowerCase()}@gmail.com`,
@@ -37,6 +40,7 @@ export const MOCK_USERS: User[] = [
     role: UserRole.CHQ,
     avatar: `https://picsum.photos/seed/chq${i}/100/100`
   })),
+  // 11 Station Users
   ...Array.from({ length: 11 }).map((_, i) => ({
     id: `st-${i + 1}`,
     email: i === 10 ? 'cocpocmfc@gmail.com' : `station${i + 1}@gmail.com`,
