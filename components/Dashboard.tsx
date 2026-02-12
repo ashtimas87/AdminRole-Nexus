@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { User, UserRole } from '../types';
 import { ROLE_LABELS, MOCK_USERS } from '../constants';
@@ -12,8 +13,7 @@ type ViewType =
   | 'target-outlook'
   | 'target-outlook-landing'
   | 'unit-landing'
-  | 'progress'
-  | 'chq-monitoring-unit';
+  | 'progress';
 
 const YEAR_CONFIG = [
   { year: '2026', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
@@ -241,6 +241,8 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
     }
 
     if (user.role === UserRole.CHQ) {
+      // For CHQ users, only show their own unit or all CHQ units if in 2023 consolidation
+      // and strictly hide station/special units in oversight view.
       stationUsers = [];
       specialUsers = [];
       subAdminUsers = [];
@@ -256,8 +258,9 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
     if (!canSeeOversight) return null;
     const { subAdminUsers, chqUsers, specialUsers, stationUsers } = getFilteredUnits();
     
-    const relevantForConsolidation = user.role === UserRole.CHQ || view === 'chq-monitoring-unit'
-      ? [...chqUsers, ...stationUsers] 
+    // For CHQ Users, consolidation should NOT reflect data from stations.
+    const relevantForConsolidation = user.role === UserRole.CHQ 
+      ? chqUsers 
       : [...chqUsers, ...stationUsers, ...specialUsers];
 
     return (
@@ -284,7 +287,6 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
               <div className="w-2 h-2 rounded-full bg-emerald-600"></div>
               {user.role === UserRole.CHQ ? 'CHQ Units Consolidation' : 'Consolidation of CHQ & Tactical'}
             </h3>
-            
             <div 
               onClick={() => { setSelectedOverviewUser(user); setView('operational-dashboard'); }} 
               className="w-full flex items-center gap-5 p-6 bg-slate-900 rounded-3xl border-2 border-slate-800 hover:border-emerald-500 transition-all text-left cursor-pointer shadow-xl group"
@@ -293,37 +295,16 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
               </div>
               <div className="flex-1">
-                <p className="text-xl font-black text-white">{user.role === UserRole.SUPER_ADMIN ? 'Operational Dashboard Template' : (user.role === UserRole.CHQ ? `CHQ Accomplishment ${selectedYear}` : `CHQ & Tactical Consolidated ${selectedYear}`)}</p>
-                <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">{user.role === UserRole.SUPER_ADMIN ? 'MASTER SYSTEM TEMPLATE' : 'ACTIVITY DATA ACCOMPLISHMENT'}</p>
+                <p className="text-xl font-black text-white">{user.role === UserRole.CHQ ? `CHQ Accomplishment ${selectedYear}` : `CHQ & Tactical Consolidated ${selectedYear}`}</p>
+                <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">ACTIVITY DATA ACCOMPLISHMENT</p>
               </div>
               <div className="text-right">
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Accomplishment</p>
                 <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg font-black text-lg">
-                  {calculateConsolidatedTotal([...chqUsers, ...stationUsers, ...specialUsers], selectedYear, 'accomplishment').toLocaleString()}
+                  {calculateConsolidatedTotal(relevantForConsolidation, selectedYear, 'accomplishment').toLocaleString()}
                 </div>
               </div>
             </div>
-
-            {isAdmin && (
-              <div 
-                onClick={() => { setSelectedOverviewUser(user); setView('chq-monitoring-unit'); }} 
-                className="w-full flex items-center gap-5 p-6 bg-indigo-950 rounded-3xl border-2 border-indigo-900 hover:border-indigo-400 transition-all text-left cursor-pointer shadow-xl group mt-2"
-              >
-                <div className="w-14 h-14 bg-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-400 border border-indigo-500/30 group-hover:scale-105 transition-transform">
-                   <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2-2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                </div>
-                <div className="flex-1">
-                  <p className="text-xl font-black text-white">City Headquarter Monitoring Unit</p>
-                  <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">CHQ & STATION CONSOLIDATION {selectedYear}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Accomplishment</p>
-                  <div className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 px-3 py-1 rounded-lg font-black text-lg">
-                    {calculateConsolidatedTotal([...chqUsers, ...stationUsers], selectedYear, 'accomplishment').toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
         
@@ -406,6 +387,8 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
 
   const renderTargetOutlookLanding = () => {
     const { subAdminUsers, chqUsers, specialUsers, stationUsers } = getFilteredUnits();
+    
+    // For CHQ Users, consolidation should NOT reflect data from stations.
     const relevantForConsolidation = user.role === UserRole.CHQ 
       ? chqUsers 
       : [...chqUsers, ...stationUsers, ...specialUsers];
@@ -607,7 +590,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
         {canSeeOversight && (
           <button 
             onClick={() => setView('unit-oversight')}
-            className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'unit-oversight' || (view === 'operational-dashboard' && selectedOverviewUser && selectedOverviewUser.id !== user.id) || view === 'chq-monitoring-unit' ? 'bg-purple-600 text-white shadow-lg shadow-purple-100' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+            className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'unit-oversight' || (view === 'operational-dashboard' && selectedOverviewUser && selectedOverviewUser.id !== user.id) ? 'bg-purple-600 text-white shadow-lg shadow-purple-100' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
           >
             Unit Oversight
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2-2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
@@ -639,12 +622,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
       }
       return `${targetUser.name} ${year} Target Outlook`;
     } else {
-      if (view === 'chq-monitoring-unit') {
-        return `City Headquarter Monitoring Unit ${year}`;
-      }
-      if (isSelf && user.role === UserRole.SUPER_ADMIN) {
-        return `Operational Dashboard Template`;
-      }
+      // Accomplishment
       if (isSelf) {
         if (user.role === UserRole.STATION) return `Tactical ${year} Accomplishment`;
         if (user.role === UserRole.CHQ) return `CHQ ${year} Accomplishment`;
@@ -681,16 +659,13 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           {view === 'status-terminal' && renderStatusTerminal()}
           {view === 'unit-oversight' && canSeeOversight && renderUnitOversight()}
           {view === 'target-outlook-landing' && renderTargetOutlookLanding()}
-          {(view === 'operational-dashboard' || view === 'chq-monitoring-unit') && selectedOverviewUser && (
+          {view === 'operational-dashboard' && selectedOverviewUser && (
             <OperationalDashboard 
               title={getDashboardTitle(selectedOverviewUser, selectedYear, false)} 
-              year={selectedYear}
-              onYearChange={setSelectedYear}
               onBack={() => { setView(canSeeOversight ? 'unit-oversight' : 'status-terminal'); setRefreshTrigger(t => t + 1); }} 
               currentUser={user} 
               subjectUser={selectedOverviewUser}
               allUnits={usersList.filter(u => {
-                if (view === 'chq-monitoring-unit') return u.role === UserRole.CHQ || u.role === UserRole.STATION;
                 if (user.role === UserRole.CHQ) return u.role === UserRole.CHQ;
                 return u.role === UserRole.STATION || u.role === UserRole.CHQ;
               })} 
@@ -699,8 +674,6 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           {view === 'target-outlook' && selectedOverviewUser && (
             <OperationalDashboard 
               title={getDashboardTitle(selectedOverviewUser, selectedYear, true)} 
-              year={selectedYear}
-              onYearChange={setSelectedYear}
               onBack={() => { setView('target-outlook-landing'); setRefreshTrigger(t => t + 1); }} 
               currentUser={user} 
               subjectUser={selectedOverviewUser} 
