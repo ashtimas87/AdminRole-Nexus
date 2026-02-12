@@ -1,9 +1,7 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { PIData, UserRole, User, MonthFile, MonthData, PIActivity } from '../types';
 
-// Add missing OperationalDashboardProps interface
 interface OperationalDashboardProps {
   title: string;
   onBack: () => void;
@@ -148,29 +146,23 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
   const effectiveId = getEffectiveUserId(userId, role, prefix, isTemplateMode);
   const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
   const hiddenPIs: string[] = JSON.parse(localStorage.getItem(hiddenPIsKey) || '[]');
-  const importedListKey = `${prefix}_imported_pi_list_${year}_${effectiveId}`;
-  let importedIds: string[] = JSON.parse(localStorage.getItem(importedListKey) || '[]');
-
+  
   const defaultList = [
     ...Array.from({ length: 29 }, (_, i) => `PI${i + 1}`),
     ...Array.from({ length: 10 }, (_, i) => `OD${i + 1}`)
   ];
 
-  // If station has no local import, check PS1 structure
-  if (importedIds.length === 0 && effectiveId.startsWith('st-') && effectiveId !== 'st-1' && !isTemplateMode) {
-      const ps1Key = `${prefix}_imported_pi_list_${year}_st-1`;
-      importedIds = JSON.parse(localStorage.getItem(ps1Key) || '[]');
-  }
+  const importedListKey = `${prefix}_imported_pi_list_${year}_${effectiveId}`;
+  let importedIds: string[] = JSON.parse(localStorage.getItem(importedListKey) || '[]');
 
-  // LOGIC CHANGE: If we have an imported list, only show those by default.
-  // Standard tabs not in the import file are effectively "hidden" until unhidden.
-  let baseIds = importedIds.length > 0 ? importedIds : defaultList;
+  // Logic: Always show the union of default and imported to ensure "all tabbings" are shown
+  let baseIds = Array.from(new Set([...defaultList, ...importedIds]));
 
   if (isTemplateMode) {
     baseIds = baseIds.filter(id => !id.startsWith('OD'));
   }
 
-  baseIds = [...new Set(baseIds)].sort(customPiSort);
+  baseIds = baseIds.sort(customPiSort);
 
   return baseIds.map(piId => {
     const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
@@ -202,7 +194,7 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
         total: 0
       };
     });
-    const defaultTitle = piId === 'PI1' ? "Number of Community Awareness/Information Activities Initiated" : `Indicator ${piId}`;
+    const defaultTitle = piId === 'PI1' ? "Community Awareness Activities Initiated" : `Indicator ${piId}`;
     return { id: piId, title: getSharedPITitle(prefix, year, effectiveId, piId, defaultTitle), activities };
   }).filter(pi => ignoreHidden ? true : !hiddenPIs.includes(pi.id));
 };
@@ -222,12 +214,12 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const effectiveId = useMemo(() => getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode), [subjectUser.id, subjectUser.role, prefix, isTemplateMode]);
   
   const isOwner = currentUser.id === subjectUser.id;
-  const isConsolidated = useMemo(() => (currentUser.role === UserRole.SUPER_ADMIN && (title.includes('Consolidation') || title.includes('Operational Dashboard'))) || (currentUser.role === UserRole.CHQ && title.includes('Consolidation')), [currentUser.role, title]);
+  const isConsolidated = useMemo(() => (currentUser.role === UserRole.SUPER_ADMIN && (title.includes('Consolidation') || title.includes('Dashboard'))) || (currentUser.role === UserRole.CHQ && title.includes('Consolidation')), [currentUser.role, title]);
   const canModifyData = useMemo(() => isConsolidated ? false : isOwner || currentUser.role === UserRole.SUPER_ADMIN || (currentUser.role === UserRole.SUB_ADMIN && subjectUser.role === UserRole.STATION), [isConsolidated, isOwner, currentUser.role, subjectUser.role]);
   const canModifyTemplate = useMemo(() => isTemplateMode && currentUser.role === UserRole.SUPER_ADMIN, [isTemplateMode, currentUser.role]);
 
   const refresh = () => {
-    const unitsToConsolidate = isConsolidated ? allUnits : [];
+    const unitsToConsolidate = isConsolidated ? (allUnits || []) : [];
     const data = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate, isTemplateMode);
     setPiData(data.map(d => ({ ...d, activities: d.activities.map(a => ({ ...a, total: a.months.reduce((sum, m) => sum + m.value, 0) })) })));
   };
@@ -237,16 +229,30 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
   const currentPI = useMemo(() => piData.find(pi => pi.id === activeTab) || piData[0], [piData, activeTab]);
 
+  const handleExportMaster = () => {
+    const dataToExport: any[] = [];
+    piData.forEach(pi => {
+      pi.activities.forEach(act => {
+        const row: any = {
+          'PI ID': pi.id,
+          'Activity ID': act.id,
+          'Activity Name': act.activity,
+          'Performance Indicator Name': act.indicator,
+          'PI Title': pi.title
+        };
+        MONTHS.forEach((month, idx) => { row[month] = act.months[idx].value; });
+        dataToExport.push(row);
+      });
+    });
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Master Template");
+    const fileName = `Master_Template_${year}_${prefix}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  };
+
   const handleUnhideAll = () => {
-    if (confirm('Restore ALL system Performance Indicators? This will show all tabs (PI1-29) regardless of imported content.')) {
-      const defaultList = [
-        ...Array.from({ length: 29 }, (_, i) => `PI${i + 1}`),
-        ...Array.from({ length: 10 }, (_, i) => `OD${i + 1}`)
-      ];
-      const importedListKey = `${prefix}_imported_pi_list_${year}_${effectiveId}`;
-      const existingImported: string[] = JSON.parse(localStorage.getItem(importedListKey) || '[]');
-      const newUnion = Array.from(new Set([...defaultList, ...existingImported]));
-      localStorage.setItem(importedListKey, JSON.stringify(newUnion));
+    if (confirm('Restore ALL system Performance Indicators?')) {
       localStorage.setItem(`${prefix}_hidden_pis_${year}_${effectiveId}`, JSON.stringify([]));
       refresh();
     }
@@ -288,7 +294,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         MONTHS.forEach((m, i) => { columnMap[`month_${i}`] = findCol(MONTH_VARIANTS[m]); });
         const isStation1Ref = !isTemplateMode && subjectUser.name.includes('Police Station 1');
         const targetPrefixes = isTemplateMode ? ['target', 'accomplishment'] : [prefix];
-        const affectedUnits = isStation1Ref && !isTemplateMode ? allUnits.filter(u => u.role === UserRole.STATION && u.name !== 'City Mobile Force Company') : [subjectUser];
+        const affectedUnits = isStation1Ref && !isTemplateMode ? (allUnits || []).filter(u => u.role === UserRole.STATION && u.name !== 'City Mobile Force Company') : [subjectUser];
         targetPrefixes.forEach(pfx => {
           affectedUnits.forEach(unit => {
             const uId = getEffectiveUserId(unit.id, unit.role, pfx, isTemplateMode);
@@ -302,11 +308,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                 if (altPi) piId = String(altPi).trim().toUpperCase(); else return;
               }
               const currentActCount = piActivitiesMap[piId]?.length || 0;
-              const defaultSampleAct = piId === 'PI1' ? (PI1_STRUCTURE[currentActCount]?.activity || 'Operational Activity') : 'Operational Activity';
-              const defaultSampleInd = piId === 'PI1' ? (PI1_STRUCTURE[currentActCount]?.indicator || 'Activity Unit') : 'Activity Unit';
               const aid = String(row[columnMap.aid] || `${piId.toLowerCase()}_a${currentActCount + 1}`).trim().toLowerCase().replace(/\s+/g, '');
-              const actName = String(row[columnMap.activityName] || defaultSampleAct).trim();
-              const indName = String(row[columnMap.indicatorName] || defaultSampleInd).trim();
+              const actName = String(row[columnMap.activityName] || 'Operational Activity').trim();
+              const indName = String(row[columnMap.indicatorName] || 'Activity Unit').trim();
               const piTitle = String(row[columnMap.piTitle] || `Indicator ${piId}`).trim();
               foundPIs.add(piId);
               if (!piActivitiesMap[piId]) piActivitiesMap[piId] = [];
@@ -325,7 +329,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           });
         });
         refresh();
-        alert(isTemplateMode ? 'Global Master Template Synchronized.' : `Import Successful for ${subjectUser.name}`);
+        alert('Sync Successful.');
       } catch (err: any) { alert("Import Failed: Check file headers."); }
     };
     reader.readAsBinaryString(file);
@@ -381,23 +385,23 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-4">
           <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-slate-900 font-black text-[10px] uppercase tracking-widest transition-all">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg> Return to Terminal
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg> Return
           </button>
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">{isTemplateMode ? 'Master Template Control' : title}</h1>
               {isConsolidated && <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-200">Consolidated</span>}
-              {isTemplateMode && <span className="bg-rose-100 text-rose-700 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-rose-200 shadow-sm animate-pulse">Master Source Active</span>}
+              {isTemplateMode && <span className="bg-rose-100 text-rose-700 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-rose-200 shadow-sm animate-pulse">Master Source</span>}
             </div>
-            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest opacity-60">Unit: {subjectUser.name} • Year: {year} {isTemplateMode && '• Structure defined here is Global'}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => setViewMode(prev => prev === 'tabbed' ? 'master' : 'tabbed')} className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2 ${viewMode === 'master' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}><svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 10h16M4 14h16M4 18h16" strokeLinecap="round" strokeLinejoin="round" /></svg> {viewMode === 'tabbed' ? 'Master List View' : 'Back to Tabbed View'}</button>
+          <button onClick={() => setViewMode(prev => prev === 'tabbed' ? 'master' : 'tabbed')} className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2 ${viewMode === 'master' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>{viewMode === 'tabbed' ? 'List View' : 'Tab View'}</button>
           {!isConsolidated && currentUser.role === UserRole.SUPER_ADMIN && (
             <>
-              <button onClick={handleUnhideAll} className="bg-white hover:bg-slate-50 text-slate-400 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition border border-slate-200 flex items-center gap-2"><svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg> Unhide All PIs</button>
-              <button onClick={() => masterImportRef.current?.click()} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2"><svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg> Import Master</button>
+              <button onClick={handleExportMaster} className="bg-indigo-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg">Export Master</button>
+              <button onClick={handleUnhideAll} className="bg-white text-slate-400 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition border border-slate-200">Unhide All</button>
+              <button onClick={() => masterImportRef.current?.click()} className="bg-slate-900 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg">Import Master</button>
               <input type="file" ref={masterImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportMasterTemplate} />
             </>
           )}
@@ -417,7 +421,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           </div>
           <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
             <div className={`${isConsolidated ? 'bg-emerald-900' : isTemplateMode ? 'bg-rose-900' : 'bg-slate-900'} p-8 text-white transition-colors duration-500`}>
-              {editingLabel?.piId === activeTab && editingLabel?.field === 'title' ? <div className="flex items-center gap-2"><span className="text-xl font-black uppercase">{formatTabLabel(activeTab)} - </span><input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e => e.key === 'Enter' && saveEdit()} className="bg-white/10 text-white border-2 border-white/30 rounded px-2 outline-none w-full font-black uppercase" /></div> : <h2 onClick={() => handleLabelClick(activeTab, 0, 'title', currentPI?.title || '')} className={`text-xl font-black uppercase tracking-tight ${canModifyTemplate ? 'cursor-pointer hover:bg-rose-800/40 rounded px-2 transition-colors' : ''}`}>{formatTabLabel(activeTab)} - {currentPI?.title}</h2>}
+              {editingLabel?.piId === activeTab && editingLabel?.field === 'title' ? <input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e => e.key === 'Enter' && saveEdit()} className="bg-white/10 text-white border-2 border-white/30 rounded px-2 outline-none w-full font-black uppercase" /> : <h2 onClick={() => handleLabelClick(activeTab, 0, 'title', currentPI?.title || '')} className={`text-xl font-black uppercase tracking-tight ${canModifyTemplate ? 'cursor-pointer hover:bg-rose-800/40 rounded px-2 transition-colors' : ''}`}>{formatTabLabel(activeTab)} - {currentPI?.title}</h2>}
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
