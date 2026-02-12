@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { PIData, UserRole, User, MonthFile, MonthData, PIActivity } from '../types';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const YEARS = ['2026', '2025', '2024', '2023'];
 
 const getEffectiveUserId = (userId: string, role?: UserRole, prefix?: string): string => {
   if (role === UserRole.SUB_ADMIN && prefix === 'target') {
@@ -201,9 +202,11 @@ interface OperationalDashboardProps {
   currentUser: User;
   subjectUser: User;
   allUnits: User[];
+  year: string;
+  onYearChange?: (year: string) => void;
 }
 
-const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBack, currentUser, subjectUser, allUnits }) => {
+const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBack, currentUser, subjectUser, allUnits, year, onYearChange }) => {
   const [activeTab, setActiveTab] = useState('PI1');
   const [piData, setPiData] = useState<PIData[]>([]);
   const [editingCell, setEditingCell] = useState<{ rowIdx: number; monthIdx: number } | null>(null);
@@ -221,7 +224,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const [editFieldName, setEditFieldName] = useState<string>('');
   const [vaultOpen, setVaultOpen] = useState(false);
 
-  const year = useMemo(() => title.match(/\d{4}/)?.[0] || '2026', [title]);
   const isTargetOutlook = useMemo(() => title.toUpperCase().includes("TARGET OUTLOOK"), [title]);
   const prefix = isTargetOutlook ? 'target' : 'accomplishment';
   const effectiveId = useMemo(() => getEffectiveUserId(subjectUser.id, subjectUser.role, prefix), [subjectUser.id, subjectUser.role, prefix]);
@@ -230,19 +232,51 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const isOwner = currentUser.id === subjectUser.id;
   const isHeadOfficeView = subjectUser.id === currentUser.id || subjectUser.role === UserRole.SUB_ADMIN;
   const isConsolidated = (prefix === 'accomplishment' || prefix === 'target') && isHeadOfficeView;
+  const isOperationalDashboardTemplate = title === "Operational Dashboard Template";
   
-  // Consolidated accomplishment views are read-only for everyone, especially for Super Admin
-  const isReadOnlyConsolidatedView = isConsolidated && prefix === 'accomplishment';
+  // Consolidated accomplishment views are read-only for everyone, except the template which functions as the master source
+  const isReadOnlyConsolidatedView = isConsolidated && prefix === 'accomplishment' && !isOperationalDashboardTemplate;
 
   const canModifyData = 
     !isReadOnlyConsolidatedView && (
-      (isOwner && currentUser.role !== UserRole.SUPER_ADMIN) || 
+      (isOwner && (currentUser.role !== UserRole.SUPER_ADMIN || isOperationalDashboardTemplate)) || 
       (currentUser.role === UserRole.SUB_ADMIN && (subjectUser.role === UserRole.STATION || subjectUser.role === UserRole.CHQ)) ||
       (currentUser.role === UserRole.SUPER_ADMIN && (subjectUser.role === UserRole.STATION || subjectUser.role === UserRole.CHQ))
     );
   
   const canEditStructure = currentUser.role === UserRole.SUPER_ADMIN && !isReadOnlyConsolidatedView; 
   const canAccessFiles = isOwner || isAdmin;
+
+  const savePIActivityName = (piId: string, aid: string, name: string) => {
+    localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, name);
+    if (isOperationalDashboardTemplate) {
+      allUnits.filter(u => u.role === UserRole.CHQ).forEach(u => {
+        localStorage.setItem(`${prefix}_pi_act_name_${year}_${u.id}_${piId}_${aid}`, name);
+      });
+    }
+  };
+
+  const savePIIndicatorName = (piId: string, aid: string, indicator: string) => {
+    localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicator);
+    if (isOperationalDashboardTemplate) {
+      allUnits.filter(u => u.role === UserRole.CHQ).forEach(u => {
+        localStorage.setItem(`${prefix}_pi_ind_name_${year}_${u.id}_${piId}_${aid}`, indicator);
+      });
+    }
+  };
+
+  const saveDataWithSync = (piId: string, aid: string, monthIdx: number, val: number) => {
+    const storageKey = `${prefix}_data_${year}_${effectiveId}_${piId}_${aid}_${monthIdx}`;
+    localStorage.setItem(storageKey, String(val));
+    
+    // Propagation to CHQ users if this is the Super Admin Dashboard Template
+    if (isOperationalDashboardTemplate) {
+      allUnits.filter(u => u.role === UserRole.CHQ).forEach(u => {
+        const chqKey = `${prefix}_data_${year}_${u.id}_${piId}_${aid}_${monthIdx}`;
+        localStorage.setItem(chqKey, String(val));
+      });
+    }
+  };
 
   const refresh = () => {
     const unitsToConsolidate = (prefix === 'accomplishment' || prefix === 'target') ? allUnits : [];
@@ -293,11 +327,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const updatedVault = [...vault, ...newEntries];
     localStorage.setItem(vaultKey, JSON.stringify(updatedVault));
     setVaultData(updatedVault); 
-  };
-
-  const saveDataWithSync = (piId: string, aid: string, monthIdx: number, val: number) => {
-    const storageKey = `${prefix}_data_${year}_${effectiveId}_${piId}_${aid}_${monthIdx}`;
-    localStorage.setItem(storageKey, String(val));
   };
 
   const handleCellClick = (rowIdx: number, monthIdx: number, val: number) => {
@@ -491,12 +520,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                         const indicatorName = row['Performance Indicator'];
 
                         if (aid) {
-                            if (activityName) {
-                                localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, activityName);
-                            }
-                            if (indicatorName) {
-                                localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicatorName);
-                            }
+                            if (activityName) savePIActivityName(piId, aid, activityName);
+                            if (indicatorName) savePIIndicatorName(piId, aid, indicatorName);
                         }
                     });
                 }
@@ -548,16 +573,19 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         const piId = row['PI ID'];
         const aid = row['Activity ID'];
         if (piId && aid) {
-          if (row['Activity']) localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, row['Activity']);
-          if (row['Performance Indicator']) localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, row['Performance Indicator']);
-          MONTHS.forEach((m, i) => { 
-            if (row[m] !== undefined) saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0); 
-          });
+          if (row['Activity']) savePIActivityName(piId, aid, row['Activity']);
+          if (row['Performance Indicator']) savePIIndicatorName(piId, aid, row['Performance Indicator']);
+          // Per user request, do not import monthly numerical data from master template
+          // MONTHS.forEach((m, i) => { 
+          //   if (row[m] !== undefined) saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0); 
+          // });
         }
       });
+      alert("Master template descriptions (Activity & Indicator) imported successfully. Monthly data was not affected.");
       refresh();
     };
     reader.readAsBinaryString(file);
+    if (e.target) e.target.value = '';
   };
 
   const getFileIcon = (type: string) => {
@@ -595,7 +623,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                 <span className="bg-rose-100 text-rose-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest animate-pulse">Read Only Consolidated View</span>
               )}
             </div>
-            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-2 opacity-60">Unit: {subjectUser.name}</p>
+            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-2 opacity-60">Unit: {subjectUser.name} {year && `• Period: ${year}`}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -641,6 +669,20 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         </div>
       </div>
 
+      {(isOperationalDashboardTemplate || isConsolidated) && onYearChange && (
+        <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2 overflow-x-auto no-scrollbar max-w-fit">
+          {YEARS.map(y => (
+            <button
+              key={y}
+              onClick={() => onYearChange(y)}
+              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${year === y ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+            >
+              {y}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-1.5 overflow-x-auto no-scrollbar">
         {piData.map(pi => (
           <button 
@@ -675,12 +717,12 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                   <tr key={act.id} className="hover:bg-slate-50/50 group transition-colors">
                     <td className="px-6 py-4">
                       {editingActivityField?.aid === act.id && editingActivityField?.field === 'activity' ? (
-                        <input autoFocus value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={() => { localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${activeTab}_${act.id}`, editFieldName); setEditingActivityField(null); refresh(); }} className="w-full px-2 py-1 bg-slate-50 border rounded text-sm font-bold" />
+                        <input autoFocus value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={() => { savePIActivityName(activeTab, act.id, editFieldName); setEditingActivityField(null); refresh(); }} className="w-full px-2 py-1 bg-slate-50 border rounded text-sm font-bold" />
                       ) : ( <div onClick={() => canEditStructure && (setEditingActivityField({ aid: act.id, field: 'activity' }), setEditFieldName(act.activity))} className={`text-sm font-bold text-slate-900 ${canEditStructure ? 'cursor-pointer hover:text-blue-600' : ''}`}>{act.activity}</div> )}
                     </td>
                     <td className="px-6 py-4">
                       {editingActivityField?.aid === act.id && editingActivityField?.field === 'indicator' ? (
-                        <input autoFocus value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={() => { localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${activeTab}_${act.id}`, editFieldName); setEditingActivityField(null); refresh(); }} className="w-full px-2 py-1 bg-slate-50 border rounded text-xs font-medium" />
+                        <input autoFocus value={editFieldName} onChange={e => setEditFieldName(e.target.value)} onBlur={() => { savePIIndicatorName(activeTab, act.id, editFieldName); setEditingActivityField(null); refresh(); }} className="w-full px-2 py-1 bg-slate-50 border rounded text-xs font-medium" />
                       ) : ( <div onClick={() => canEditStructure && (setEditingActivityField({ aid: act.id, field: 'indicator' }), setEditFieldName(act.indicator))} className={`text-xs font-medium text-slate-500 ${canEditStructure ? 'cursor-pointer hover:text-blue-600' : ''}`}>{act.indicator}</div> )}
                     </td>
                     {act.months.map((m, mIdx) => (
