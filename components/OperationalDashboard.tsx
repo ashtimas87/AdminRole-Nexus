@@ -29,7 +29,7 @@ const customPiSort = (a: string, b: string) => {
 
 /**
  * Standardizes the tab label based on the priority request:
- * Now strictly refers to the PI ID from the list, ensuring that 
+ * Strictly refers to the PI ID from the list, ensuring that 
  * extra prefixes like "PI -" are not added to OD-prefixed IDs.
  */
 const formatTabLabel = (id: string): string => {
@@ -138,6 +138,7 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
     const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
     const storedIds = localStorage.getItem(actIdsKey);
     
+    // Check if we have an imported structure first, otherwise use piStructureMap
     const struct = piStructureMap[piId] || { 
       title: `Indicator ${piId}`, 
       activities: [{ id: `${piId.toLowerCase()}_a1`, name: "Operational Activity", indicator: "Activity Unit", defaults: Array(12).fill(0) }] 
@@ -332,20 +333,29 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
         data.forEach(row => {
           const getVal = (possibleKeys: string[]) => {
-            const key = possibleKeys.find(k => row[k] !== undefined);
-            return key ? String(row[key]).trim() : '';
+            const key = possibleKeys.find(k => {
+               const normalizedK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+               return Object.keys(row).some(rowKey => rowKey.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedK);
+            });
+            
+            if (key) {
+               // Find the actual key in row that matched
+               const actualKey = Object.keys(row).find(rk => rk.toLowerCase().replace(/[^a-z0-9]/g, '') === key.toLowerCase().replace(/[^a-z0-9]/g, ''));
+               return actualKey ? String(row[actualKey]).trim() : '';
+            }
+            return '';
           };
 
-          // Capture PI ID (e.g. ODPI6, PI1)
-          let piId = getVal(['PI ID', 'pi id', 'Indicator ID', 'PI', 'Tab Name']);
+          // Flexible mapping for Indicator IDs
+          let piId = getVal(['PI ID', 'Indicator ID', 'PI', 'Tab Name', 'ID']);
           if (!piId) return;
 
-          piId = piId.replace(/\s+/g, ' '); 
+          piId = piId.replace(/\s+/g, ' ').toUpperCase(); 
           
-          const aid = getVal(['Activity ID', 'activity id', 'Act ID', 'ID']);
-          const activityName = getVal(['Activity', 'activity', 'Activity Name']);
-          const indicatorName = getVal(['Performance Indicator', 'performance indicator', 'Indicator', 'Indicator Name']);
-          const piTitle = getVal(['PI Title', 'pi title', 'Indicator Title']);
+          const aid = getVal(['Activity ID', 'Act ID', 'ID', 'Activity No']);
+          const activityName = getVal(['Activity', 'Activity Name', 'Action']);
+          const indicatorName = getVal(['Performance Indicator', 'Indicator', 'Indicator Name', 'PI Description']);
+          const piTitle = getVal(['PI Title', 'Indicator Title', 'Goal']);
 
           if (piId && aid) {
             foundPIs.add(piId);
@@ -357,7 +367,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             if (piTitle) localStorage.setItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`, piTitle);
 
             MONTHS.forEach((m, i) => { 
-              const val = parseInt(getVal([m, m.toLowerCase(), m.toUpperCase(), m.substring(0, 3)]), 10) || 0;
+              const val = parseInt(getVal([m, m.substring(0, 3)]), 10) || 0;
               localStorage.setItem(`${prefix}_data_${year}_${effectiveId}_${piId}_${aid}_${i}`, String(val));
             });
           }
@@ -375,10 +385,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         localStorage.setItem(`${prefix}_hidden_pis_${year}_${effectiveId}`, JSON.stringify([]));
 
         refresh();
-        alert(`Registry Refreshed. Imported ${sortedPIs.length} Performance Indicators in priority order (PI then OD).`);
+        alert(`Registry Refreshed. Strictly imported ${sortedPIs.length} indicators with monthly data from the provided list.`);
       } catch (err) {
         console.error(err);
-        alert("Import Failed: Check Excel structure.");
+        alert("Import Failed: Ensure Excel columns match expected identifiers (Indicator ID, Activity, PI, etc.).");
       }
     };
     reader.readAsBinaryString(file);
@@ -461,8 +471,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[250px]">Activity & ID</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[150px]">Indicator</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[300px]">Activity</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[200px]">Indicator</th>
                 {MONTHS.map(m => <th key={m} className="px-3 py-4 text-center text-[10px] font-black uppercase text-slate-400 tracking-widest">{m}</th>)}
                 <th className="px-6 py-4 text-center text-[10px] font-black uppercase text-slate-900 tracking-widest">Total</th>
               </tr>
@@ -470,33 +480,32 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             <tbody className="divide-y divide-slate-100">
               {currentPI?.activities.map((act, rIdx) => (
                 <tr key={act.id} className="hover:bg-slate-50/50 group transition-colors">
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-5">
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">[{act.id}]</span>
-                      <span className="text-sm font-bold text-slate-900 leading-tight">{act.activity}</span>
+                      <span className="text-sm font-bold text-slate-900 leading-snug">{act.activity}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-xs font-medium text-slate-500">{act.indicator}</td>
+                  <td className="px-6 py-5 text-xs font-semibold text-slate-600 leading-snug">{act.indicator}</td>
                   {act.months.map((m, mIdx) => (
-                    <td key={mIdx} className="px-1 py-4 text-center relative">
+                    <td key={mIdx} className="px-1 py-5 text-center relative">
                       {editingCell?.rowIdx === rIdx && editingCell?.monthIdx === mIdx ? (
-                        <input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} className="w-12 text-center border-2 border-slate-900 rounded font-black text-xs py-1" />
+                        <input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} className="w-12 text-center border-2 border-slate-900 rounded font-black text-xs py-1 shadow-sm" />
                       ) : (
                         <div 
                           onClick={() => handleCellClick(rIdx, mIdx, m.value)} 
-                          className={`rounded py-1 font-black text-xs ${canModifyData ? 'cursor-pointer hover:bg-slate-100' : ''} ${m.value > 0 ? (isConsolidated ? 'text-emerald-700' : 'text-slate-900') : 'text-slate-200'}`}
+                          className={`rounded py-1 font-black text-xs transition-colors ${canModifyData ? 'cursor-pointer hover:bg-slate-100' : ''} ${m.value > 0 ? (isConsolidated ? 'text-emerald-700' : 'text-slate-900') : 'text-slate-200'}`}
                         >
                           {m.value.toLocaleString()}
                         </div>
                       )}
                     </td>
                   ))}
-                  <td className={`px-6 py-4 text-center text-sm font-black ${isConsolidated ? 'text-emerald-900' : 'text-slate-900'}`}>{act.total.toLocaleString()}</td>
+                  <td className={`px-6 py-5 text-center text-sm font-black ${isConsolidated ? 'text-emerald-900' : 'text-slate-900'}`}>{act.total.toLocaleString()}</td>
                 </tr>
               ))}
               {(!currentPI || currentPI.activities.length === 0) && (
                 <tr>
-                  <td colSpan={15} className="px-6 py-12 text-center text-slate-300 font-bold uppercase tracking-widest text-[10px]">Registry Empty: Please Import Master Template</td>
+                  <td colSpan={15} className="px-6 py-12 text-center text-slate-300 font-bold uppercase tracking-widest text-[10px]">No Records Found: Use 'Import Master' to Populate Data</td>
                 </tr>
               )}
             </tbody>
