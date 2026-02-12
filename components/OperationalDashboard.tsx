@@ -28,17 +28,13 @@ const customPiSort = (a: string, b: string) => {
 };
 
 /**
- * Standardizes the tab label based on the priority request:
- * Strictly refers to the PI ID from the list, ensuring that 
- * extra prefixes like "PI -" are not added to OD-prefixed IDs.
+ * Standardizes the tab label based on the priority request.
  */
 const formatTabLabel = (id: string): string => {
   const cleanId = id.toUpperCase().trim();
-  // If it's already a valid identifier (starts with PI or OD), return as is.
   if (cleanId.startsWith('PI') || cleanId.startsWith('OD')) {
     return cleanId;
   }
-  // Otherwise, fallback to a standard PI prefix for numerical raw IDs.
   return `PI ${cleanId}`;
 };
 
@@ -114,7 +110,6 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
   const orderKey = `${prefix}_pi_order_${year}_${effectiveId}`;
   const customOrder: string[] = JSON.parse(localStorage.getItem(orderKey) || '[]');
   
-  // Load the list of PI IDs that were explicitly imported for this unit/year
   const importedListKey = `${prefix}_imported_pi_list_${year}_${effectiveId}`;
   const importedIds: string[] = JSON.parse(localStorage.getItem(importedListKey) || '[]');
 
@@ -128,17 +123,13 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
     }
   };
 
-  // Base set of IDs: Use imported ones or default PI1-PI29
   let baseIds = importedIds.length > 0 ? importedIds : Array.from({ length: 29 }, (_, i) => `PI${i + 1}`);
-  
-  // Apply our custom priority sort to the base IDs
   baseIds = [...baseIds].sort(customPiSort);
 
   const piList = baseIds.map(piId => {
     const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
     const storedIds = localStorage.getItem(actIdsKey);
     
-    // Check if we have an imported structure first, otherwise use piStructureMap
     const struct = piStructureMap[piId] || { 
       title: `Indicator ${piId}`, 
       activities: [{ id: `${piId.toLowerCase()}_a1`, name: "Operational Activity", indicator: "Activity Unit", defaults: Array(12).fill(0) }] 
@@ -328,8 +319,12 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data: any[] = XLSX.utils.sheet_to_json(ws);
         
-        // Propagation check: If subject is Police Station 1 (st-1) and mode is Target Outlook
-        const isStation1Target = prefix === 'target' && subjectUser.id === 'st-1';
+        // Propagation Rule:
+        // 1. PS1 + Target Outlook -> Propagates to all stations except Company.
+        // 2. PS1 + Tactical Accomplishment -> Does NOT propagate (stays unit-local).
+        const isPS1 = subjectUser.id === 'st-1' || subjectUser.name === 'Police Station 1';
+        const isStation1Target = prefix === 'target' && isPS1;
+        
         const affectedUnits = isStation1Target 
           ? allUnits.filter(u => u.role === UserRole.STATION && u.name !== 'City Mobile Force Company')
           : [subjectUser];
@@ -391,13 +386,15 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
         refresh();
         if (isStation1Target) {
-          alert(`Master Registry Refreshed and Propagated to all Station Units (excluding Company).`);
+          alert(`Target Registry Propagated to all Station Units (excluding Company).`);
+        } else if (isPS1 && prefix === 'accomplishment') {
+          alert(`Accomplishment Registry Refreshed locally for Police Station 1 only.`);
         } else {
-          alert(`Registry Refreshed for ${subjectUser.name}. Imported identifiers with monthly data.`);
+          alert(`Registry Refreshed for ${subjectUser.name}.`);
         }
       } catch (err) {
         console.error(err);
-        alert("Import Failed: Ensure Excel columns match expected identifiers (Indicator ID, Activity, PI, etc.).");
+        alert("Import Failed: Check Excel column mapping.");
       }
     };
     reader.readAsBinaryString(file);
