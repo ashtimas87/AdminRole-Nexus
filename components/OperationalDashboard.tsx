@@ -230,9 +230,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   
   const isAdmin = currentUser.role === UserRole.SUPER_ADMIN || currentUser.role === UserRole.SUB_ADMIN;
   const isOwner = currentUser.id === subjectUser.id;
-  const isHeadOfficeView = subjectUser.id === currentUser.id || subjectUser.role === UserRole.SUB_ADMIN;
-  const isConsolidated = (prefix === 'accomplishment' || prefix === 'target') && isHeadOfficeView;
   const isOperationalDashboardTemplate = title === "Operational Dashboard Template";
+
+  // Modification: Template view is for the Master Editor, not a consolidation of others.
+  const isHeadOfficeView = subjectUser.id === currentUser.id || subjectUser.role === UserRole.SUB_ADMIN;
+  const isConsolidated = (prefix === 'accomplishment' || prefix === 'target') && isHeadOfficeView && !isOperationalDashboardTemplate;
   
   // Consolidated accomplishment views are read-only for everyone, except the template which functions as the master source
   const isReadOnlyConsolidatedView = isConsolidated && prefix === 'accomplishment' && !isOperationalDashboardTemplate;
@@ -247,10 +249,20 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const canEditStructure = currentUser.role === UserRole.SUPER_ADMIN && !isReadOnlyConsolidatedView; 
   const canAccessFiles = isOwner || isAdmin;
 
+  // Propagate changes to ALL units if editing the Master Template
+  const savePITitle = (piId: string, title: string) => {
+    localStorage.setItem(`${prefix}_pi_title_${year}_${effectiveId}_${piId}`, title);
+    if (isOperationalDashboardTemplate) {
+      allUnits.forEach(u => {
+        localStorage.setItem(`${prefix}_pi_title_${year}_${u.id}_${piId}`, title);
+      });
+    }
+  };
+
   const savePIActivityName = (piId: string, aid: string, name: string) => {
     localStorage.setItem(`${prefix}_pi_act_name_${year}_${effectiveId}_${piId}_${aid}`, name);
     if (isOperationalDashboardTemplate) {
-      allUnits.filter(u => u.role === UserRole.CHQ).forEach(u => {
+      allUnits.forEach(u => {
         localStorage.setItem(`${prefix}_pi_act_name_${year}_${u.id}_${piId}_${aid}`, name);
       });
     }
@@ -259,7 +271,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const savePIIndicatorName = (piId: string, aid: string, indicator: string) => {
     localStorage.setItem(`${prefix}_pi_ind_name_${year}_${effectiveId}_${piId}_${aid}`, indicator);
     if (isOperationalDashboardTemplate) {
-      allUnits.filter(u => u.role === UserRole.CHQ).forEach(u => {
+      allUnits.forEach(u => {
         localStorage.setItem(`${prefix}_pi_ind_name_${year}_${u.id}_${piId}_${aid}`, indicator);
       });
     }
@@ -269,18 +281,19 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const storageKey = `${prefix}_data_${year}_${effectiveId}_${piId}_${aid}_${monthIdx}`;
     localStorage.setItem(storageKey, String(val));
     
-    // Propagation to CHQ users if this is the Super Admin Dashboard Template
+    // Propagation to ALL units if this is the Master Template
     if (isOperationalDashboardTemplate) {
-      allUnits.filter(u => u.role === UserRole.CHQ).forEach(u => {
-        const chqKey = `${prefix}_data_${year}_${u.id}_${piId}_${aid}_${monthIdx}`;
-        localStorage.setItem(chqKey, String(val));
+      allUnits.forEach(u => {
+        const unitKey = `${prefix}_data_${year}_${u.id}_${piId}_${aid}_${monthIdx}`;
+        localStorage.setItem(unitKey, String(val));
       });
     }
   };
 
   const refresh = () => {
-    const unitsToConsolidate = (prefix === 'accomplishment' || prefix === 'target') ? allUnits : [];
-    const data = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate);
+    const unitsToConsolidate = isConsolidated ? allUnits : [];
+    // Template unhides all tabbings by passing ignoreHidden = true
+    const data = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToConsolidate, isOperationalDashboardTemplate);
     setPiData(data.map(d => ({
       ...d,
       activities: d.activities.map(a => ({
@@ -566,22 +579,33 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     reader.onload = (evt) => {
       const bstr = evt.target?.result;
       const wb = XLSX.read(bstr, { type: 'binary' });
+      // The master template export creates a single sheet named "Master Template". 
       const ws = wb.Sheets[wb.SheetNames[0]];
       const data: any[] = XLSX.utils.sheet_to_json(ws);
       
       data.forEach(row => {
         const piId = row['PI ID'];
         const aid = row['Activity ID'];
+        const piTitle = row['PI Title'];
+        const activityName = row['Activity'];
+        const indicatorName = row['Performance Indicator'];
+
         if (piId && aid) {
-          if (row['Activity']) savePIActivityName(piId, aid, row['Activity']);
-          if (row['Performance Indicator']) savePIIndicatorName(piId, aid, row['Performance Indicator']);
-          // Per user request, do not import monthly numerical data from master template
-          // MONTHS.forEach((m, i) => { 
-          //   if (row[m] !== undefined) saveDataWithSync(piId, aid, i, parseInt(row[m], 10) || 0); 
-          // });
+          // Process Activity and Indicator names across all tabs
+          if (piTitle) savePITitle(piId, piTitle);
+          if (activityName) savePIActivityName(piId, aid, activityName);
+          if (indicatorName) savePIIndicatorName(piId, aid, indicatorName);
+          
+          // Process numerical data
+          MONTHS.forEach((m, i) => { 
+            const val = row[m];
+            if (val !== undefined && val !== null) {
+              saveDataWithSync(piId, aid, i, parseInt(String(val), 10) || 0); 
+            }
+          });
         }
       });
-      alert("Master template descriptions (Activity & Indicator) imported successfully. Monthly data was not affected.");
+      alert("Master Template processed: Activities, Indicators, and Data have been updated across all tabs and propagated to CHQ and Station units.");
       refresh();
     };
     reader.readAsBinaryString(file);
