@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { PIData, UserRole, User, MonthData } from '../types';
@@ -9,7 +10,6 @@ interface OperationalDashboardProps {
   subjectUser: User;
   allUnits?: User[];
   isTemplateMode?: boolean;
-  year: string;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -721,24 +721,54 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
         if (!rows || rows.length === 0) throw new Error("File empty");
         
-        let headerRowIdx = rows.findIndex(r => r && r.filter(c => c).length >= 4);
-        if (headerRowIdx === -1) headerRowIdx = 0;
-        const headerRow = rows[headerRowIdx];
+        let headerRowIdx = -1;
         
-        const findCol = (keywords: string[]) => headerRow.findIndex(cell => { 
-          if (!cell) return false; 
-          const norm = String(cell).toLowerCase().trim(); 
-          return keywords.some(k => norm.includes(k)); 
-        });
+        // Intelligent Header Row Detection (Top 50 rows)
+        for (let i = 0; i < Math.min(rows.length, 50); i++) {
+           const row = rows[i];
+           if (!row || !Array.isArray(row)) continue;
+           
+           const normalizedRow = row.map(c => String(c).toLowerCase().replace(/[^a-z0-9]/g, ''));
+           const hasActivity = normalizedRow.some(c => c.includes('activity'));
+           const hasIndicator = normalizedRow.some(c => c.includes('indicator') || c.includes('performance'));
+           const hasPI = normalizedRow.some(c => c.includes('pi') || c.includes('id'));
+           
+           if (hasActivity || (hasPI && hasIndicator)) {
+               headerRowIdx = i;
+               break;
+           }
+        }
+        
+        // Fallback: Use row with most columns if no keywords found
+        if (headerRowIdx === -1) {
+             let maxCols = 0;
+             rows.forEach((r, i) => {
+                 if (r && r.length > maxCols) {
+                     maxCols = r.length;
+                     headerRowIdx = i;
+                 }
+             });
+        }
+        
+        const headerRowRaw = rows[headerRowIdx] || [];
+        const normalizedHeaders = headerRowRaw.map(c => String(c).toLowerCase().replace(/[^a-z0-9]/g, ''));
+        
+        const findCol = (keywords: string[]) => {
+             const normalizedKeywords = keywords.map(k => k.replace(/[^a-z0-9]/g, ''));
+             return normalizedHeaders.findIndex(h => normalizedKeywords.some(k => h.includes(k)));
+        };
 
         const columnMap: Record<string, number> = {
-          piId: findCol(['pi id', 'indicator id', 'pi', 'id', 'tab']),
-          activityName: findCol(['activity', 'activity name', 'description', 'activity description']),
-          indicatorName: findCol(['performance', 'indicator name', 'indicator description', 'measurement', 'measure', 'pi', 'indicator']),
-          piTitle: findCol(['pi title', 'indicator title', 'summary', 'goal', 'title']),
-          aid: findCol(['activity id', 'act id', 'aid', 'no.', 'order'])
+          piId: findCol(['piid', 'indicatorid', 'pi', 'id', 'tab']),
+          activityName: findCol(['activity', 'activityname', 'description', 'activitydescription']),
+          indicatorName: findCol(['performance', 'indicatorname', 'indicatordescription', 'measurement', 'measure', 'pi', 'indicator']),
+          piTitle: findCol(['pititle', 'indicatortitle', 'summary', 'goal', 'title']),
+          aid: findCol(['activityid', 'actid', 'aid', 'no.', 'order'])
         };
-        MONTHS.forEach((m, i) => { columnMap[`month_${i}`] = findCol(MONTH_VARIANTS[m]); });
+        MONTHS.forEach((m, i) => { 
+            // Also normalize variants for the findCol function
+            columnMap[`month_${i}`] = findCol(MONTH_VARIANTS[m].map(v => v.replace(/[^a-z0-9]/g, ''))); 
+        });
 
         const uId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
         
@@ -759,9 +789,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         rows.slice(headerRowIdx + 1).forEach((row) => {
           if (!row || row.length < 2) return;
           
+          // Helper to get value from column map
+          const getVal = (idx: number) => (idx !== -1 && row[idx]) ? String(row[idx]).trim() : '';
+
           // 1. Extract potential PI ID from row
-          // Allow loose matching initially to capture spacing, then normalize
-          let rowPiId = String(row[columnMap.piId] || '').trim().toUpperCase().replace(/\s+/g, '');
+          let rowPiId = getVal(columnMap.piId).toUpperCase().replace(/\s+/g, '');
           
           // Helper to validate ID format: allows standard PI/OD/ODPI
           const isValidId = (s: string) => /^(PI|OD|ODPI)\d+$/.test(s);
@@ -789,9 +821,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           const piId = currentPiId;
           
           // 4. Get content
-          let aidFromCol = String(row[columnMap.aid] || '').trim().toLowerCase().replace(/\s+/g, '');
-          let actNameInFile = String(row[columnMap.activityName] || '').trim();
-          let indNameInFile = String(row[columnMap.indicatorName] || '').trim();
+          let aidFromCol = getVal(columnMap.aid).toLowerCase().replace(/\s+/g, '');
+          let actNameInFile = getVal(columnMap.activityName);
+          let indNameInFile = getVal(columnMap.indicatorName);
 
           // Update fill-down states if values present
           if (actNameInFile) currentActivityName = actNameInFile;
@@ -805,7 +837,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           if (!actNameInFile && !indNameInFile && !currentActivityName && !currentIndicatorName && !aidFromCol) {
             // Likely a header row for the PI itself
             // We check for PI Title in this row
-            const titleInRow = String(row[columnMap.piTitle] || '').trim();
+            const titleInRow = getVal(columnMap.piTitle);
             if (titleInRow) {
                localStorage.setItem(`${prefix}_pi_title_${year}_${uId}_${piId}`, titleInRow);
                propagationTargets.forEach(target => {
@@ -884,7 +916,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             localStorage.setItem(`${prefix}_pi_ind_name_${year}_${target.id}_${piId}_${aid}`, indName);
           });
           
-          const titleInRow = String(row[columnMap.piTitle] || '').trim();
+          const titleInRow = getVal(columnMap.piTitle);
           if (titleInRow) {
             localStorage.setItem(`${prefix}_pi_title_${year}_${uId}_${piId}`, titleInRow);
             propagationTargets.forEach(target => {
@@ -947,204 +979,272 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     e.target.value = '';
   };
 
-  const handleCellClick = (piId: string, rowIdx: number, monthIdx: number, val: number) => { 
-    if (canModifyData) { 
-      setEditingCell({ piId, rowIdx, monthIdx }); 
-      setEditValue(String(val)); 
-    } 
-  };
-  
-  const handleLabelClick = (piId: string, rowIdx: number, field: 'activity' | 'indicator' | 'title', currentVal: string) => { 
-    if (canEditStructure) { 
-      setEditingLabel({ piId, rowIdx, field }); 
-      setEditValue(currentVal); 
-    } 
-  };
-
-  const saveEdit = () => {
+  const saveCell = () => {
+    if (!editingCell) return;
+    const { piId, rowIdx, monthIdx } = editingCell;
+    const piIndex = piData.findIndex(p => p.id === piId);
+    if (piIndex === -1) return;
+    
+    const pi = piData[piIndex];
+    const act = pi.activities[rowIdx];
+    
+    // Save to local storage
     const uId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
-    if (editingCell) {
-      const val = parseInt(editValue, 10) || 0;
-      const targetPI = piData.find(p => p.id === editingCell.piId);
-      if (targetPI) {
-        const aid = targetPI.activities[editingCell.rowIdx].id;
-        localStorage.setItem(`${prefix}_data_${year}_${uId}_${editingCell.piId}_${aid}_${editingCell.monthIdx}`, String(val));
-      }
-      setEditingCell(null);
-    } else if (editingLabel) {
-      const targetPI = piData.find(p => p.id === editingLabel.piId);
-      if (targetPI) {
-        if (editingLabel.field === 'title') {
-          localStorage.setItem(`${prefix}_pi_title_${year}_${uId}_${editingLabel.piId}`, editValue);
-        } else {
-          const aid = targetPI.activities[editingLabel.rowIdx].id;
-          const type = editingLabel.field === 'activity' ? 'act' : 'ind';
-          localStorage.setItem(`${prefix}_pi_${type}_name_${year}_${uId}_${editingLabel.piId}_${aid}`, editValue);
-        }
-      }
-      setEditingLabel(null);
-    }
+    
+    const key = `${prefix}_data_${year}_${uId}_${pi.id}_${act.id}_${monthIdx}`;
+    localStorage.setItem(key, editValue || '0');
+    
+    setEditingCell(null);
     refresh();
   };
 
-  const renderRows = (pi: PIData) => {
-    const rows = pi.activities.map((act, rIdx) => {
-      const isRepeatedActivity = rIdx > 0 && pi.activities[rIdx - 1].activity === act.activity;
-
-      return (
-      <tr key={`${pi.id}-${act.id}`} className="hover:bg-slate-50/50 group transition-colors border-b border-slate-100 relative">
-        <td className="px-6 py-4 relative group">
-          {editingLabel?.piId === pi.id && editingLabel?.rowIdx === rIdx && editingLabel?.field === 'activity' ? 
-            <input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e => e.key === 'Enter' && saveEdit()} className="w-full border-2 border-rose-500 rounded font-black text-[13px] px-2 outline-none" /> : 
-            (!isRepeatedActivity ? 
-              <span onClick={() => handleLabelClick(pi.id, rIdx, 'activity', act.activity)} className={`text-[13px] font-bold text-slate-900 leading-snug block py-1 ${canEditStructure ? 'cursor-pointer hover:bg-rose-50 p-1 rounded transition-colors' : ''}`}>{act.activity}</span>
-              :
-              <span onClick={() => handleLabelClick(pi.id, rIdx, 'activity', act.activity)} className={`text-[13px] font-bold text-transparent select-none leading-snug block py-1 ${canEditStructure ? 'cursor-pointer hover:bg-rose-50 hover:text-slate-400 p-1 rounded transition-colors' : ''}`}>{act.activity}</span>
-            )
-          }
-            
-            {canEditStructure && (
-              <button 
-                onClick={(e) => { e.stopPropagation(); handleRemoveActivity(pi.id, act.id); }} 
-                className="absolute -left-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
-                title="Remove Activity Row"
-              >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            )}
-        </td>
-        <td className="px-6 py-4">
-          {editingLabel?.piId === pi.id && editingLabel?.rowIdx === rIdx && editingLabel?.field === 'indicator' ? 
-            <input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e => e.key === 'Enter' && saveEdit()} className="w-full border-2 border-rose-500 rounded font-black text-[11px] px-2 outline-none" /> : 
-            <span onClick={() => handleLabelClick(pi.id, rIdx, 'indicator', act.indicator)} className={`text-[11px] font-semibold text-slate-500 leading-snug block py-1 ${canEditStructure ? 'cursor-pointer hover:bg-rose-50 p-1 rounded transition-colors' : ''}`}>{act.indicator}</span>}
-        </td>
-        {act.months.map((m, mIdx) => (
-          <td key={mIdx} className="px-1 py-4 text-center">
-            {editingCell?.piId === pi.id && editingCell?.rowIdx === rIdx && editingCell?.monthIdx === mIdx ? 
-              <input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} className="w-12 text-center border-2 border-slate-900 rounded font-black text-[11px] py-0.5 outline-none" /> : 
-              <div onClick={() => handleCellClick(pi.id, rIdx, mIdx, m.value)} className={`rounded py-1 font-black text-[11px] transition-colors ${canModifyData ? 'cursor-pointer hover:bg-slate-100' : ''} ${m.value > 0 ? (isConsolidated ? 'text-emerald-700' : (isTemplateMode ? 'text-rose-700' : (isTargetOutlook ? 'text-amber-700' : 'text-slate-900'))) : 'text-slate-200'}`}>{m.value.toLocaleString()}</div>}
-          </td>
-        ))}
-        <td className={`px-6 py-4 text-center text-xs font-black ${isConsolidated ? 'text-emerald-900' : (isTemplateMode ? 'text-rose-900' : (isTargetOutlook ? 'text-amber-900' : 'text-slate-900'))}`}>{act.total.toLocaleString()}</td>
-      </tr>
-      );
-    });
-
-    if (canEditStructure) {
-      rows.push(
-        <tr key={`${pi.id}-add-row`} className="bg-slate-50/30">
-          <td colSpan={15} className="px-6 py-2">
-             <button 
-               onClick={() => handleAddActivity(pi.id)}
-               className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-800 flex items-center gap-1 transition-colors"
-             >
-               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-               Add Activity
-             </button>
-          </td>
-        </tr>
-      );
-    }
+  const saveLabel = () => {
+    if (!editingLabel) return;
+    const { piId, rowIdx, field } = editingLabel;
+    const uId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
     
-    return rows;
+    const piIndex = piData.findIndex(p => p.id === piId);
+    if (piIndex === -1) return;
+    const pi = piData[piIndex];
+    
+    if (field === 'title') {
+        const key = `${prefix}_pi_title_${year}_${uId}_${piId}`;
+        localStorage.setItem(key, editValue);
+        // Propagate title if template mode
+        if (isTemplateMode) {
+             (allUnits || []).forEach(target => {
+                 localStorage.setItem(`${prefix}_pi_title_${year}_${target.id}_${piId}`, editValue);
+             });
+        }
+    } else {
+        const act = pi.activities[rowIdx];
+        if (field === 'activity') {
+            const key = `${prefix}_pi_act_name_${year}_${uId}_${piId}_${act.id}`;
+            localStorage.setItem(key, editValue);
+             if (isTemplateMode) {
+                 (allUnits || []).forEach(target => {
+                     localStorage.setItem(`${prefix}_pi_act_name_${year}_${target.id}_${piId}_${act.id}`, editValue);
+                 });
+            }
+        } else if (field === 'indicator') {
+            const key = `${prefix}_pi_ind_name_${year}_${uId}_${piId}_${act.id}`;
+            localStorage.setItem(key, editValue);
+             if (isTemplateMode) {
+                 (allUnits || []).forEach(target => {
+                     localStorage.setItem(`${prefix}_pi_ind_name_${year}_${target.id}_${piId}_${act.id}`, editValue);
+                 });
+            }
+        }
+    }
+    setEditingLabel(null);
+    refresh();
   };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-4">
-          <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-slate-900 font-black text-[10px] uppercase tracking-widest transition-all">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg> Return
+       <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="p-2 rounded-xl hover:bg-slate-200 text-slate-500 transition-colors">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </button>
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">{isTemplateMode ? 'Master Template Control' : title}</h1>
-              {isConsolidated && <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-200">Consolidated</span>}
-              {isTemplateMode && <span className="bg-rose-100 text-rose-700 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-rose-200 shadow-sm animate-pulse">Master Source</span>}
-              {!isTemplateMode && isTargetOutlook && <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-amber-200 shadow-sm">Projection</span>}
-            </div>
-            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest opacity-60">Unit: {subjectUser.name} • Year: {year}</p>
+          <div>
+            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">{title}</h2>
+            {isTemplateMode && <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Master Configuration Mode</p>}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => setViewMode(prev => prev === 'tabbed' ? 'master' : 'tabbed')} className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg flex items-center gap-2 ${viewMode === 'master' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}>
-            {viewMode === 'tabbed' ? 'List View' : 'Tab View'}
-          </button>
-          {!isConsolidated && (currentUser.role === UserRole.SUPER_ADMIN || (currentUser.role === UserRole.SUB_ADMIN && isTargetOutlook)) && (
-            <>
-              <button onClick={handleExportMaster} className="bg-indigo-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg">Export Master</button>
-              <button onClick={handleUnhideAll} className="bg-white text-slate-400 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition border border-slate-200">Unhide All</button>
-              <button onClick={() => masterImportRef.current?.click()} className={`${isTargetOutlook ? 'bg-amber-600' : 'bg-slate-900'} text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition shadow-lg`}>Import Master</button>
-              <input type="file" ref={masterImportRef} className="hidden" accept=".xlsx,.xls" onChange={handleImportMasterTemplate} />
-            </>
-          )}
+        
+        {isTemplateMode && (
+            <div className="flex gap-2">
+                <button onClick={handleExportMaster} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg shadow-indigo-200">
+                    Export Template
+                </button>
+                <button onClick={() => masterImportRef.current?.click()} className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg">
+                    Import Template
+                </button>
+                <input type="file" ref={masterImportRef} onChange={handleImportMasterTemplate} className="hidden" accept=".xlsx, .xls" />
+                <button onClick={handleUnhideAll} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-xl text-xs font-bold uppercase tracking-widest transition-all">
+                    Reset Tabs
+                </button>
+            </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden flex flex-col min-h-[600px]">
+        {/* Tabs */}
+        <div className="flex overflow-x-auto no-scrollbar border-b border-slate-100 bg-slate-50/50 p-2 gap-2">
+            {piData.map(pi => (
+                <div key={pi.id} className="relative group">
+                    <button
+                        onClick={() => setActiveTab(pi.id)}
+                        className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === pi.id ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                    >
+                        {formatTabLabel(pi.id)}
+                    </button>
+                    {isTemplateMode && (
+                        <button 
+                            onClick={(e) => handleHideTab(pi.id, e)}
+                            className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold shadow-md z-10"
+                            title="Hide Tab"
+                        >
+                            ×
+                        </button>
+                    )}
+                </div>
+            ))}
+        </div>
+
+        {/* Content */}
+        <div className="p-8 overflow-x-auto">
+            {currentPI && (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                         <div className="group flex items-center gap-3">
+                            <h3 className="text-xl font-black text-slate-800 tracking-tight">{currentPI.title}</h3>
+                            {canEditStructure && (
+                                <button 
+                                    onClick={() => {
+                                        setEditingLabel({ piId: currentPI.id, rowIdx: -1, field: 'title' });
+                                        setEditValue(currentPI.title);
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-600 transition"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                </button>
+                            )}
+                         </div>
+                         {canEditStructure && (
+                             <button onClick={() => handleAddActivity(currentPI.id)} className="px-4 py-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-xs font-black uppercase tracking-widest transition-colors">
+                                + Add Activity
+                             </button>
+                         )}
+                    </div>
+
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr>
+                                <th className="p-3 text-[9px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-100 min-w-[200px]">Activity</th>
+                                <th className="p-3 text-[9px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-100 min-w-[200px]">Indicator</th>
+                                {MONTHS.map(m => (
+                                    <th key={m} className="p-3 text-[9px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-100 text-center w-[60px]">{m}</th>
+                                ))}
+                                <th className="p-3 text-[9px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-100 text-center w-[80px]">Total</th>
+                                {canEditStructure && <th className="w-10 border-b border-slate-100"></th>}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {currentPI.activities.map((act, idx) => (
+                                <tr key={act.id} className="hover:bg-slate-50/50 group transition-colors">
+                                    <td className="p-3 border-b border-slate-50">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold text-slate-700 leading-snug">{act.activity}</span>
+                                            {canEditStructure && (
+                                                <button 
+                                                    onClick={() => {
+                                                        setEditingLabel({ piId: currentPI.id, rowIdx: idx, field: 'activity' });
+                                                        setEditValue(act.activity);
+                                                    }}
+                                                    className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-blue-600 transition"
+                                                >
+                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="p-3 border-b border-slate-50">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-slate-500">{act.indicator}</span>
+                                            {canEditStructure && (
+                                                <button 
+                                                    onClick={() => {
+                                                        setEditingLabel({ piId: currentPI.id, rowIdx: idx, field: 'indicator' });
+                                                        setEditValue(act.indicator);
+                                                    }}
+                                                    className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-blue-600 transition"
+                                                >
+                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                    {act.months.map((m, mIdx) => (
+                                        <td key={mIdx} className="p-1 border-b border-slate-50 text-center">
+                                            <div 
+                                                onClick={() => {
+                                                    if (canModifyData) {
+                                                        setEditingCell({ piId: currentPI.id, rowIdx: idx, monthIdx: mIdx });
+                                                        setEditValue(String(m.value));
+                                                    }
+                                                }}
+                                                className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${m.value > 0 ? 'bg-indigo-50 text-indigo-600' : 'text-slate-300 hover:bg-slate-100'}`}
+                                            >
+                                                {m.value}
+                                            </div>
+                                        </td>
+                                    ))}
+                                    <td className="p-3 border-b border-slate-50 text-center">
+                                        <span className={`text-xs font-black ${act.total > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>{act.total}</span>
+                                    </td>
+                                    {canEditStructure && (
+                                        <td className="p-3 border-b border-slate-50 text-center">
+                                            <button 
+                                                onClick={() => handleRemoveActivity(currentPI.id, act.id)}
+                                                className="text-slate-300 hover:text-rose-500 transition"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                        </td>
+                                    )}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
       </div>
 
-      {viewMode === 'tabbed' ? (
-        <>
-          <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-            {piData.map(pi => (
-              <div key={pi.id} className="relative group">
-                <button onClick={() => setActiveTab(pi.id)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap pr-10 ${activeTab === pi.id ? (isConsolidated ? 'bg-emerald-600 text-white shadow-lg' : isTemplateMode ? 'bg-rose-600 text-white shadow-lg' : (isTargetOutlook ? 'bg-amber-600 text-white shadow-lg' : 'bg-slate-900 text-white shadow-lg')) : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}>{formatTabLabel(pi.id)}</button>
-                {(currentUser.role === UserRole.SUPER_ADMIN || (currentUser.role === UserRole.SUB_ADMIN && isTargetOutlook)) && !isConsolidated && (
-                  <button onClick={(e) => handleHideTab(pi.id, e)} className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-slate-400/20 text-slate-400 hover:bg-rose-500 hover:text-white transition-all opacity-0 group-hover:opacity-100">×</button>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
-            <div className={`${isConsolidated ? 'bg-emerald-900' : isTemplateMode ? 'bg-rose-900' : (isTargetOutlook ? 'bg-amber-900' : 'bg-slate-900')} p-8 text-white`}>
-              {editingLabel?.piId === activeTab && editingLabel?.field === 'title' ? 
-                <input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e => e.key === 'Enter' && saveEdit()} className="bg-white/10 text-white border-2 border-white/30 rounded px-2 outline-none w-full font-black uppercase" /> : 
-                <h2 onClick={() => handleLabelClick(activeTab, 0, 'title', currentPI?.title || '')} className={`text-xl font-black uppercase tracking-tight ${canEditStructure ? 'cursor-pointer hover:bg-rose-800/40 rounded px-2 transition-colors' : ''}`}>{formatTabLabel(activeTab)} - {currentPI?.title}</h2>}
+      {/* Edit Value Modal */}
+      {editingCell && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" onClick={() => setEditingCell(null)}>
+            <div className="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-sm animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-black text-slate-900 mb-4">Update Value</h3>
+                <input 
+                    type="number" 
+                    value={editValue} 
+                    onChange={e => setEditValue(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 outline-none focus:border-slate-900 font-bold text-xl mb-6"
+                    autoFocus
+                    onKeyDown={e => {
+                        if (e.key === 'Enter') saveCell();
+                        if (e.key === 'Escape') setEditingCell(null);
+                    }}
+                />
+                <div className="flex gap-2">
+                    <button onClick={() => setEditingCell(null)} className="flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest text-slate-400 hover:bg-slate-50">Cancel</button>
+                    <button onClick={saveCell} className="flex-1 py-3 rounded-xl bg-slate-900 text-white font-black text-xs uppercase tracking-widest hover:bg-slate-800 shadow-lg">Save</button>
+                </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
-                    <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[300px]">Activity</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest min-w-[200px]">Performance Indicator</th>
-                    {MONTHS.map(m => <th key={m} className="px-3 py-4 text-center text-[10px] font-black uppercase text-slate-400 tracking-widest">{m}</th>)}
-                    <th className="px-6 py-4 text-center text-[10px] font-black uppercase text-slate-900 tracking-widest">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">{currentPI && renderRows(currentPI)}</tbody>
-              </table>
+        </div>
+      )}
+
+      {/* Edit Label Modal */}
+      {editingLabel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" onClick={() => setEditingLabel(null)}>
+            <div className="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-lg animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-black text-slate-900 mb-4">
+                    {editingLabel.field === 'title' ? 'Edit Section Title' : editingLabel.field === 'activity' ? 'Edit Activity Name' : 'Edit Indicator Description'}
+                </h3>
+                <textarea 
+                    value={editValue} 
+                    onChange={e => setEditValue(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 outline-none focus:border-slate-900 font-medium text-sm mb-6 min-h-[100px]"
+                    autoFocus
+                />
+                <div className="flex gap-2">
+                    <button onClick={() => setEditingLabel(null)} className="flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest text-slate-400 hover:bg-slate-50">Cancel</button>
+                    <button onClick={saveLabel} className="flex-1 py-3 rounded-xl bg-slate-900 text-white font-black text-xs uppercase tracking-widest hover:bg-slate-800 shadow-lg">Save Update</button>
+                </div>
             </div>
-          </div>
-        </>
-      ) : (
-        <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden animate-in fade-in duration-700">
-          <div className="overflow-x-auto max-h-[75vh]">
-            <table className="w-full text-left border-collapse">
-              <thead className="sticky top-0 z-30">
-                <tr className={`${isTemplateMode ? 'bg-rose-900' : (isTargetOutlook ? 'bg-amber-900' : 'bg-slate-900')} text-white shadow-md`}>
-                  <th className="px-6 py-5 text-[11px] font-black uppercase tracking-[0.2em] min-w-[300px] border-r border-slate-800">Activity</th>
-                  <th className="px-6 py-5 text-[11px] font-black uppercase tracking-[0.2em] min-w-[200px] border-r border-slate-800">Performance Indicator</th>
-                  {MONTHS.map(m => <th key={m} className="px-2 py-5 text-center text-[10px] font-black uppercase tracking-wider min-w-[50px]">{m}</th>)}
-                  <th className={`px-6 py-5 text-center text-[11px] font-black uppercase tracking-[0.2em] ${isTargetOutlook ? 'bg-amber-700/50' : 'bg-indigo-900/50'}`}>Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {piData.map((pi) => (
-                  <React.Fragment key={pi.id}>
-                    <tr className="bg-slate-50/80 sticky z-20" style={{ top: '64px' }}>
-                      <td colSpan={15} className="px-6 py-3 border-y border-slate-200">
-                        <div className="flex items-center gap-3">
-                          <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest text-white ${isConsolidated ? 'bg-emerald-600' : isTemplateMode ? 'bg-rose-600' : (isTargetOutlook ? 'bg-amber-600' : 'bg-slate-900')}`}>{formatTabLabel(pi.id)}</span>
-                          {editingLabel?.piId === pi.id && editingLabel?.field === 'title' ? 
-                            <input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e => e.key === 'Enter' && saveEdit()} className="text-xs font-black text-slate-800 uppercase tracking-tight border-b border-rose-500 outline-none bg-transparent" /> : 
-                            <span onClick={() => handleLabelClick(pi.id, 0, 'title', pi.title)} className={`text-xs font-black text-slate-800 uppercase tracking-tight ${canEditStructure ? 'cursor-pointer hover:bg-rose-50 px-1 rounded transition-colors' : ''}`}>{pi.title}</span>}
-                        </div>
-                      </td>
-                    </tr>
-                    {renderRows(pi)}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
     </div>
