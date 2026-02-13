@@ -719,14 +719,24 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const data = evt.target?.result;
+        const wb = XLSX.read(data, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
         if (!rows || rows.length === 0) throw new Error("File empty");
         
-        let headerRowIdx = rows.findIndex(r => r && r.filter(c => c).length >= 4);
+        // Improved header detection: Look for key columns
+        let headerRowIdx = rows.findIndex(r => r && Array.isArray(r) && r.some(c => {
+            const s = String(c).toLowerCase().trim();
+            return s.includes('pi id') || s.includes('indicator') || s.includes('activity');
+        }));
+        
+        if (headerRowIdx === -1) {
+            // Fallback: try to find a row with enough columns
+            headerRowIdx = rows.findIndex(r => r && r.filter(c => c).length >= 3);
+        }
         if (headerRowIdx === -1) headerRowIdx = 0;
+        
         const headerRow = rows[headerRowIdx];
         
         const findCol = (keywords: string[]) => headerRow.findIndex(cell => { 
@@ -953,7 +963,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         alert("Import Failed: Please verify Excel headers."); 
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
     e.target.value = '';
   };
 
