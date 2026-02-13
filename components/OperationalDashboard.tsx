@@ -495,15 +495,9 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
       // STRICTLY USE IMPORTED IDS
       activityIds = JSON.parse(storedIds!);
       // Fallback structure only for resolving NAMES if they are missing in local storage (e.g. placeholders)
-       // Map ODPI to PI for structure lookup if needed
-       let structId = piId;
-       if (piId.startsWith('ODPI')) {
-          structId = piId.replace('ODPI', 'PI');
-       }
-       
-       if (PI_STRUCTURE_2026[structId]) {
-         fallbackStructure = PI_STRUCTURE_2026[structId];
-       } else if (piId === 'PI1' || piId === 'ODPI1') {
+       if (PI_STRUCTURE_2026[piId]) {
+         fallbackStructure = PI_STRUCTURE_2026[piId];
+       } else if (piId === 'PI1') {
          fallbackStructure = PI1_STRUCTURE;
        } else {
          // Generic fallback
@@ -527,12 +521,7 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
     }
 
     const activities = activityIds.map(aid => {
-      let base = fallbackStructure.find(a => a.id === aid);
-      if (!base && aid.toLowerCase().startsWith('odpi')) {
-          const mappedAid = aid.toLowerCase().replace('odpi', 'pi');
-          base = fallbackStructure.find(a => a.id === mappedAid);
-      }
-      base = base || fallbackStructure[0];
+      const base = fallbackStructure.find(a => a.id === aid) || fallbackStructure[0];
       return {
         id: aid,
         activity: getSharedLabel(prefix, year, effectiveId, piId, aid, 'act', base.activity),
@@ -542,13 +531,8 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
       };
     });
     
-    // Map ODPI to PI for title lookup
-    let titleId = piId;
-    if (piId.startsWith('ODPI')) {
-        titleId = piId.replace('ODPI', 'PI');
-    }
     const defaultTitleBase = piId === 'PI1' ? "Community Awareness Activities Initiated" : `Indicator ${piId}`;
-    const specificTitle = year === '2026' && PI_TITLES_2026[titleId] ? PI_TITLES_2026[titleId] : defaultTitleBase;
+    const specificTitle = year === '2026' && PI_TITLES_2026[piId] ? PI_TITLES_2026[piId] : defaultTitleBase;
     
     return { 
       id: piId, 
@@ -595,31 +579,42 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const currentPI = useMemo(() => piData.find(pi => pi.id === activeTab) || piData[0], [piData, activeTab]);
 
   const handleExportMaster = () => {
+    // 1. Get ALL definitions, ignoring hidden state, to ensure a complete master template
+    // Use consolidation units if applicable, otherwise empty
+    const unitsToUse = isConsolidated ? (allUnits || []) : [];
+    const fullPiData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToUse, isTemplateMode, true);
+    
+    // 2. Map to export format with strict key ordering
     const dataToExport: any[] = [];
-    piData.forEach(pi => {
+    fullPiData.forEach(pi => {
       pi.activities.forEach(act => {
         const row: any = {
           'PI ID': pi.id,
+          'PI Title': pi.title,
           'Activity ID': act.id, // Added to help strict mapping on re-import
           'Activity Name': act.activity,
           'Performance Indicator': act.indicator,
-          'PI Title': pi.title
         };
-        MONTHS.forEach((month, idx) => { row[month] = act.months[idx].value; });
+        MONTHS.forEach((month, idx) => { 
+            row[month] = act.months[idx].value; 
+        });
         dataToExport.push(row);
       });
     });
     
-    // Create sheet
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    // 3. Define strict header order to match the "current set up" requirements for re-import
+    const header = ['PI ID', 'PI Title', 'Activity ID', 'Activity Name', 'Performance Indicator', ...MONTHS];
 
-    // Set column widths for better "Template" feel
+    // 4. Create sheet
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport, { header });
+
+    // 5. Set column widths for better "Template" feel
     const wscols = [
       { wch: 10 }, // PI ID
+      { wch: 40 }, // PI Title
       { wch: 15 }, // Activity ID
       { wch: 50 }, // Activity Name
       { wch: 50 }, // Performance Indicator
-      { wch: 40 }, // PI Title
       // Months
       { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, 
       { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, 
@@ -629,7 +624,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Master Template");
-    XLSX.writeFile(workbook, `Master_Template_${year}_${prefix}.xlsx`);
+    const safeName = subjectUser.name.replace(/[^a-z0-9]/gi, '_');
+    XLSX.writeFile(workbook, `Master_Template_${safeName}_${year}_${prefix}.xlsx`);
   };
 
   const handleUnhideAll = () => {
@@ -719,24 +715,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const data = evt.target?.result;
-        const wb = XLSX.read(data, { type: 'array' });
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
         if (!rows || rows.length === 0) throw new Error("File empty");
         
-        // Improved header detection: Look for key columns
-        let headerRowIdx = rows.findIndex(r => r && Array.isArray(r) && r.some(c => {
-            const s = String(c).toLowerCase().trim();
-            return s.includes('pi id') || s.includes('indicator') || s.includes('activity');
-        }));
-        
-        if (headerRowIdx === -1) {
-            // Fallback: try to find a row with enough columns
-            headerRowIdx = rows.findIndex(r => r && r.filter(c => c).length >= 3);
-        }
+        let headerRowIdx = rows.findIndex(r => r && r.filter(c => c).length >= 4);
         if (headerRowIdx === -1) headerRowIdx = 0;
-        
         const headerRow = rows[headerRowIdx];
         
         const findCol = (keywords: string[]) => headerRow.findIndex(cell => { 
@@ -852,24 +838,12 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           const isIndPlaceholder = isPlaceholder(indName);
 
           // Resolve from Structure (PI1-29, etc) using PI_STRUCTURE_2026
-          // Map ODPI to PI for structure lookup if needed to provide better defaults
-          let structId = piId;
-          if (piId.startsWith('ODPI')) {
-             structId = piId.replace('ODPI', 'PI');
-          }
-          const struct = PI_STRUCTURE_2026[structId] || PI_STRUCTURE_2026[piId];
-
+          // This ensures PI3 and others are resolved correctly if inputs are placeholders/IDs.
+          const struct = PI_STRUCTURE_2026[piId];
           if (struct) {
               let match;
               // Match by aid
               if (aid) match = struct.find(s => s.id.toLowerCase() === aid.toLowerCase());
-              
-              // NEW: Match by index if IDs are generated sequentially or simple mapping (e.g. odpi6_a1 matches pi6_a1)
-              if (!match && aid && aid.toLowerCase().startsWith('odpi')) {
-                 const piAid = aid.toLowerCase().replace('odpi', 'pi');
-                 match = struct.find(s => s.id.toLowerCase() === piAid);
-              }
-              
               // Match by name-as-id
               if (!match && isActPlaceholder && actName) {
                   match = struct.find(s => s.id.toLowerCase() === actName.toLowerCase());
@@ -881,8 +855,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
               }
           }
 
-          // Fallbacks for specific ODPIs if needed - simplified since we now map ODPI to PI structure above
-          if (piId.startsWith('ODPI') && !struct) {
+          // Fallbacks for specific ODPIs if needed
+          if (piId === 'ODPI6') {
+             if (isActPlaceholder || !actName) actName = "EMPO Assessment and Evaluations";
+             if (isIndPlaceholder || !indName) indName = "No. of EMPO Assessment and Evaluations conducted";
+          } else if (piId === 'ODPI10') {
+             if (isActPlaceholder || !actName) actName = "Operational Resource Management";
+             if (isIndPlaceholder || !indName) indName = "No. of ODPI 10 activities conducted";
+          } else if (piId.startsWith('ODPI')) {
              const tabNum = piId.replace('ODPI', '');
              if (isActPlaceholder || !actName) actName = `ODPI ${tabNum} Operational Task`;
              if (isIndPlaceholder || !indName) indName = `No. of ODPI ${tabNum} activities conducted`;
@@ -963,7 +943,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         alert("Import Failed: Please verify Excel headers."); 
       }
     };
-    reader.readAsArrayBuffer(file);
+    reader.readAsBinaryString(file);
     e.target.value = '';
   };
 
