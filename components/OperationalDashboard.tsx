@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { PIData, UserRole, User, MonthData } from '../types';
@@ -480,7 +481,6 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
   
   if (isTemplateMode) {
     baseIds = baseIds.filter(id => {
-      // Keep if it is in importedIds (explicitly added)
       if (importedIds.includes(id)) return true;
       
       if (!id.startsWith('PI')) return false;
@@ -611,7 +611,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   // Specific check for Super Admin viewing Police Station 1 Target Outlook 2026
   const isStationOneTarget2026 = currentUser.role === UserRole.SUPER_ADMIN && prefix === 'target' && year === '2026' && subjectUser.name === 'Police Station 1';
 
-  const showTemplateControls = isTemplateMode || isSuperAdminTargetMaster || isStationOneTarget2026;
+  // New check for Super Admin viewing Police Station 1 Tactical Accomplishment 2026
+  const isStationOneAccomplishment2026 = currentUser.role === UserRole.SUPER_ADMIN && prefix === 'accomplishment' && year === '2026' && subjectUser.name === 'Police Station 1';
+
+  const showTemplateControls = isTemplateMode || isSuperAdminTargetMaster || isStationOneTarget2026 || isStationOneAccomplishment2026;
 
   // Modified canModifyData logic to prevent editing of Target Outlook for CHQ and Station users
   const canModifyData = useMemo(() => {
