@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { PIData, UserRole, User, MonthData } from '../types';
@@ -439,7 +438,7 @@ const getTabLabel = (prefix: string, year: string, userId: string, piId: string)
     return formatTabLabel(piId);
 }
 
-const createMonthsForActivity = (prefix: string, year: string, userId: string, piId: string, activityId: string, role: UserRole, isConsolidated: boolean, units: User[]): MonthData[] => {
+const createMonthsForActivity = (prefix: string, year: string, userId: string, piId: string, activityId: string, activityName: string, role: UserRole, isConsolidated: boolean, units: User[]): MonthData[] => {
   return Array.from({ length: 12 }).map((_, mIdx) => {
     let value = 0;
     const key = `${prefix}_data_${year}_${userId}_${piId}_${activityId}_${mIdx}`;
@@ -447,7 +446,45 @@ const createMonthsForActivity = (prefix: string, year: string, userId: string, p
     
     if (isConsolidated && units && units.length > 0) {
       value = units.reduce((sum, unit) => {
-        const unitKey = `${prefix}_data_${year}_${unit.id}_${piId}_${activityId}_${mIdx}`;
+        let targetId = activityId;
+        
+        const unitActIdsKey = `${prefix}_pi_act_ids_${year}_${unit.id}_${piId}`;
+        const storedIds = localStorage.getItem(unitActIdsKey);
+        let ids: string[] = [];
+        
+        if (storedIds) {
+            ids = JSON.parse(storedIds);
+        } else {
+             if (year === '2026' && PI_STRUCTURE_2026[piId]) ids = PI_STRUCTURE_2026[piId].map(a => a.id);
+             else if (piId === 'PI1') ids = PI1_STRUCTURE.map(a => a.id);
+             else {
+                 ids = [`${piId.toLowerCase()}_a1`];
+             }
+        }
+
+        const foundId = ids.find(id => {
+             const nameKey = `${prefix}_pi_act_name_${year}_${unit.id}_${piId}_${id}`;
+             let name = localStorage.getItem(nameKey);
+             if (!name) {
+                 if (year === '2026' && PI_STRUCTURE_2026[piId]) {
+                     const base = PI_STRUCTURE_2026[piId].find(a => a.id === id);
+                     if (base) name = base.activity;
+                 } else if (piId === 'PI1') {
+                     const base = PI1_STRUCTURE.find(a => a.id === id);
+                     if (base) name = base.activity;
+                 } else {
+                     const piNumMatch = piId.match(/^PI(\d+)$/);
+                     const piNum = piNumMatch ? parseInt(piNumMatch[1], 10) : null;
+                     if (piNum !== null && piNum >= 2 && piNum <= 29) name = "Sectoral groups/BPATs mobilized";
+                     else name = "Operational Activity";
+                 }
+             }
+             return name === activityName;
+        });
+
+        if (foundId) targetId = foundId;
+
+        const unitKey = `${prefix}_data_${year}_${unit.id}_${piId}_${targetId}_${mIdx}`;
         const val = localStorage.getItem(unitKey);
         return sum + (val ? parseInt(val, 10) : 0);
       }, 0);
@@ -481,6 +518,7 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
   
   if (isTemplateMode) {
     baseIds = baseIds.filter(id => {
+      // Keep if it is in importedIds (explicitly added)
       if (importedIds.includes(id)) return true;
       
       if (!id.startsWith('PI')) return false;
@@ -548,11 +586,12 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
 
     const activities = activityIds.map(aid => {
       const base = fallbackStructure.find(a => a.id === aid) || fallbackStructure[0];
+      const actName = getSharedLabel(prefix, year, effectiveId, piId, aid, 'act', base.activity);
       return {
         id: aid,
-        activity: getSharedLabel(prefix, year, effectiveId, piId, aid, 'act', base.activity),
+        activity: actName,
         indicator: getSharedLabel(prefix, year, effectiveId, piId, aid, 'ind', base.indicator),
-        months: createMonthsForActivity(prefix, year, effectiveId, piId, aid, role, isConsolidated, units),
+        months: createMonthsForActivity(prefix, year, effectiveId, piId, aid, actName, role, isConsolidated, units),
         total: 0
       };
     });
