@@ -372,6 +372,65 @@ const PI1_STRUCTURE = [
   { id: 'pi1_a17', activity: "collaborative efforts with NGOs, CSOs, GAs and Non-GAs", indicator: "No. of collaborative efforts activities conducted" }
 ];
 
+// ... (Keep existing customPiSort, formatTabLabel, getEffectiveUserId, getSharedLabel, getSharedPITitle, getTabLabel, createMonthsForActivity, getPIDefinitions, getPropagationTargets)
+
+// IMPORTANT: Including the modified createMonthsForActivity from previous updates to ensure context
+const createMonthsForActivity = (prefix: string, year: string, userId: string, piId: string, activityId: string, activityName: string, role: UserRole, isConsolidated: boolean, units: User[]): MonthData[] => {
+  return Array.from({ length: 12 }).map((_, mIdx) => {
+    let value = 0;
+    const key = `${prefix}_data_${year}_${userId}_${piId}_${activityId}_${mIdx}`;
+    const stored = localStorage.getItem(key);
+    
+    if (isConsolidated && units && units.length > 0) {
+      value = units.reduce((sum, unit) => {
+        let targetId = activityId;
+        const unitActIdsKey = `${prefix}_pi_act_ids_${year}_${unit.id}_${piId}`;
+        const storedIds = localStorage.getItem(unitActIdsKey);
+        let ids: string[] = [];
+        
+        if (storedIds) {
+            ids = JSON.parse(storedIds);
+        } else {
+             if (year === '2026' && PI_STRUCTURE_2026[piId]) ids = PI_STRUCTURE_2026[piId].map(a => a.id);
+             else if (piId === 'PI1') ids = PI1_STRUCTURE.map(a => a.id);
+             else {
+                 ids = [`${piId.toLowerCase()}_a1`];
+             }
+        }
+
+        const foundId = ids.find(id => {
+             const nameKey = `${prefix}_pi_act_name_${year}_${unit.id}_${piId}_${id}`;
+             let name = localStorage.getItem(nameKey);
+             if (!name) {
+                 if (year === '2026' && PI_STRUCTURE_2026[piId]) {
+                     const base = PI_STRUCTURE_2026[piId].find(a => a.id === id);
+                     if (base) name = base.activity;
+                 } else if (piId === 'PI1') {
+                     const base = PI1_STRUCTURE.find(a => a.id === id);
+                     if (base) name = base.activity;
+                 } else {
+                     const piNumMatch = piId.match(/^PI(\d+)$/);
+                     const piNum = piNumMatch ? parseInt(piNumMatch[1], 10) : null;
+                     if (piNum !== null && piNum >= 2 && piNum <= 29) name = "Sectoral groups/BPATs mobilized";
+                     else name = "Operational Activity";
+                 }
+             }
+             return name === activityName;
+        });
+
+        if (foundId) targetId = foundId;
+
+        const unitKey = `${prefix}_data_${year}_${unit.id}_${piId}_${targetId}_${mIdx}`;
+        const val = localStorage.getItem(unitKey);
+        return sum + (val ? parseInt(val, 10) : 0);
+      }, 0);
+    } else {
+      if (stored !== null) value = parseInt(stored, 10);
+    }
+    return { value, files: [] };
+  });
+};
+
 const customPiSort = (a: string, b: string) => {
   const aUpper = a.toUpperCase();
   const bUpper = b.toUpperCase();
@@ -438,63 +497,6 @@ const getTabLabel = (prefix: string, year: string, userId: string, piId: string)
     return formatTabLabel(piId);
 }
 
-const createMonthsForActivity = (prefix: string, year: string, userId: string, piId: string, activityId: string, activityName: string, role: UserRole, isConsolidated: boolean, units: User[]): MonthData[] => {
-  return Array.from({ length: 12 }).map((_, mIdx) => {
-    let value = 0;
-    const key = `${prefix}_data_${year}_${userId}_${piId}_${activityId}_${mIdx}`;
-    const stored = localStorage.getItem(key);
-    
-    if (isConsolidated && units && units.length > 0) {
-      value = units.reduce((sum, unit) => {
-        let targetId = activityId;
-        
-        const unitActIdsKey = `${prefix}_pi_act_ids_${year}_${unit.id}_${piId}`;
-        const storedIds = localStorage.getItem(unitActIdsKey);
-        let ids: string[] = [];
-        
-        if (storedIds) {
-            ids = JSON.parse(storedIds);
-        } else {
-             if (year === '2026' && PI_STRUCTURE_2026[piId]) ids = PI_STRUCTURE_2026[piId].map(a => a.id);
-             else if (piId === 'PI1') ids = PI1_STRUCTURE.map(a => a.id);
-             else {
-                 ids = [`${piId.toLowerCase()}_a1`];
-             }
-        }
-
-        const foundId = ids.find(id => {
-             const nameKey = `${prefix}_pi_act_name_${year}_${unit.id}_${piId}_${id}`;
-             let name = localStorage.getItem(nameKey);
-             if (!name) {
-                 if (year === '2026' && PI_STRUCTURE_2026[piId]) {
-                     const base = PI_STRUCTURE_2026[piId].find(a => a.id === id);
-                     if (base) name = base.activity;
-                 } else if (piId === 'PI1') {
-                     const base = PI1_STRUCTURE.find(a => a.id === id);
-                     if (base) name = base.activity;
-                 } else {
-                     const piNumMatch = piId.match(/^PI(\d+)$/);
-                     const piNum = piNumMatch ? parseInt(piNumMatch[1], 10) : null;
-                     if (piNum !== null && piNum >= 2 && piNum <= 29) name = "Sectoral groups/BPATs mobilized";
-                     else name = "Operational Activity";
-                 }
-             }
-             return name === activityName;
-        });
-
-        if (foundId) targetId = foundId;
-
-        const unitKey = `${prefix}_data_${year}_${unit.id}_${piId}_${targetId}_${mIdx}`;
-        const val = localStorage.getItem(unitKey);
-        return sum + (val ? parseInt(val, 10) : 0);
-      }, 0);
-    } else {
-      if (stored !== null) value = parseInt(stored, 10);
-    }
-    return { value, files: [] };
-  });
-};
-
 const getPIDefinitions = (prefix: string, year: string, userId: string, role: UserRole, isConsolidated: boolean, units: User[], isTemplateMode: boolean, ignoreHidden = false): ExtendedPIData[] => {
   const effectiveId = getEffectiveUserId(userId, role, prefix, isTemplateMode);
   const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
@@ -518,9 +520,7 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
   
   if (isTemplateMode) {
     baseIds = baseIds.filter(id => {
-      // Keep if it is in importedIds (explicitly added)
       if (importedIds.includes(id)) return true;
-      
       if (!id.startsWith('PI')) return false;
       const numStr = id.replace('PI', '');
       if (!/^\d+$/.test(numStr)) return false; 
@@ -610,13 +610,9 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
 
 const getPropagationTargets = (currentUser: User, subjectUser: User, allUnits: User[], prefix: string, year: string, isTemplateMode: boolean): User[] => {
     if (isTemplateMode) return allUnits || [];
-    
-    // Super Admin editing Master Target Outlook -> Propagate to CHQ
     if (currentUser.role === UserRole.SUPER_ADMIN && subjectUser.role === UserRole.SUPER_ADMIN && prefix === 'target') {
         return (allUnits || []).filter(u => u.role === UserRole.CHQ);
     }
-
-    // Super Admin editing Police Station 1 2026 Target -> Propagate to other Stations
     if (currentUser.role === UserRole.SUPER_ADMIN && prefix === 'target' && year === '2026' && subjectUser.name === 'Police Station 1') {
          return (allUnits || []).filter(u => 
             u.role === UserRole.STATION && 
@@ -624,7 +620,6 @@ const getPropagationTargets = (currentUser: User, subjectUser: User, allUnits: U
             u.name !== 'City Mobile Force Company'
         );
     }
-    
     return [];
 };
 
@@ -634,7 +629,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const [editingCell, setEditingCell] = useState<{ piId: string; rowIdx: number; monthIdx: number } | null>(null);
   const [editingLabel, setEditingLabel] = useState<{ piId: string; rowIdx: number; field: 'activity' | 'indicator' | 'title' | 'tab_label' } | null>(null);
   const [editValue, setEditValue] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'tabbed' | 'master'>('tabbed');
   const masterImportRef = useRef<HTMLInputElement>(null);
 
   const year = useMemo(() => title.match(/\d{4}/)?.[0] || '2026', [title]);
@@ -644,28 +638,19 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const isConsolidated = useMemo(() => (currentUser.role === UserRole.SUPER_ADMIN && (title.includes('Consolidation') || title.includes('Dashboard'))) || (currentUser.role === UserRole.CHQ && title.includes('Consolidation')), [currentUser.role, title]);
   const isOwner = currentUser.id === subjectUser.id;
   
-  // Specific check for Super Admin viewing the master target outlook, which serves as a template for CHQ users
   const isSuperAdminTargetMaster = currentUser.role === UserRole.SUPER_ADMIN && subjectUser.role === UserRole.SUPER_ADMIN && prefix === 'target';
-
-  // Specific check for Super Admin viewing Police Station 1 Target Outlook 2026
   const isStationOneTarget2026 = currentUser.role === UserRole.SUPER_ADMIN && prefix === 'target' && year === '2026' && subjectUser.name === 'Police Station 1';
-
-  // New check for Super Admin viewing Police Station 1 Tactical Accomplishment 2026
   const isStationOneAccomplishment2026 = currentUser.role === UserRole.SUPER_ADMIN && prefix === 'accomplishment' && year === '2026' && subjectUser.name === 'Police Station 1';
 
   const showTemplateControls = isTemplateMode || isSuperAdminTargetMaster || isStationOneTarget2026 || isStationOneAccomplishment2026;
 
-  // Modified canModifyData logic to prevent editing of Target Outlook for CHQ and Station users
   const canModifyData = useMemo(() => {
     if (isConsolidated) return false;
-    
-    // Target Outlook is read-only for CHQ and STATION users, regardless of ownership
     if (isTargetOutlook) {
       if (currentUser.role === UserRole.CHQ || currentUser.role === UserRole.STATION) {
         return false;
       }
     }
-    
     return isOwner || currentUser.role === UserRole.SUPER_ADMIN || (currentUser.role === UserRole.SUB_ADMIN && subjectUser.role === UserRole.STATION);
   }, [isConsolidated, isOwner, currentUser.role, subjectUser.role, isTargetOutlook]);
 
@@ -699,10 +684,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const fullPiData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToUse, isTemplateMode, true);
     
     const workbook = XLSX.utils.book_new();
-    // Updated header order: PI ID, Activity ID, PI Title, Activity, Performance Indicator
     const header = ['PI ID', 'Activity ID', 'PI Title', 'Activity', 'Performance Indicator', ...MONTHS];
     const wscols = [
-      { wch: 10 }, { wch: 15 }, { wch: 40 }, { wch: 50 }, { wch: 50 }, // Updated widths to match header order
+      { wch: 10 }, { wch: 15 }, { wch: 40 }, { wch: 50 }, { wch: 50 },
       { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 },
       { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }
     ];
@@ -712,9 +696,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         pi.activities.forEach(act => {
             const row: any = {
                 'PI ID': pi.id,
-                'Activity ID': act.id, // Swapped position
-                'PI Title': pi.title, // Swapped position
-                'Activity': act.activity, // Renamed from 'Activity Name'
+                'Activity ID': act.id, 
+                'PI Title': pi.title, 
+                'Activity': act.activity, 
                 'Performance Indicator': act.indicator,
             };
             MONTHS.forEach((month, idx) => { row[month] = act.months[idx].value; });
@@ -744,26 +728,22 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
   const handleAddTab = () => {
     if (!canEditStructure) return;
-    const newTabId = `CPI_${Date.now()}`; // Custom Performance Indicator
+    const newTabId = `CPI_${Date.now()}`; 
     const uId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
     
-    // Update Imported List
     const importedKey = `${prefix}_imported_pi_list_${year}_${uId}`;
     const currentImported: string[] = JSON.parse(localStorage.getItem(importedKey) || '[]');
     const newImported = [...currentImported, newTabId];
     localStorage.setItem(importedKey, JSON.stringify(newImported));
 
-    // Update Order
     const orderKey = `${prefix}_pi_order_${year}_${uId}`;
     const currentOrder: string[] = piData.map(p => p.id); 
     const newOrder = [...currentOrder, newTabId]; 
     localStorage.setItem(orderKey, JSON.stringify(newOrder));
     
-    // Set Default Label/Title
     localStorage.setItem(`${prefix}_tab_label_${year}_${uId}_${newTabId}`, "New Tab");
     localStorage.setItem(`${prefix}_pi_title_${year}_${uId}_${newTabId}`, "New Performance Indicator Section");
     
-    // Initialize one activity
     const actId = `${newTabId.toLowerCase()}_a1`;
     const actIdsKey = `${prefix}_pi_act_ids_${year}_${uId}_${newTabId}`;
     localStorage.setItem(actIdsKey, JSON.stringify([actId]));
@@ -773,24 +753,18 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
          localStorage.setItem(`${prefix}_data_${year}_${uId}_${newTabId}_${actId}_${i}`, "0");
     }
 
-    // Propagation
     const targets = getPropagationTargets(currentUser, subjectUser, allUnits || [], prefix, year, isTemplateMode || false);
     targets.forEach(target => {
-        // Imported List
         const tImportedKey = `${prefix}_imported_pi_list_${year}_${target.id}`;
         const tImported = JSON.parse(localStorage.getItem(tImportedKey) || '[]');
         if (!tImported.includes(newTabId)) {
             localStorage.setItem(tImportedKey, JSON.stringify([...tImported, newTabId]));
         }
-
-        // Order
         const tOrderKey = `${prefix}_pi_order_${year}_${target.id}`;
         const tOrder = JSON.parse(localStorage.getItem(tOrderKey) || '[]');
         if (!tOrder.includes(newTabId)) {
             localStorage.setItem(tOrderKey, JSON.stringify([...tOrder, newTabId]));
         }
-        
-        // Data
         localStorage.setItem(`${prefix}_tab_label_${year}_${target.id}_${newTabId}`, "New Tab");
         localStorage.setItem(`${prefix}_pi_title_${year}_${target.id}_${newTabId}`, "New Performance Indicator Section");
         localStorage.setItem(`${prefix}_pi_act_ids_${year}_${target.id}_${newTabId}`, JSON.stringify([actId]));
@@ -814,8 +788,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       if (!hidden.includes(piId)) {
           const newHidden = [...hidden, piId];
           localStorage.setItem(hiddenKey, JSON.stringify(newHidden));
-
-          // Propagation
           const targets = getPropagationTargets(currentUser, subjectUser, allUnits || [], prefix, year, isTemplateMode || false);
           targets.forEach(target => {
             const tHiddenKey = `${prefix}_hidden_pis_${year}_${target.id}`;
@@ -824,7 +796,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                 localStorage.setItem(tHiddenKey, JSON.stringify([...tHidden, piId]));
             }
           });
-
           refresh();
       }
     }
@@ -835,35 +806,26 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const effectiveId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
     const currentIndex = piData.findIndex(p => p.id === piId);
     if (currentIndex === -1) return;
-    
     const newIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
     if (newIndex < 0 || newIndex >= piData.length) return;
-
     const newOrder = piData.map(p => p.id);
-    // Swap
     [newOrder[currentIndex], newOrder[newIndex]] = [newOrder[newIndex], newOrder[currentIndex]];
-    
     const orderKey = `${prefix}_pi_order_${year}_${effectiveId}`;
     localStorage.setItem(orderKey, JSON.stringify(newOrder));
-    
-    // Propagation
     const targets = getPropagationTargets(currentUser, subjectUser, allUnits || [], prefix, year, isTemplateMode || false);
     targets.forEach(target => {
         const tOrderKey = `${prefix}_pi_order_${year}_${target.id}`;
         localStorage.setItem(tOrderKey, JSON.stringify(newOrder));
     });
-
     refresh();
   };
 
   const handleAddActivity = (piId: string) => {
     if (!canEditStructure) return;
     const uId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
-    
     let currentIds: string[] = [];
     const localKey = `${prefix}_pi_act_ids_${year}_${uId}_${piId}`;
     const storedLocal = localStorage.getItem(localKey);
-    
     if (storedLocal) {
         currentIds = JSON.parse(storedLocal);
     } else {
@@ -874,19 +836,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             currentIds = [];
         }
     }
-
     const newId = `${piId.toLowerCase()}_custom_${Date.now()}`;
     const newIds = [...currentIds, newId];
-
     localStorage.setItem(localKey, JSON.stringify(newIds));
-
     localStorage.setItem(`${prefix}_pi_act_name_${year}_${uId}_${piId}_${newId}`, "New Activity");
     localStorage.setItem(`${prefix}_pi_ind_name_${year}_${uId}_${piId}_${newId}`, "New Indicator");
     for(let i=0; i<12; i++) {
          localStorage.setItem(`${prefix}_data_${year}_${uId}_${piId}_${newId}_${i}`, "0");
     }
-
-    // Propagation
     const targets = getPropagationTargets(currentUser, subjectUser, allUnits || [], prefix, year, isTemplateMode || false);
     targets.forEach(target => {
         const tLocalKey = `${prefix}_pi_act_ids_${year}_${target.id}_${piId}`;
@@ -897,18 +854,15 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
              localStorage.setItem(`${prefix}_data_${year}_${target.id}_${piId}_${newId}_${i}`, "0");
         }
     });
-
     refresh();
   };
 
   const handleRemoveActivity = (piId: string, activityId: string) => {
     if (!canEditStructure) return;
     if (!confirm('Are you sure you want to remove this activity row?')) return;
-
     const uId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
     const localKey = `${prefix}_pi_act_ids_${year}_${uId}_${piId}`;
     const storedLocal = localStorage.getItem(localKey);
-
     let currentIds: string[] = [];
     if (storedLocal) {
       currentIds = JSON.parse(storedLocal);
@@ -916,17 +870,13 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       const pi = piData.find(p => p.id === piId);
       currentIds = pi ? pi.activities.map(a => a.id) : [];
     }
-
     const newIds = currentIds.filter(id => id !== activityId);
     localStorage.setItem(localKey, JSON.stringify(newIds));
-    
-    // Propagation
     const targets = getPropagationTargets(currentUser, subjectUser, allUnits || [], prefix, year, isTemplateMode || false);
     targets.forEach(target => {
         const tLocalKey = `${prefix}_pi_act_ids_${year}_${target.id}_${piId}`;
         localStorage.setItem(tLocalKey, JSON.stringify(newIds));
     });
-
     refresh();
   };
 
@@ -988,12 +938,13 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                  return normalizedHeaders.findIndex(h => normalizedKeywords.some(k => h.includes(k)));
             };
 
+            // Improved column mapping to match: PI ID, Activity ID, PI Title, Activity, Performance Indicator
             const columnMap: Record<string, number> = {
-              piId: findCol(['piid', 'indicatorid', 'pi', 'id', 'tab']),
-              activityName: findCol(['activity', 'activityname', 'description', 'activitydescription']),
-              indicatorName: findCol(['performance', 'indicatorname', 'indicatordescription', 'measurement', 'measure', 'pi', 'indicator']),
-              piTitle: findCol(['pititle', 'indicatortitle', 'summary', 'goal', 'title']),
-              aid: findCol(['activityid', 'actid', 'aid', 'no.', 'order'])
+              piId: findCol(['piid', 'pi id', 'indicatorid', 'id']),
+              aid: findCol(['activityid', 'activity id', 'actid', 'aid']),
+              piTitle: findCol(['pititle', 'pi title', 'indicatortitle', 'title']),
+              activityName: findCol(['activity', 'activityname', 'description']),
+              indicatorName: findCol(['performanceindicator', 'performance indicator', 'performance', 'indicator']),
             };
             MONTHS.forEach((m, i) => { columnMap[`month_${i}`] = findCol(MONTH_VARIANTS[m].map(v => v.replace(/[^a-z0-9]/g, ''))); });
 
@@ -1143,7 +1094,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             localStorage.setItem(`${prefix}_pi_act_ids_${year}_${uId}_${pid}`, JSON.stringify(aids));
           });
 
-          // Enforce Strict Order based on file content
           localStorage.setItem(`${prefix}_pi_order_${year}_${uId}`, JSON.stringify(orderedPIs));
 
           const defaultList = [
