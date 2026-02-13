@@ -420,7 +420,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
                 className="w-full flex items-center gap-5 p-6 bg-slate-900 rounded-3xl border-2 border-slate-800 hover:border-amber-400 transition-all text-left cursor-pointer shadow-xl group"
               >
                 <div className="w-14 h-14 bg-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-400 border border-indigo-500/30 group-hover:scale-105 transition-transform">
-                   <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                   <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
                 </div>
                 <div className="flex-1">
                   <p className="text-xl font-black text-white">Operational Dashboard Target Outlook</p>
@@ -596,7 +596,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
             onClick={() => setView('unit-oversight')}
             className={`w-full text-left px-4 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-between group ${view === 'unit-oversight' || (view === 'operational-dashboard' && selectedOverviewUser && selectedOverviewUser.id !== user.id) ? 'bg-purple-600 text-white shadow-lg shadow-purple-100' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
           >
-            Unit Oversight
+            UNIT ACCOMPLISHMENT
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2-2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
           </button>
         )}
