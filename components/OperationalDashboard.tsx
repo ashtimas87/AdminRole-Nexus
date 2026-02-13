@@ -480,6 +480,9 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
   
   if (isTemplateMode) {
     baseIds = baseIds.filter(id => {
+      // Keep if it is in importedIds (explicitly added)
+      if (importedIds.includes(id)) return true;
+      
       if (!id.startsWith('PI')) return false;
       const numStr = id.replace('PI', '');
       if (!/^\d+$/.test(numStr)) return false; 
@@ -566,6 +569,26 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
   }).filter(pi => ignoreHidden ? true : !hiddenPIs.includes(pi.id));
 };
 
+const getPropagationTargets = (currentUser: User, subjectUser: User, allUnits: User[], prefix: string, year: string, isTemplateMode: boolean): User[] => {
+    if (isTemplateMode) return allUnits || [];
+    
+    // Super Admin editing Master Target Outlook -> Propagate to CHQ
+    if (currentUser.role === UserRole.SUPER_ADMIN && subjectUser.role === UserRole.SUPER_ADMIN && prefix === 'target') {
+        return (allUnits || []).filter(u => u.role === UserRole.CHQ);
+    }
+
+    // Super Admin editing Police Station 1 2026 Target -> Propagate to other Stations
+    if (currentUser.role === UserRole.SUPER_ADMIN && prefix === 'target' && year === '2026' && subjectUser.name === 'Police Station 1') {
+         return (allUnits || []).filter(u => 
+            u.role === UserRole.STATION && 
+            u.id !== subjectUser.id && 
+            u.name !== 'City Mobile Force Company'
+        );
+    }
+    
+    return [];
+};
+
 const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBack, currentUser, subjectUser, allUnits = [], isTemplateMode = false }) => {
   const [activeTab, setActiveTab] = useState('');
   const [piData, setPiData] = useState<ExtendedPIData[]>([]);
@@ -584,6 +607,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   
   // Specific check for Super Admin viewing the master target outlook, which serves as a template for CHQ users
   const isSuperAdminTargetMaster = currentUser.role === UserRole.SUPER_ADMIN && subjectUser.role === UserRole.SUPER_ADMIN && prefix === 'target';
+
+  // Specific check for Super Admin viewing Police Station 1 Target Outlook 2026
+  const isStationOneTarget2026 = currentUser.role === UserRole.SUPER_ADMIN && prefix === 'target' && year === '2026' && subjectUser.name === 'Police Station 1';
+
+  const showTemplateControls = isTemplateMode || isSuperAdminTargetMaster || isStationOneTarget2026;
 
   // Modified canModifyData logic to prevent editing of Target Outlook for CHQ and Station users
   const canModifyData = useMemo(() => {
@@ -629,9 +657,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const fullPiData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToUse, isTemplateMode, true);
     
     const workbook = XLSX.utils.book_new();
-    const header = ['PI ID', 'PI Title', 'Activity ID', 'Activity Name', 'Performance Indicator', ...MONTHS];
+    // Updated header order: PI ID, Activity ID, PI Title, Activity, Performance Indicator
+    const header = ['PI ID', 'Activity ID', 'PI Title', 'Activity', 'Performance Indicator', ...MONTHS];
     const wscols = [
-      { wch: 10 }, { wch: 40 }, { wch: 15 }, { wch: 50 }, { wch: 50 },
+      { wch: 10 }, { wch: 15 }, { wch: 40 }, { wch: 50 }, { wch: 50 }, // Updated widths to match header order
       { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 },
       { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }
     ];
@@ -641,9 +670,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         pi.activities.forEach(act => {
             const row: any = {
                 'PI ID': pi.id,
-                'PI Title': pi.title,
-                'Activity ID': act.id,
-                'Activity Name': act.activity,
+                'Activity ID': act.id, // Swapped position
+                'PI Title': pi.title, // Swapped position
+                'Activity': act.activity, // Renamed from 'Activity Name'
                 'Performance Indicator': act.indicator,
             };
             MONTHS.forEach((month, idx) => { row[month] = act.months[idx].value; });
@@ -671,15 +700,91 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     }
   };
 
+  const handleAddTab = () => {
+    if (!canEditStructure) return;
+    const newTabId = `CPI_${Date.now()}`; // Custom Performance Indicator
+    const uId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
+    
+    // Update Imported List
+    const importedKey = `${prefix}_imported_pi_list_${year}_${uId}`;
+    const currentImported: string[] = JSON.parse(localStorage.getItem(importedKey) || '[]');
+    const newImported = [...currentImported, newTabId];
+    localStorage.setItem(importedKey, JSON.stringify(newImported));
+
+    // Update Order
+    const orderKey = `${prefix}_pi_order_${year}_${uId}`;
+    const currentOrder: string[] = piData.map(p => p.id); 
+    const newOrder = [...currentOrder, newTabId]; 
+    localStorage.setItem(orderKey, JSON.stringify(newOrder));
+    
+    // Set Default Label/Title
+    localStorage.setItem(`${prefix}_tab_label_${year}_${uId}_${newTabId}`, "New Tab");
+    localStorage.setItem(`${prefix}_pi_title_${year}_${uId}_${newTabId}`, "New Performance Indicator Section");
+    
+    // Initialize one activity
+    const actId = `${newTabId.toLowerCase()}_a1`;
+    const actIdsKey = `${prefix}_pi_act_ids_${year}_${uId}_${newTabId}`;
+    localStorage.setItem(actIdsKey, JSON.stringify([actId]));
+    localStorage.setItem(`${prefix}_pi_act_name_${year}_${uId}_${newTabId}_${actId}`, "New Activity");
+    localStorage.setItem(`${prefix}_pi_ind_name_${year}_${uId}_${newTabId}_${actId}`, "New Indicator");
+    for(let i=0; i<12; i++) {
+         localStorage.setItem(`${prefix}_data_${year}_${uId}_${newTabId}_${actId}_${i}`, "0");
+    }
+
+    // Propagation
+    const targets = getPropagationTargets(currentUser, subjectUser, allUnits || [], prefix, year, isTemplateMode || false);
+    targets.forEach(target => {
+        // Imported List
+        const tImportedKey = `${prefix}_imported_pi_list_${year}_${target.id}`;
+        const tImported = JSON.parse(localStorage.getItem(tImportedKey) || '[]');
+        if (!tImported.includes(newTabId)) {
+            localStorage.setItem(tImportedKey, JSON.stringify([...tImported, newTabId]));
+        }
+
+        // Order
+        const tOrderKey = `${prefix}_pi_order_${year}_${target.id}`;
+        const tOrder = JSON.parse(localStorage.getItem(tOrderKey) || '[]');
+        if (!tOrder.includes(newTabId)) {
+            localStorage.setItem(tOrderKey, JSON.stringify([...tOrder, newTabId]));
+        }
+        
+        // Data
+        localStorage.setItem(`${prefix}_tab_label_${year}_${target.id}_${newTabId}`, "New Tab");
+        localStorage.setItem(`${prefix}_pi_title_${year}_${target.id}_${newTabId}`, "New Performance Indicator Section");
+        localStorage.setItem(`${prefix}_pi_act_ids_${year}_${target.id}_${newTabId}`, JSON.stringify([actId]));
+        localStorage.setItem(`${prefix}_pi_act_name_${year}_${target.id}_${newTabId}_${actId}`, "New Activity");
+        localStorage.setItem(`${prefix}_pi_ind_name_${year}_${target.id}_${newTabId}_${actId}`, "New Indicator");
+        for(let i=0; i<12; i++) {
+             localStorage.setItem(`${prefix}_data_${year}_${target.id}_${newTabId}_${actId}_${i}`, "0");
+        }
+    });
+    
+    refresh();
+    setActiveTab(newTabId);
+  };
+
   const handleHideTab = (piId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const effectiveId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
     if (confirm(`Delete ${formatTabLabel(piId)}?`)) {
       const hiddenKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
       const hidden: string[] = JSON.parse(localStorage.getItem(hiddenKey) || '[]');
-      if (!hidden.includes(piId)) hidden.push(piId);
-      localStorage.setItem(hiddenKey, JSON.stringify(hidden));
-      refresh();
+      if (!hidden.includes(piId)) {
+          const newHidden = [...hidden, piId];
+          localStorage.setItem(hiddenKey, JSON.stringify(newHidden));
+
+          // Propagation
+          const targets = getPropagationTargets(currentUser, subjectUser, allUnits || [], prefix, year, isTemplateMode || false);
+          targets.forEach(target => {
+            const tHiddenKey = `${prefix}_hidden_pis_${year}_${target.id}`;
+            const tHidden = JSON.parse(localStorage.getItem(tHiddenKey) || '[]');
+            if (!tHidden.includes(piId)) {
+                localStorage.setItem(tHiddenKey, JSON.stringify([...tHidden, piId]));
+            }
+          });
+
+          refresh();
+      }
     }
   };
 
@@ -698,6 +803,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     
     const orderKey = `${prefix}_pi_order_${year}_${effectiveId}`;
     localStorage.setItem(orderKey, JSON.stringify(newOrder));
+    
+    // Propagation
+    const targets = getPropagationTargets(currentUser, subjectUser, allUnits || [], prefix, year, isTemplateMode || false);
+    targets.forEach(target => {
+        const tOrderKey = `${prefix}_pi_order_${year}_${target.id}`;
+        localStorage.setItem(tOrderKey, JSON.stringify(newOrder));
+    });
+
     refresh();
   };
 
@@ -731,6 +844,18 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
          localStorage.setItem(`${prefix}_data_${year}_${uId}_${piId}_${newId}_${i}`, "0");
     }
 
+    // Propagation
+    const targets = getPropagationTargets(currentUser, subjectUser, allUnits || [], prefix, year, isTemplateMode || false);
+    targets.forEach(target => {
+        const tLocalKey = `${prefix}_pi_act_ids_${year}_${target.id}_${piId}`;
+        localStorage.setItem(tLocalKey, JSON.stringify(newIds));
+        localStorage.setItem(`${prefix}_pi_act_name_${year}_${target.id}_${piId}_${newId}`, "New Activity");
+        localStorage.setItem(`${prefix}_pi_ind_name_${year}_${target.id}_${piId}_${newId}`, "New Indicator");
+        for(let i=0; i<12; i++) {
+             localStorage.setItem(`${prefix}_data_${year}_${target.id}_${piId}_${newId}_${i}`, "0");
+        }
+    });
+
     refresh();
   };
 
@@ -752,6 +877,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
     const newIds = currentIds.filter(id => id !== activityId);
     localStorage.setItem(localKey, JSON.stringify(newIds));
+    
+    // Propagation
+    const targets = getPropagationTargets(currentUser, subjectUser, allUnits || [], prefix, year, isTemplateMode || false);
+    targets.forEach(target => {
+        const tLocalKey = `${prefix}_pi_act_ids_${year}_${target.id}_${piId}`;
+        localStorage.setItem(tLocalKey, JSON.stringify(newIds));
+    });
+
     refresh();
   };
 
@@ -807,6 +940,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             const normalizedHeaders = headerRowRaw.map(c => String(c).toLowerCase().replace(/[^a-z0-9]/g, ''));
             const findCol = (keywords: string[]) => {
                  const normalizedKeywords = keywords.map(k => k.replace(/[^a-z0-9]/g, ''));
+                 // Priority: Exact Match -> Partial Match
+                 const exactIdx = normalizedHeaders.findIndex(h => normalizedKeywords.includes(h));
+                 if (exactIdx !== -1) return exactIdx;
                  return normalizedHeaders.findIndex(h => normalizedKeywords.some(k => h.includes(k)));
             };
 
@@ -1041,40 +1177,34 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     if (piIndex === -1) return;
     const pi = piData[piIndex];
     
+    const targets = getPropagationTargets(currentUser, subjectUser, allUnits || [], prefix, year, isTemplateMode || false);
+
     if (field === 'tab_label') {
         const key = `${prefix}_tab_label_${year}_${uId}_${piId}`;
         localStorage.setItem(key, editValue);
-        if (isTemplateMode) {
-             (allUnits || []).forEach(target => {
-                 localStorage.setItem(`${prefix}_tab_label_${year}_${target.id}_${piId}`, editValue);
-             });
-        }
+        targets.forEach(target => {
+            localStorage.setItem(`${prefix}_tab_label_${year}_${target.id}_${piId}`, editValue);
+        });
     } else if (field === 'title') {
         const key = `${prefix}_pi_title_${year}_${uId}_${piId}`;
         localStorage.setItem(key, editValue);
-        if (isTemplateMode) {
-             (allUnits || []).forEach(target => {
-                 localStorage.setItem(`${prefix}_pi_title_${year}_${target.id}_${piId}`, editValue);
-             });
-        }
+        targets.forEach(target => {
+            localStorage.setItem(`${prefix}_pi_title_${year}_${target.id}_${piId}`, editValue);
+        });
     } else {
         const act = pi.activities[rowIdx];
         if (field === 'activity') {
             const key = `${prefix}_pi_act_name_${year}_${uId}_${piId}_${act.id}`;
             localStorage.setItem(key, editValue);
-             if (isTemplateMode) {
-                 (allUnits || []).forEach(target => {
-                     localStorage.setItem(`${prefix}_pi_act_name_${year}_${target.id}_${piId}_${act.id}`, editValue);
-                 });
-            }
+            targets.forEach(target => {
+                localStorage.setItem(`${prefix}_pi_act_name_${year}_${target.id}_${piId}_${act.id}`, editValue);
+            });
         } else if (field === 'indicator') {
             const key = `${prefix}_pi_ind_name_${year}_${uId}_${piId}_${act.id}`;
             localStorage.setItem(key, editValue);
-             if (isTemplateMode) {
-                 (allUnits || []).forEach(target => {
-                     localStorage.setItem(`${prefix}_pi_ind_name_${year}_${target.id}_${piId}_${act.id}`, editValue);
-                 });
-            }
+            targets.forEach(target => {
+                localStorage.setItem(`${prefix}_pi_ind_name_${year}_${target.id}_${piId}_${act.id}`, editValue);
+            });
         }
     }
     setEditingLabel(null);
@@ -1094,7 +1224,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           </div>
         </div>
         
-        {(isTemplateMode || isSuperAdminTargetMaster) && (
+        {showTemplateControls && (
             <div className="flex gap-2">
                 <button onClick={handleExportMaster} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg shadow-indigo-200">
                     Export Template
@@ -1146,6 +1276,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                     )}
                 </div>
             ))}
+            {canEditStructure && (
+                <button onClick={handleAddTab} className="px-4 py-3 rounded-xl bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 font-black text-lg transition-colors min-w-[50px] shadow-sm border border-transparent hover:border-slate-200">
+                    +
+                </button>
+            )}
         </div>
 
         {/* Content */}
