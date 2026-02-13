@@ -9,6 +9,7 @@ interface OperationalDashboardProps {
   subjectUser: User;
   allUnits?: User[];
   isTemplateMode?: boolean;
+  year: string;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -491,24 +492,25 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
     const isExplicitlyImported = importedIds.includes(piId) && storedIds;
 
     if (isExplicitlyImported) {
+      // STRICTLY USE IMPORTED IDS
       activityIds = JSON.parse(storedIds!);
-       if (PI_STRUCTURE_2026[piId]) {
-         fallbackStructure = PI_STRUCTURE_2026[piId];
-       } else if (piId === 'PI1') {
+      // Fallback structure only for resolving NAMES if they are missing in local storage (e.g. placeholders)
+       // Map ODPI to PI for structure lookup if needed
+       let structId = piId;
+       if (piId.startsWith('ODPI')) {
+          structId = piId.replace('ODPI', 'PI');
+       }
+       
+       if (PI_STRUCTURE_2026[structId]) {
+         fallbackStructure = PI_STRUCTURE_2026[structId];
+       } else if (piId === 'PI1' || piId === 'ODPI1') {
          fallbackStructure = PI1_STRUCTURE;
        } else {
-         const piNumMatch = piId.match(/^PI(\d+)$/);
-         const piNum = piNumMatch ? parseInt(piNumMatch[1], 10) : null;
-         if (piNum !== null && piNum >= 2 && piNum <= 29) {
-           fallbackStructure = [{ id: `${piId.toLowerCase()}_a1`, activity: "Sectoral groups/BPATs mobilized", indicator: "Collaborative efforts with NGOs" }];
-         } else {
-           fallbackStructure = [{ id: `${piId.toLowerCase()}_a1`, activity: "Operational Activity", indicator: "Activity Unit" }];
-         }
+         // Generic fallback
+         fallbackStructure = [{ id: `${piId.toLowerCase()}_a1`, activity: "Operational Activity", indicator: "Activity Unit" }];
        }
     } else if (year === '2026' && PI_STRUCTURE_2026[piId]) {
       fallbackStructure = PI_STRUCTURE_2026[piId];
-      // Force strict structure for 2026 to ensure new format is applied
-      // ignoring potentially stale localStorage data UNLESS explicitly imported above
       activityIds = fallbackStructure.map(a => a.id);
     } else if (piId === 'PI1') {
       fallbackStructure = PI1_STRUCTURE;
@@ -525,7 +527,12 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
     }
 
     const activities = activityIds.map(aid => {
-      const base = fallbackStructure.find(a => a.id === aid) || fallbackStructure[0];
+      let base = fallbackStructure.find(a => a.id === aid);
+      if (!base && aid.toLowerCase().startsWith('odpi')) {
+          const mappedAid = aid.toLowerCase().replace('odpi', 'pi');
+          base = fallbackStructure.find(a => a.id === mappedAid);
+      }
+      base = base || fallbackStructure[0];
       return {
         id: aid,
         activity: getSharedLabel(prefix, year, effectiveId, piId, aid, 'act', base.activity),
@@ -535,8 +542,13 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
       };
     });
     
+    // Map ODPI to PI for title lookup
+    let titleId = piId;
+    if (piId.startsWith('ODPI')) {
+        titleId = piId.replace('ODPI', 'PI');
+    }
     const defaultTitleBase = piId === 'PI1' ? "Community Awareness Activities Initiated" : `Indicator ${piId}`;
-    const specificTitle = year === '2026' && PI_TITLES_2026[piId] ? PI_TITLES_2026[piId] : defaultTitleBase;
+    const specificTitle = year === '2026' && PI_TITLES_2026[titleId] ? PI_TITLES_2026[titleId] : defaultTitleBase;
     
     return { 
       id: piId, 
@@ -588,6 +600,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       pi.activities.forEach(act => {
         const row: any = {
           'PI ID': pi.id,
+          'Activity ID': act.id, // Added to help strict mapping on re-import
           'Activity Name': act.activity,
           'Performance Indicator': act.indicator,
           'PI Title': pi.title
@@ -596,7 +609,24 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         dataToExport.push(row);
       });
     });
+    
+    // Create sheet
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+
+    // Set column widths for better "Template" feel
+    const wscols = [
+      { wch: 10 }, // PI ID
+      { wch: 15 }, // Activity ID
+      { wch: 50 }, // Activity Name
+      { wch: 50 }, // Performance Indicator
+      { wch: 40 }, // PI Title
+      // Months
+      { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, 
+      { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, 
+      { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }
+    ];
+    worksheet['!cols'] = wscols;
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Master Template");
     XLSX.writeFile(workbook, `Master_Template_${year}_${prefix}.xlsx`);
@@ -734,9 +764,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           if (!row || row.length < 2) return;
           
           // 1. Extract potential PI ID from row
+          // Allow loose matching initially to capture spacing, then normalize
           let rowPiId = String(row[columnMap.piId] || '').trim().toUpperCase().replace(/\s+/g, '');
           
-          // Helper to validate ID format
+          // Helper to validate ID format: allows standard PI/OD/ODPI
           const isValidId = (s: string) => /^(PI|OD|ODPI)\d+$/.test(s);
           
           // Fallback search if column value is invalid/empty
@@ -745,7 +776,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                 const s = String(c).toUpperCase().trim().replace(/\s+/g, ''); 
                 return isValidId(s); 
              });
-             // Only adopt altPi if it looks like a valid ID
              if (altPi) rowPiId = String(altPi).trim().toUpperCase().replace(/\s+/g, '');
              else rowPiId = '';
           }
@@ -771,14 +801,25 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           if (actNameInFile) currentActivityName = actNameInFile;
           if (indNameInFile) currentIndicatorName = indNameInFile;
 
-          // 5. Skip empty filler rows (only if it's a fill-down row)
-          // If rowPiId is present, it's an explicit declaration, so we process it (might just be a header row or start of section)
-          // If rowPiId is empty (fill-down), we need content to justify creating an activity
-          if (!rowPiId && !actNameInFile && !indNameInFile) return;
-
+          // 5. If we have a PI ID but no activity content at all (and no previous fill-down content), 
+          // we track the PI but don't add an activity yet.
           foundPIs.add(piId);
           if (!piActivitiesMap[piId]) piActivitiesMap[piId] = [];
-          
+
+          if (!actNameInFile && !indNameInFile && !currentActivityName && !currentIndicatorName && !aidFromCol) {
+            // Likely a header row for the PI itself
+            // We check for PI Title in this row
+            const titleInRow = String(row[columnMap.piTitle] || '').trim();
+            if (titleInRow) {
+               localStorage.setItem(`${prefix}_pi_title_${year}_${uId}_${piId}`, titleInRow);
+               propagationTargets.forEach(target => {
+                 if (target.id === uId) return;
+                 localStorage.setItem(`${prefix}_pi_title_${year}_${target.id}_${piId}`, titleInRow);
+               });
+            }
+            return; 
+          }
+
           // Generate a stable ID for the activity
           let aid = aidFromCol;
           if (!aid) {
@@ -800,40 +841,47 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           const isActPlaceholder = isPlaceholder(actName);
           const isIndPlaceholder = isPlaceholder(indName);
 
-          // Apply specific and generic fallbacks ONLY if file content is missing or technical
-          if (piId === 'PI1') {
-             // PI1 structure matching is handled later via ID logic if needed, 
-             // but if file has text, we keep it.
-             const likelyId = isActPlaceholder ? actName.toLowerCase() : '';
-             if (likelyId) {
-                const match = PI1_STRUCTURE.find(s => s.id === likelyId);
-                if (match) {
-                   actName = match.activity;
-                   if (isIndPlaceholder) indName = match.indicator;
-                }
-             }
-          } else if (piId === 'PI2') {
-             if (isActPlaceholder || !actName) actName = "Sectoral groups/BPATs mobilized";
-             if (isIndPlaceholder || !indName) indName = "No. of collaborative efforts activities conducted";
-          } else if (piId === 'ODPI6') {
-             if (isActPlaceholder || !actName) actName = "EMPO Assessment and Evaluations";
-             if (isIndPlaceholder || !indName) indName = "No. of EMPO Assessment and Evaluations conducted";
-          } else if (piId === 'ODPI10') {
-             if (isActPlaceholder || !actName) actName = "Operational Resource Management";
-             if (isIndPlaceholder || !indName) indName = "No. of ODPI 10 activities conducted";
-          } else if (piId.startsWith('ODPI')) {
+          // Resolve from Structure (PI1-29, etc) using PI_STRUCTURE_2026
+          // Map ODPI to PI for structure lookup if needed to provide better defaults
+          let structId = piId;
+          if (piId.startsWith('ODPI')) {
+             structId = piId.replace('ODPI', 'PI');
+          }
+          const struct = PI_STRUCTURE_2026[structId] || PI_STRUCTURE_2026[piId];
+
+          if (struct) {
+              let match;
+              // Match by aid
+              if (aid) match = struct.find(s => s.id.toLowerCase() === aid.toLowerCase());
+              
+              // NEW: Match by index if IDs are generated sequentially or simple mapping (e.g. odpi6_a1 matches pi6_a1)
+              if (!match && aid && aid.toLowerCase().startsWith('odpi')) {
+                 const piAid = aid.toLowerCase().replace('odpi', 'pi');
+                 match = struct.find(s => s.id.toLowerCase() === piAid);
+              }
+              
+              // Match by name-as-id
+              if (!match && isActPlaceholder && actName) {
+                  match = struct.find(s => s.id.toLowerCase() === actName.toLowerCase());
+              }
+              
+              if (match) {
+                  if (isActPlaceholder || !actName) actName = match.activity;
+                  if (isIndPlaceholder || !indName) indName = match.indicator;
+              }
+          }
+
+          // Fallbacks for specific ODPIs if needed - simplified since we now map ODPI to PI structure above
+          if (piId.startsWith('ODPI') && !struct) {
              const tabNum = piId.replace('ODPI', '');
              if (isActPlaceholder || !actName) actName = `ODPI ${tabNum} Operational Task`;
              if (isIndPlaceholder || !indName) indName = `No. of ODPI ${tabNum} activities conducted`;
-          } else if (piId.startsWith('PI')) {
-             const piNum = parseInt(piId.replace('PI', ''), 10);
-             if (piNum >= 3 && piNum <= 29) {
-                if (isActPlaceholder || !actName) actName = "Sectoral groups/BPATs mobilized";
-                if (isIndPlaceholder || !indName) indName = "Collaborative efforts with NGOs";
-             }
+          } else if (piId === 'PI2' && !struct) { 
+             if (isActPlaceholder || !actName) actName = "Sectoral groups/BPATs mobilized";
+             if (isIndPlaceholder || !indName) indName = "No. of collaborative efforts activities conducted";
           }
 
-          // Safety default if everything else failed
+          // Safety default
           if (!actName) actName = "Operational Activity";
           if (!indName) indName = "Activity Unit";
 
@@ -882,6 +930,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             ...Array.from({ length: 10 }, (_, i) => `OD${i + 1}`)
           ];
           const allPotentialIds = Array.from(new Set([...defaultList, ...updatedImported]));
+          
+          // STRICT VISIBILITY: Hide anything that was NOT found in the current file upload
           const idsToHide = allPotentialIds.filter(id => !foundPIs.has(id));
           
           localStorage.setItem(`${prefix}_hidden_pis_${year}_${uId}`, JSON.stringify(idsToHide));
@@ -897,7 +947,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         }
 
         refresh();
-        alert(`Master Import Success: ${foundPIs.size} Indicators updated. Activity and Performance Indicator headings strictly synced from file.`);
+        alert(`Master Import Success: ${foundPIs.size} Indicators found. Visible tabs strictly synced to file content. Activities strictly synced.`);
       } catch (err: any) { 
         console.error(err);
         alert("Import Failed: Please verify Excel headers."); 
@@ -948,12 +998,20 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   };
 
   const renderRows = (pi: PIData) => {
-    const rows = pi.activities.map((act, rIdx) => (
+    const rows = pi.activities.map((act, rIdx) => {
+      const isRepeatedActivity = rIdx > 0 && pi.activities[rIdx - 1].activity === act.activity;
+
+      return (
       <tr key={`${pi.id}-${act.id}`} className="hover:bg-slate-50/50 group transition-colors border-b border-slate-100 relative">
         <td className="px-6 py-4 relative group">
           {editingLabel?.piId === pi.id && editingLabel?.rowIdx === rIdx && editingLabel?.field === 'activity' ? 
             <input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={saveEdit} onKeyDown={e => e.key === 'Enter' && saveEdit()} className="w-full border-2 border-rose-500 rounded font-black text-[13px] px-2 outline-none" /> : 
-            <span onClick={() => handleLabelClick(pi.id, rIdx, 'activity', act.activity)} className={`text-[13px] font-bold text-slate-900 leading-snug block py-1 ${canEditStructure ? 'cursor-pointer hover:bg-rose-50 p-1 rounded transition-colors' : ''}`}>{act.activity}</span>}
+            (!isRepeatedActivity ? 
+              <span onClick={() => handleLabelClick(pi.id, rIdx, 'activity', act.activity)} className={`text-[13px] font-bold text-slate-900 leading-snug block py-1 ${canEditStructure ? 'cursor-pointer hover:bg-rose-50 p-1 rounded transition-colors' : ''}`}>{act.activity}</span>
+              :
+              <span onClick={() => handleLabelClick(pi.id, rIdx, 'activity', act.activity)} className={`text-[13px] font-bold text-transparent select-none leading-snug block py-1 ${canEditStructure ? 'cursor-pointer hover:bg-rose-50 hover:text-slate-400 p-1 rounded transition-colors' : ''}`}>{act.activity}</span>
+            )
+          }
             
             {canEditStructure && (
               <button 
@@ -979,7 +1037,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         ))}
         <td className={`px-6 py-4 text-center text-xs font-black ${isConsolidated ? 'text-emerald-900' : (isTemplateMode ? 'text-rose-900' : (isTargetOutlook ? 'text-amber-900' : 'text-slate-900'))}`}>{act.total.toLocaleString()}</td>
       </tr>
-    ));
+      );
+    });
 
     if (canEditStructure) {
       rows.push(
