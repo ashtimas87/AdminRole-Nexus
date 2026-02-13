@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { PIData, UserRole, User, MonthData } from '../types';
@@ -559,7 +558,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const isOwner = currentUser.id === subjectUser.id;
   const canModifyData = useMemo(() => isConsolidated ? false : isOwner || currentUser.role === UserRole.SUPER_ADMIN || (currentUser.role === UserRole.SUB_ADMIN && subjectUser.role === UserRole.STATION), [isConsolidated, isOwner, currentUser.role, subjectUser.role]);
   const canModifyTemplate = useMemo(() => isTemplateMode && currentUser.role === UserRole.SUPER_ADMIN, [isTemplateMode, currentUser.role]);
-  const canEditStructure = useMemo(() => canModifyTemplate || (canModifyData && isTargetOutlook), [canModifyTemplate, canModifyData, isTargetOutlook]);
+  
+  // Allow Super Admin to edit structure (titles/activities) on individual Station dashboards, regardless of Target Outlook or Accomplishment mode.
+  // This logic ensures editing is possible unless it's a Consolidated view (where individual editing is disabled).
+  const canEditStructure = useMemo(() => 
+    canModifyTemplate || 
+    (canModifyData && (isTargetOutlook || currentUser.role === UserRole.SUPER_ADMIN)), 
+    [canModifyTemplate, canModifyData, isTargetOutlook, currentUser.role]
+  );
 
   const refresh = () => {
     const unitsToConsolidate = isConsolidated ? (allUnits || []) : [];
@@ -579,51 +585,39 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const currentPI = useMemo(() => piData.find(pi => pi.id === activeTab) || piData[0], [piData, activeTab]);
 
   const handleExportMaster = () => {
-    // 1. Get ALL definitions, ignoring hidden state, to ensure a complete master template
-    // Use consolidation units if applicable, otherwise empty
     const unitsToUse = isConsolidated ? (allUnits || []) : [];
     const fullPiData = getPIDefinitions(prefix, year, subjectUser.id, subjectUser.role, isConsolidated, unitsToUse, isTemplateMode, true);
     
-    // 2. Map to export format with strict key ordering
-    const dataToExport: any[] = [];
-    fullPiData.forEach(pi => {
-      pi.activities.forEach(act => {
-        const row: any = {
-          'PI ID': pi.id,
-          'PI Title': pi.title,
-          'Activity ID': act.id, // Added to help strict mapping on re-import
-          'Activity Name': act.activity,
-          'Performance Indicator': act.indicator,
-        };
-        MONTHS.forEach((month, idx) => { 
-            row[month] = act.months[idx].value; 
-        });
-        dataToExport.push(row);
-      });
-    });
-    
-    // 3. Define strict header order to match the "current set up" requirements for re-import
+    const workbook = XLSX.utils.book_new();
     const header = ['PI ID', 'PI Title', 'Activity ID', 'Activity Name', 'Performance Indicator', ...MONTHS];
-
-    // 4. Create sheet
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport, { header });
-
-    // 5. Set column widths for better "Template" feel
     const wscols = [
-      { wch: 10 }, // PI ID
-      { wch: 40 }, // PI Title
-      { wch: 15 }, // Activity ID
-      { wch: 50 }, // Activity Name
-      { wch: 50 }, // Performance Indicator
-      // Months
-      { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, 
-      { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, 
+      { wch: 10 }, { wch: 40 }, { wch: 15 }, { wch: 50 }, { wch: 50 },
+      { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 },
       { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }
     ];
-    worksheet['!cols'] = wscols;
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Master Template");
+    fullPiData.forEach(pi => {
+        const dataToExport: any[] = [];
+        pi.activities.forEach(act => {
+            const row: any = {
+                'PI ID': pi.id,
+                'PI Title': pi.title,
+                'Activity ID': act.id,
+                'Activity Name': act.activity,
+                'Performance Indicator': act.indicator,
+            };
+            MONTHS.forEach((month, idx) => { row[month] = act.months[idx].value; });
+            dataToExport.push(row);
+        });
+        
+        if (dataToExport.length > 0) {
+            const worksheet = XLSX.utils.json_to_sheet(dataToExport, { header });
+            worksheet['!cols'] = wscols;
+            const sheetName = pi.id.replace(/[\\/?*[\]]/g, '').substring(0, 31);
+            XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+        }
+    });
+
     const safeName = subjectUser.name.replace(/[^a-z0-9]/gi, '_');
     XLSX.writeFile(workbook, `Master_Template_${safeName}_${year}_${prefix}.xlsx`);
   };
@@ -717,61 +711,8 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       try {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
-        if (!rows || rows.length === 0) throw new Error("File empty");
         
-        let headerRowIdx = -1;
-        
-        // Intelligent Header Row Detection (Top 50 rows)
-        for (let i = 0; i < Math.min(rows.length, 50); i++) {
-           const row = rows[i];
-           if (!row || !Array.isArray(row)) continue;
-           
-           const normalizedRow = row.map(c => String(c).toLowerCase().replace(/[^a-z0-9]/g, ''));
-           const hasActivity = normalizedRow.some(c => c.includes('activity'));
-           const hasIndicator = normalizedRow.some(c => c.includes('indicator') || c.includes('performance'));
-           const hasPI = normalizedRow.some(c => c.includes('pi') || c.includes('id'));
-           
-           if (hasActivity || (hasPI && hasIndicator)) {
-               headerRowIdx = i;
-               break;
-           }
-        }
-        
-        // Fallback: Use row with most columns if no keywords found
-        if (headerRowIdx === -1) {
-             let maxCols = 0;
-             rows.forEach((r, i) => {
-                 if (r && r.length > maxCols) {
-                     maxCols = r.length;
-                     headerRowIdx = i;
-                 }
-             });
-        }
-        
-        const headerRowRaw = rows[headerRowIdx] || [];
-        const normalizedHeaders = headerRowRaw.map(c => String(c).toLowerCase().replace(/[^a-z0-9]/g, ''));
-        
-        const findCol = (keywords: string[]) => {
-             const normalizedKeywords = keywords.map(k => k.replace(/[^a-z0-9]/g, ''));
-             return normalizedHeaders.findIndex(h => normalizedKeywords.some(k => h.includes(k)));
-        };
-
-        const columnMap: Record<string, number> = {
-          piId: findCol(['piid', 'indicatorid', 'pi', 'id', 'tab']),
-          activityName: findCol(['activity', 'activityname', 'description', 'activitydescription']),
-          indicatorName: findCol(['performance', 'indicatorname', 'indicatordescription', 'measurement', 'measure', 'pi', 'indicator']),
-          piTitle: findCol(['pititle', 'indicatortitle', 'summary', 'goal', 'title']),
-          aid: findCol(['activityid', 'actid', 'aid', 'no.', 'order'])
-        };
-        MONTHS.forEach((m, i) => { 
-            // Also normalize variants for the findCol function
-            columnMap[`month_${i}`] = findCol(MONTH_VARIANTS[m].map(v => v.replace(/[^a-z0-9]/g, ''))); 
-        });
-
         const uId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
-        
         const isStandardStation = (user: User) => user.role === UserRole.STATION && user.name !== 'City Mobile Force Company';
         const isCurrentTargetStandard = prefix === 'target' && isStandardStation(subjectUser);
         const propagationTargets = isCurrentTargetStandard 
@@ -781,160 +722,179 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         const foundPIs = new Set<string>();
         const piActivitiesMap: Record<string, string[]> = {};
         
-        // Fill-down state
-        let currentPiId = '';
-        let currentActivityName = '';
-        let currentIndicatorName = '';
+        wb.SheetNames.forEach(sheetName => {
+            const ws = wb.Sheets[sheetName];
+            const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+            if (!rows || rows.length === 0) return;
 
-        rows.slice(headerRowIdx + 1).forEach((row) => {
-          if (!row || row.length < 2) return;
-          
-          // Helper to get value from column map
-          const getVal = (idx: number) => (idx !== -1 && row[idx]) ? String(row[idx]).trim() : '';
-
-          // 1. Extract potential PI ID from row
-          let rowPiId = getVal(columnMap.piId).toUpperCase().replace(/\s+/g, '');
-          
-          // Helper to validate ID format: allows standard PI/OD/ODPI
-          const isValidId = (s: string) => /^(PI|OD|ODPI)\d+$/.test(s);
-          
-          // Fallback search if column value is invalid/empty
-          if (!isValidId(rowPiId)) {
-             const altPi = row.find(c => { 
-                const s = String(c).toUpperCase().trim().replace(/\s+/g, ''); 
-                return isValidId(s); 
-             });
-             if (altPi) rowPiId = String(altPi).trim().toUpperCase().replace(/\s+/g, '');
-             else rowPiId = '';
-          }
-          
-          // 2. Update fill-down state
-          if (rowPiId) {
-            currentPiId = rowPiId;
-            currentActivityName = '';
-            currentIndicatorName = '';
-          }
-          
-          // 3. If no state, we can't process
-          if (!currentPiId) return;
-          
-          const piId = currentPiId;
-          
-          // 4. Get content
-          let aidFromCol = getVal(columnMap.aid).toLowerCase().replace(/\s+/g, '');
-          let actNameInFile = getVal(columnMap.activityName);
-          let indNameInFile = getVal(columnMap.indicatorName);
-
-          // Update fill-down states if values present
-          if (actNameInFile) currentActivityName = actNameInFile;
-          if (indNameInFile) currentIndicatorName = indNameInFile;
-
-          // 5. If we have a PI ID but no activity content at all (and no previous fill-down content), 
-          // we track the PI but don't add an activity yet.
-          foundPIs.add(piId);
-          if (!piActivitiesMap[piId]) piActivitiesMap[piId] = [];
-
-          if (!actNameInFile && !indNameInFile && !currentActivityName && !currentIndicatorName && !aidFromCol) {
-            // Likely a header row for the PI itself
-            // We check for PI Title in this row
-            const titleInRow = getVal(columnMap.piTitle);
-            if (titleInRow) {
-               localStorage.setItem(`${prefix}_pi_title_${year}_${uId}_${piId}`, titleInRow);
-               propagationTargets.forEach(target => {
-                 if (target.id === uId) return;
-                 localStorage.setItem(`${prefix}_pi_title_${year}_${target.id}_${piId}`, titleInRow);
-               });
+            let headerRowIdx = -1;
+            // Intelligent Header Row Detection (Top 50 rows)
+            for (let i = 0; i < Math.min(rows.length, 50); i++) {
+               const row = rows[i];
+               if (!row || !Array.isArray(row)) continue;
+               const normalizedRow = row.map(c => String(c).toLowerCase().replace(/[^a-z0-9]/g, ''));
+               const hasActivity = normalizedRow.some(c => c.includes('activity'));
+               const hasIndicator = normalizedRow.some(c => c.includes('indicator') || c.includes('performance'));
+               const hasPI = normalizedRow.some(c => c.includes('pi') || c.includes('id'));
+               if (hasActivity || (hasPI && hasIndicator)) {
+                   headerRowIdx = i;
+                   break;
+               }
             }
-            return; 
-          }
+            // Fallback
+            if (headerRowIdx === -1) {
+                 let maxCols = 0;
+                 rows.forEach((r, i) => { if (r && r.length > maxCols) { maxCols = r.length; headerRowIdx = i; } });
+            }
 
-          // Generate a stable ID for the activity
-          let aid = aidFromCol;
-          if (!aid) {
-             const normalizedActName = (actNameInFile || currentActivityName).toLowerCase().replace(/\s+/g, '');
-             if (normalizedActName.match(/^(pi|od|odpi)\d+_a\d+$/)) {
-                aid = normalizedActName;
-             } else {
-                aid = `${piId.toLowerCase()}_a${piActivitiesMap[piId].length + 1}`;
-             }
-          }
-          
-          if (!piActivitiesMap[piId].includes(aid)) {
-             piActivitiesMap[piId].push(aid);
-          }
+            const headerRowRaw = rows[headerRowIdx] || [];
+            const normalizedHeaders = headerRowRaw.map(c => String(c).toLowerCase().replace(/[^a-z0-9]/g, ''));
+            const findCol = (keywords: string[]) => {
+                 const normalizedKeywords = keywords.map(k => k.replace(/[^a-z0-9]/g, ''));
+                 return normalizedHeaders.findIndex(h => normalizedKeywords.some(k => h.includes(k)));
+            };
 
-          let actName = actNameInFile || currentActivityName;
-          let indName = indNameInFile || currentIndicatorName;
-          const isPlaceholder = (s: string) => s.toLowerCase().match(/^(pi|od|odpi)\d+(_a\d+)?$/) || s === '';
-          const isActPlaceholder = isPlaceholder(actName);
-          const isIndPlaceholder = isPlaceholder(indName);
+            const columnMap: Record<string, number> = {
+              piId: findCol(['piid', 'indicatorid', 'pi', 'id', 'tab']),
+              activityName: findCol(['activity', 'activityname', 'description', 'activitydescription']),
+              indicatorName: findCol(['performance', 'indicatorname', 'indicatordescription', 'measurement', 'measure', 'pi', 'indicator']),
+              piTitle: findCol(['pititle', 'indicatortitle', 'summary', 'goal', 'title']),
+              aid: findCol(['activityid', 'actid', 'aid', 'no.', 'order'])
+            };
+            MONTHS.forEach((m, i) => { columnMap[`month_${i}`] = findCol(MONTH_VARIANTS[m].map(v => v.replace(/[^a-z0-9]/g, ''))); });
 
-          // Resolve from Structure (PI1-29, etc) using PI_STRUCTURE_2026
-          // This ensures PI3 and others are resolved correctly if inputs are placeholders/IDs.
-          const struct = PI_STRUCTURE_2026[piId];
-          if (struct) {
-              let match;
-              // Match by aid
-              if (aid) match = struct.find(s => s.id.toLowerCase() === aid.toLowerCase());
-              // Match by name-as-id
-              if (!match && isActPlaceholder && actName) {
-                  match = struct.find(s => s.id.toLowerCase() === actName.toLowerCase());
-              }
-              
-              if (match) {
-                  if (isActPlaceholder || !actName) actName = match.activity;
-                  if (isIndPlaceholder || !indName) indName = match.indicator;
-              }
-          }
+            // Sheet-specific fill-down state
+            let currentPiId = '';
+            let currentActivityName = '';
+            let currentIndicatorName = '';
 
-          // Fallbacks for specific ODPIs if needed
-          if (piId === 'ODPI6') {
-             if (isActPlaceholder || !actName) actName = "EMPO Assessment and Evaluations";
-             if (isIndPlaceholder || !indName) indName = "No. of EMPO Assessment and Evaluations conducted";
-          } else if (piId === 'ODPI10') {
-             if (isActPlaceholder || !actName) actName = "Operational Resource Management";
-             if (isIndPlaceholder || !indName) indName = "No. of ODPI 10 activities conducted";
-          } else if (piId.startsWith('ODPI')) {
-             const tabNum = piId.replace('ODPI', '');
-             if (isActPlaceholder || !actName) actName = `ODPI ${tabNum} Operational Task`;
-             if (isIndPlaceholder || !indName) indName = `No. of ODPI ${tabNum} activities conducted`;
-          } else if (piId === 'PI2' && !struct) { 
-             if (isActPlaceholder || !actName) actName = "Sectoral groups/BPATs mobilized";
-             if (isIndPlaceholder || !indName) indName = "No. of collaborative efforts activities conducted";
-          }
+            rows.slice(headerRowIdx + 1).forEach((row) => {
+                if (!row || row.length < 2) return;
+                const getVal = (idx: number) => (idx !== -1 && row[idx]) ? String(row[idx]).trim() : '';
 
-          // Safety default
-          if (!actName) actName = "Operational Activity";
-          if (!indName) indName = "Activity Unit";
+                let rowPiId = getVal(columnMap.piId).toUpperCase().replace(/\s+/g, '');
+                
+                const isValidId = (s: string) => /^(PI|OD|ODPI)\d+$/.test(s);
+                if (!isValidId(rowPiId)) {
+                    const altPi = row.find(c => { 
+                       const s = String(c).toUpperCase().trim().replace(/\s+/g, ''); 
+                       return isValidId(s); 
+                    });
+                    if (altPi) rowPiId = String(altPi).trim().toUpperCase().replace(/\s+/g, '');
+                    else rowPiId = '';
+                }
 
-          localStorage.setItem(`${prefix}_pi_act_name_${year}_${uId}_${piId}_${aid}`, actName);
-          localStorage.setItem(`${prefix}_pi_ind_name_${year}_${uId}_${piId}_${aid}`, indName);
-          
-          propagationTargets.forEach(target => {
-            if (target.id === uId) return;
-            localStorage.setItem(`${prefix}_pi_act_name_${year}_${target.id}_${piId}_${aid}`, actName);
-            localStorage.setItem(`${prefix}_pi_ind_name_${year}_${target.id}_${piId}_${aid}`, indName);
-          });
-          
-          const titleInRow = getVal(columnMap.piTitle);
-          if (titleInRow) {
-            localStorage.setItem(`${prefix}_pi_title_${year}_${uId}_${piId}`, titleInRow);
-            propagationTargets.forEach(target => {
-              if (target.id === uId) return;
-              localStorage.setItem(`${prefix}_pi_title_${year}_${target.id}_${piId}`, titleInRow);
+                if (rowPiId) {
+                    currentPiId = rowPiId;
+                    currentActivityName = '';
+                    currentIndicatorName = '';
+                }
+                
+                if (!currentPiId) return;
+                const piId = currentPiId;
+
+                let aidFromCol = getVal(columnMap.aid).toLowerCase().replace(/\s+/g, '');
+                let actNameInFile = getVal(columnMap.activityName);
+                let indNameInFile = getVal(columnMap.indicatorName);
+
+                if (actNameInFile) currentActivityName = actNameInFile;
+                if (indNameInFile) currentIndicatorName = indNameInFile;
+
+                foundPIs.add(piId);
+                if (!piActivitiesMap[piId]) piActivitiesMap[piId] = [];
+
+                if (!actNameInFile && !indNameInFile && !currentActivityName && !currentIndicatorName && !aidFromCol) {
+                    const titleInRow = getVal(columnMap.piTitle);
+                    if (titleInRow) {
+                       localStorage.setItem(`${prefix}_pi_title_${year}_${uId}_${piId}`, titleInRow);
+                       propagationTargets.forEach(target => {
+                         if (target.id === uId) return;
+                         localStorage.setItem(`${prefix}_pi_title_${year}_${target.id}_${piId}`, titleInRow);
+                       });
+                    }
+                    return;
+                }
+
+                let aid = aidFromCol;
+                if (!aid) {
+                   const normalizedActName = (actNameInFile || currentActivityName).toLowerCase().replace(/\s+/g, '');
+                   if (normalizedActName.match(/^(pi|od|odpi)\d+_a\d+$/)) {
+                      aid = normalizedActName;
+                   } else {
+                      aid = `${piId.toLowerCase()}_a${piActivitiesMap[piId].length + 1}`;
+                   }
+                }
+                
+                if (!piActivitiesMap[piId].includes(aid)) {
+                   piActivitiesMap[piId].push(aid);
+                }
+
+                let actName = actNameInFile || currentActivityName;
+                let indName = indNameInFile || currentIndicatorName;
+                const isPlaceholder = (s: string) => s.toLowerCase().match(/^(pi|od|odpi)\d+(_a\d+)?$/) || s === '';
+                const isActPlaceholder = isPlaceholder(actName);
+                const isIndPlaceholder = isPlaceholder(indName);
+
+                const struct = PI_STRUCTURE_2026[piId];
+                if (struct) {
+                    let match;
+                    if (aid) match = struct.find(s => s.id.toLowerCase() === aid.toLowerCase());
+                    if (!match && isActPlaceholder && actName) {
+                        match = struct.find(s => s.id.toLowerCase() === actName.toLowerCase());
+                    }
+                    if (match) {
+                        if (isActPlaceholder || !actName) actName = match.activity;
+                        if (isIndPlaceholder || !indName) indName = match.indicator;
+                    }
+                }
+
+                if (piId === 'ODPI6') {
+                   if (isActPlaceholder || !actName) actName = "EMPO Assessment and Evaluations";
+                   if (isIndPlaceholder || !indName) indName = "No. of EMPO Assessment and Evaluations conducted";
+                } else if (piId === 'ODPI10') {
+                   if (isActPlaceholder || !actName) actName = "Operational Resource Management";
+                   if (isIndPlaceholder || !indName) indName = "No. of ODPI 10 activities conducted";
+                } else if (piId.startsWith('ODPI')) {
+                   const tabNum = piId.replace('ODPI', '');
+                   if (isActPlaceholder || !actName) actName = `ODPI ${tabNum} Operational Task`;
+                   if (isIndPlaceholder || !indName) indName = `No. of ODPI ${tabNum} activities conducted`;
+                } else if (piId === 'PI2' && !struct) { 
+                   if (isActPlaceholder || !actName) actName = "Sectoral groups/BPATs mobilized";
+                   if (isIndPlaceholder || !indName) indName = "No. of collaborative efforts activities conducted";
+                }
+
+                if (!actName) actName = "Operational Activity";
+                if (!indName) indName = "Activity Unit";
+
+                localStorage.setItem(`${prefix}_pi_act_name_${year}_${uId}_${piId}_${aid}`, actName);
+                localStorage.setItem(`${prefix}_pi_ind_name_${year}_${uId}_${piId}_${aid}`, indName);
+                
+                propagationTargets.forEach(target => {
+                  if (target.id === uId) return;
+                  localStorage.setItem(`${prefix}_pi_act_name_${year}_${target.id}_${piId}_${aid}`, actName);
+                  localStorage.setItem(`${prefix}_pi_ind_name_${year}_${target.id}_${piId}_${aid}`, indName);
+                });
+                
+                const titleInRow = getVal(columnMap.piTitle);
+                if (titleInRow) {
+                  localStorage.setItem(`${prefix}_pi_title_${year}_${uId}_${piId}`, titleInRow);
+                  propagationTargets.forEach(target => {
+                    if (target.id === uId) return;
+                    localStorage.setItem(`${prefix}_pi_title_${year}_${target.id}_${piId}`, titleInRow);
+                  });
+                }
+                
+                MONTHS.forEach((_, i) => { 
+                  const valCol = columnMap[`month_${i}`]; 
+                  const val = valCol !== -1 ? (parseInt(String(row[valCol] || '0'), 10) || 0) : 0; 
+                  localStorage.setItem(`${prefix}_data_${year}_${uId}_${piId}_${aid}_${i}`, String(val)); 
+                  
+                  propagationTargets.forEach(target => {
+                    if (target.id === uId) return;
+                    localStorage.setItem(`${prefix}_data_${year}_${target.id}_${piId}_${aid}_${i}`, String(val));
+                  });
+                });
             });
-          }
-          
-          MONTHS.forEach((_, i) => { 
-            const valCol = columnMap[`month_${i}`]; 
-            const val = valCol !== -1 ? (parseInt(String(row[valCol] || '0'), 10) || 0) : 0; 
-            localStorage.setItem(`${prefix}_data_${year}_${uId}_${piId}_${aid}_${i}`, String(val)); 
-            
-            propagationTargets.forEach(target => {
-              if (target.id === uId) return;
-              localStorage.setItem(`${prefix}_data_${year}_${target.id}_${piId}_${aid}_${i}`, String(val));
-            });
-          });
         });
 
         if (foundPIs.size > 0) {
@@ -953,7 +913,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           ];
           const allPotentialIds = Array.from(new Set([...defaultList, ...updatedImported]));
           
-          // STRICT VISIBILITY: Hide anything that was NOT found in the current file upload
           const idsToHide = allPotentialIds.filter(id => !foundPIs.has(id));
           
           localStorage.setItem(`${prefix}_hidden_pis_${year}_${uId}`, JSON.stringify(idsToHide));
@@ -969,7 +928,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         }
 
         refresh();
-        alert(`Master Import Success: ${foundPIs.size} Indicators found. Visible tabs strictly synced to file content. Activities strictly synced.`);
+        alert(`Master Import Success: ${foundPIs.size} Indicators found. All tabs strictly synced to file content.`);
       } catch (err: any) { 
         console.error(err);
         alert("Import Failed: Please verify Excel headers."); 
