@@ -581,11 +581,25 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   
   const isConsolidated = useMemo(() => (currentUser.role === UserRole.SUPER_ADMIN && (title.includes('Consolidation') || title.includes('Dashboard'))) || (currentUser.role === UserRole.CHQ && title.includes('Consolidation')), [currentUser.role, title]);
   const isOwner = currentUser.id === subjectUser.id;
-  const canModifyData = useMemo(() => isConsolidated ? false : isOwner || currentUser.role === UserRole.SUPER_ADMIN || (currentUser.role === UserRole.SUB_ADMIN && subjectUser.role === UserRole.STATION), [isConsolidated, isOwner, currentUser.role, subjectUser.role]);
-  const canModifyTemplate = useMemo(() => isTemplateMode && currentUser.role === UserRole.SUPER_ADMIN, [isTemplateMode, currentUser.role]);
   
   // Specific check for Super Admin viewing the master target outlook, which serves as a template for CHQ users
   const isSuperAdminTargetMaster = currentUser.role === UserRole.SUPER_ADMIN && subjectUser.role === UserRole.SUPER_ADMIN && prefix === 'target';
+
+  // Modified canModifyData logic to prevent editing of Target Outlook for CHQ and Station users
+  const canModifyData = useMemo(() => {
+    if (isConsolidated) return false;
+    
+    // Target Outlook is read-only for CHQ and STATION users, regardless of ownership
+    if (isTargetOutlook) {
+      if (currentUser.role === UserRole.CHQ || currentUser.role === UserRole.STATION) {
+        return false;
+      }
+    }
+    
+    return isOwner || currentUser.role === UserRole.SUPER_ADMIN || (currentUser.role === UserRole.SUB_ADMIN && subjectUser.role === UserRole.STATION);
+  }, [isConsolidated, isOwner, currentUser.role, subjectUser.role, isTargetOutlook]);
+
+  const canModifyTemplate = useMemo(() => isTemplateMode && currentUser.role === UserRole.SUPER_ADMIN, [isTemplateMode, currentUser.role]);
 
   const canEditStructure = useMemo(() => 
     canModifyTemplate || 
@@ -763,6 +777,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         }
 
         const foundPIs = new Set<string>();
+        const orderedPIs: string[] = [];
         const piActivitiesMap: Record<string, string[]> = {};
         
         wb.SheetNames.forEach(sheetName => {
@@ -840,7 +855,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                 if (actNameInFile) currentActivityName = actNameInFile;
                 if (indNameInFile) currentIndicatorName = indNameInFile;
 
-                foundPIs.add(piId);
+                if (!foundPIs.has(piId)) {
+                    foundPIs.add(piId);
+                    orderedPIs.push(piId);
+                }
                 if (!piActivitiesMap[piId]) piActivitiesMap[piId] = [];
 
                 if (!actNameInFile && !indNameInFile && !currentActivityName && !currentIndicatorName && !aidFromCol) {
@@ -947,6 +965,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             localStorage.setItem(`${prefix}_pi_act_ids_${year}_${uId}_${pid}`, JSON.stringify(aids));
           });
 
+          // Enforce Strict Order based on file content
+          localStorage.setItem(`${prefix}_pi_order_${year}_${uId}`, JSON.stringify(orderedPIs));
+
           const defaultList = [
             ...Array.from({ length: 29 }, (_, i) => `PI${i + 1}`),
             ...Array.from({ length: 10 }, (_, i) => `OD${i + 1}`)
@@ -961,6 +982,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             if (target.id === uId) return;
             localStorage.setItem(`${prefix}_imported_pi_list_${year}_${target.id}`, JSON.stringify(updatedImported));
             localStorage.setItem(`${prefix}_hidden_pis_${year}_${target.id}`, JSON.stringify(idsToHide));
+            localStorage.setItem(`${prefix}_pi_order_${year}_${target.id}`, JSON.stringify(orderedPIs));
             Object.entries(piActivitiesMap).forEach(([pid, aids]) => {
               localStorage.setItem(`${prefix}_pi_act_ids_${year}_${target.id}_${pid}`, JSON.stringify(aids));
             });
