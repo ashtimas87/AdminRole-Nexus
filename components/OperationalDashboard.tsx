@@ -11,6 +11,10 @@ interface OperationalDashboardProps {
   isTemplateMode?: boolean;
 }
 
+interface ExtendedPIData extends PIData {
+  tabLabel: string;
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_VARIANTS: Record<string, string[]> = {
   Jan: ['january', 'jan', 'target jan', 'actual jan', 't jan'],
@@ -422,6 +426,18 @@ const getSharedPITitle = (prefix: string, year: string, userId: string, piId: st
   return defaultTitle;
 };
 
+const getTabLabel = (prefix: string, year: string, userId: string, piId: string) => {
+    const key = `${prefix}_tab_label_${year}_${userId}_${piId}`;
+    const local = localStorage.getItem(key);
+    if (local) return local;
+    
+    if (userId !== 'sa-1') {
+         const templateKey = `${prefix}_tab_label_${year}_sa-1_${piId}`;
+         return localStorage.getItem(templateKey) || formatTabLabel(piId);
+    }
+    return formatTabLabel(piId);
+}
+
 const createMonthsForActivity = (prefix: string, year: string, userId: string, piId: string, activityId: string, role: UserRole, isConsolidated: boolean, units: User[]): MonthData[] => {
   return Array.from({ length: 12 }).map((_, mIdx) => {
     let value = 0;
@@ -441,7 +457,7 @@ const createMonthsForActivity = (prefix: string, year: string, userId: string, p
   });
 };
 
-const getPIDefinitions = (prefix: string, year: string, userId: string, role: UserRole, isConsolidated: boolean, units: User[], isTemplateMode: boolean, ignoreHidden = false) => {
+const getPIDefinitions = (prefix: string, year: string, userId: string, role: UserRole, isConsolidated: boolean, units: User[], isTemplateMode: boolean, ignoreHidden = false): ExtendedPIData[] => {
   const effectiveId = getEffectiveUserId(userId, role, prefix, isTemplateMode);
   const hiddenPIsKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
   const hiddenPIs: string[] = JSON.parse(localStorage.getItem(hiddenPIsKey) || '[]');
@@ -462,10 +478,8 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
 
   let baseIds = Array.from(new Set([...defaultList, ...importedIds]));
   
-  // Filter for Template Mode ONLY
   if (isTemplateMode) {
     baseIds = baseIds.filter(id => {
-      // Show only PI1 to PI29
       if (!id.startsWith('PI')) return false;
       const numStr = id.replace('PI', '');
       if (!/^\d+$/.test(numStr)) return false; 
@@ -474,7 +488,21 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
     });
   }
 
-  baseIds = baseIds.sort(customPiSort);
+  const orderKey = `${prefix}_pi_order_${year}_${effectiveId}`;
+  const savedOrder: string[] = JSON.parse(localStorage.getItem(orderKey) || '[]');
+  
+  if (savedOrder.length > 0) {
+      baseIds.sort((a, b) => {
+          const idxA = savedOrder.indexOf(a);
+          const idxB = savedOrder.indexOf(b);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+          return customPiSort(a, b);
+      });
+  } else {
+      baseIds.sort(customPiSort);
+  }
 
   return baseIds.map(piId => {
     const actIdsKey = `${prefix}_pi_act_ids_${year}_${effectiveId}_${piId}`;
@@ -487,19 +515,15 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
     let activityIds: string[];
     let fallbackStructure: { id: string; activity: string; indicator: string }[];
     
-    // Check if this PI was explicitly imported to override defaults
     const isExplicitlyImported = importedIds.includes(piId) && storedIds;
 
     if (isExplicitlyImported) {
-      // STRICTLY USE IMPORTED IDS
       activityIds = JSON.parse(storedIds!);
-      // Fallback structure only for resolving NAMES if they are missing in local storage (e.g. placeholders)
        if (PI_STRUCTURE_2026[piId]) {
          fallbackStructure = PI_STRUCTURE_2026[piId];
        } else if (piId === 'PI1') {
          fallbackStructure = PI1_STRUCTURE;
        } else {
-         // Generic fallback
          fallbackStructure = [{ id: `${piId.toLowerCase()}_a1`, activity: "Operational Activity", indicator: "Activity Unit" }];
        }
     } else if (year === '2026' && PI_STRUCTURE_2026[piId]) {
@@ -536,6 +560,7 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
     return { 
       id: piId, 
       title: getSharedPITitle(prefix, year, effectiveId, piId, specificTitle), 
+      tabLabel: getTabLabel(prefix, year, effectiveId, piId),
       activities 
     };
   }).filter(pi => ignoreHidden ? true : !hiddenPIs.includes(pi.id));
@@ -543,9 +568,9 @@ const getPIDefinitions = (prefix: string, year: string, userId: string, role: Us
 
 const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBack, currentUser, subjectUser, allUnits = [], isTemplateMode = false }) => {
   const [activeTab, setActiveTab] = useState('');
-  const [piData, setPiData] = useState<PIData[]>([]);
+  const [piData, setPiData] = useState<ExtendedPIData[]>([]);
   const [editingCell, setEditingCell] = useState<{ piId: string; rowIdx: number; monthIdx: number } | null>(null);
-  const [editingLabel, setEditingLabel] = useState<{ piId: string; rowIdx: number; field: 'activity' | 'indicator' | 'title' } | null>(null);
+  const [editingLabel, setEditingLabel] = useState<{ piId: string; rowIdx: number; field: 'activity' | 'indicator' | 'title' | 'tab_label' } | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [viewMode, setViewMode] = useState<'tabbed' | 'master'>('tabbed');
   const masterImportRef = useRef<HTMLInputElement>(null);
@@ -559,8 +584,9 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const canModifyData = useMemo(() => isConsolidated ? false : isOwner || currentUser.role === UserRole.SUPER_ADMIN || (currentUser.role === UserRole.SUB_ADMIN && subjectUser.role === UserRole.STATION), [isConsolidated, isOwner, currentUser.role, subjectUser.role]);
   const canModifyTemplate = useMemo(() => isTemplateMode && currentUser.role === UserRole.SUPER_ADMIN, [isTemplateMode, currentUser.role]);
   
-  // Allow Super Admin to edit structure (titles/activities) on individual Station dashboards, regardless of Target Outlook or Accomplishment mode.
-  // This logic ensures editing is possible unless it's a Consolidated view (where individual editing is disabled).
+  // Specific check for Super Admin viewing the master target outlook, which serves as a template for CHQ users
+  const isSuperAdminTargetMaster = currentUser.role === UserRole.SUPER_ADMIN && subjectUser.role === UserRole.SUPER_ADMIN && prefix === 'target';
+
   const canEditStructure = useMemo(() => 
     canModifyTemplate || 
     (canModifyData && (isTargetOutlook || currentUser.role === UserRole.SUPER_ADMIN)), 
@@ -626,6 +652,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const effectiveId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
     if (confirm('Restore ALL Performance Indicators?')) {
       localStorage.setItem(`${prefix}_hidden_pis_${year}_${effectiveId}`, JSON.stringify([]));
+      localStorage.setItem(`${prefix}_pi_order_${year}_${effectiveId}`, JSON.stringify([]));
       refresh();
     }
   };
@@ -633,7 +660,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const handleHideTab = (piId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const effectiveId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
-    if (confirm(`Hide ${formatTabLabel(piId)}?`)) {
+    if (confirm(`Delete ${formatTabLabel(piId)}?`)) {
       const hiddenKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
       const hidden: string[] = JSON.parse(localStorage.getItem(hiddenKey) || '[]');
       if (!hidden.includes(piId)) hidden.push(piId);
@@ -642,11 +669,28 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     }
   };
 
+  const handleMoveTab = (piId: string, direction: 'left' | 'right', e: React.MouseEvent) => {
+    e.stopPropagation();
+    const effectiveId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
+    const currentIndex = piData.findIndex(p => p.id === piId);
+    if (currentIndex === -1) return;
+    
+    const newIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= piData.length) return;
+
+    const newOrder = piData.map(p => p.id);
+    // Swap
+    [newOrder[currentIndex], newOrder[newIndex]] = [newOrder[newIndex], newOrder[currentIndex]];
+    
+    const orderKey = `${prefix}_pi_order_${year}_${effectiveId}`;
+    localStorage.setItem(orderKey, JSON.stringify(newOrder));
+    refresh();
+  };
+
   const handleAddActivity = (piId: string) => {
     if (!canEditStructure) return;
     const uId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
     
-    // 1. Get current IDs
     let currentIds: string[] = [];
     const localKey = `${prefix}_pi_act_ids_${year}_${uId}_${piId}`;
     const storedLocal = localStorage.getItem(localKey);
@@ -654,7 +698,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     if (storedLocal) {
         currentIds = JSON.parse(storedLocal);
     } else {
-        // Fallback to what is currently rendered (derived from template or defaults)
         const pi = piData.find(p => p.id === piId);
         if (pi) {
             currentIds = pi.activities.map(a => a.id);
@@ -663,21 +706,17 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         }
     }
 
-    // 2. Create new ID
     const newId = `${piId.toLowerCase()}_custom_${Date.now()}`;
     const newIds = [...currentIds, newId];
 
-    // 3. Save new list
     localStorage.setItem(localKey, JSON.stringify(newIds));
 
-    // 4. Initialize labels and data
     localStorage.setItem(`${prefix}_pi_act_name_${year}_${uId}_${piId}_${newId}`, "New Activity");
     localStorage.setItem(`${prefix}_pi_ind_name_${year}_${uId}_${piId}_${newId}`, "New Indicator");
     for(let i=0; i<12; i++) {
          localStorage.setItem(`${prefix}_data_${year}_${uId}_${piId}_${newId}_${i}`, "0");
     }
 
-    // 5. Refresh
     refresh();
   };
 
@@ -715,9 +754,13 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         const uId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
         const isStandardStation = (user: User) => user.role === UserRole.STATION && user.name !== 'City Mobile Force Company';
         const isCurrentTargetStandard = prefix === 'target' && isStandardStation(subjectUser);
-        const propagationTargets = isCurrentTargetStandard 
-          ? (allUnits || []).filter(u => isStandardStation(u))
-          : [];
+        
+        let propagationTargets: User[] = [];
+        if (isSuperAdminTargetMaster) {
+           propagationTargets = (allUnits || []).filter(u => u.role === UserRole.CHQ);
+        } else if (isCurrentTargetStandard) {
+           propagationTargets = (allUnits || []).filter(u => isStandardStation(u));
+        }
 
         const foundPIs = new Set<string>();
         const piActivitiesMap: Record<string, string[]> = {};
@@ -728,7 +771,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             if (!rows || rows.length === 0) return;
 
             let headerRowIdx = -1;
-            // Intelligent Header Row Detection (Top 50 rows)
             for (let i = 0; i < Math.min(rows.length, 50); i++) {
                const row = rows[i];
                if (!row || !Array.isArray(row)) continue;
@@ -741,7 +783,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                    break;
                }
             }
-            // Fallback
             if (headerRowIdx === -1) {
                  let maxCols = 0;
                  rows.forEach((r, i) => { if (r && r.length > maxCols) { maxCols = r.length; headerRowIdx = i; } });
@@ -763,7 +804,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             };
             MONTHS.forEach((m, i) => { columnMap[`month_${i}`] = findCol(MONTH_VARIANTS[m].map(v => v.replace(/[^a-z0-9]/g, ''))); });
 
-            // Sheet-specific fill-down state
             let currentPiId = '';
             let currentActivityName = '';
             let currentIndicatorName = '';
@@ -928,7 +968,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         }
 
         refresh();
-        alert(`Master Import Success: ${foundPIs.size} Indicators found. All tabs strictly synced to file content.`);
+        alert(`Master Import Success: ${foundPIs.size} Indicators found. All tabs strictly synced to file content.${propagationTargets.length > 0 ? ` Updated ${propagationTargets.length} CHQ/Target units.` : ''}`);
       } catch (err: any) { 
         console.error(err);
         alert("Import Failed: Please verify Excel headers."); 
@@ -947,11 +987,24 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     const pi = piData[piIndex];
     const act = pi.activities[rowIdx];
     
-    // Save to local storage
     const uId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
     
     const key = `${prefix}_data_${year}_${uId}_${pi.id}_${act.id}_${monthIdx}`;
-    localStorage.setItem(key, editValue || '0');
+    const newValue = editValue || '0';
+    localStorage.setItem(key, newValue);
+    
+    if (prefix === 'target' && year === '2026' && subjectUser.name === 'Police Station 1') {
+        const propagationTargets = (allUnits || []).filter(u => 
+            u.role === UserRole.STATION && 
+            u.id !== subjectUser.id && 
+            u.name !== 'City Mobile Force Company'
+        );
+        
+        propagationTargets.forEach(target => {
+            const targetKey = `${prefix}_data_${year}_${target.id}_${pi.id}_${act.id}_${monthIdx}`;
+            localStorage.setItem(targetKey, newValue);
+        });
+    }
     
     setEditingCell(null);
     refresh();
@@ -966,10 +1019,17 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     if (piIndex === -1) return;
     const pi = piData[piIndex];
     
-    if (field === 'title') {
+    if (field === 'tab_label') {
+        const key = `${prefix}_tab_label_${year}_${uId}_${piId}`;
+        localStorage.setItem(key, editValue);
+        if (isTemplateMode) {
+             (allUnits || []).forEach(target => {
+                 localStorage.setItem(`${prefix}_tab_label_${year}_${target.id}_${piId}`, editValue);
+             });
+        }
+    } else if (field === 'title') {
         const key = `${prefix}_pi_title_${year}_${uId}_${piId}`;
         localStorage.setItem(key, editValue);
-        // Propagate title if template mode
         if (isTemplateMode) {
              (allUnits || []).forEach(target => {
                  localStorage.setItem(`${prefix}_pi_title_${year}_${target.id}_${piId}`, editValue);
@@ -1012,7 +1072,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
           </div>
         </div>
         
-        {isTemplateMode && (
+        {(isTemplateMode || isSuperAdminTargetMaster) && (
             <div className="flex gap-2">
                 <button onClick={handleExportMaster} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg shadow-indigo-200">
                     Export Template
@@ -1031,22 +1091,36 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
       <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden flex flex-col min-h-[600px]">
         {/* Tabs */}
         <div className="flex overflow-x-auto no-scrollbar border-b border-slate-100 bg-slate-50/50 p-2 gap-2">
-            {piData.map(pi => (
-                <div key={pi.id} className="relative group">
+            {piData.map((pi, index) => (
+                <div key={pi.id} className="relative group flex items-center bg-white rounded-xl shadow-sm border border-transparent hover:border-slate-200 hover:shadow-md transition-all">
                     <button
                         onClick={() => setActiveTab(pi.id)}
-                        className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === pi.id ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                        onDoubleClick={() => {
+                            if (canEditStructure) {
+                                setEditingLabel({ piId: pi.id, rowIdx: -1, field: 'tab_label' });
+                                setEditValue(pi.tabLabel);
+                            }
+                        }}
+                        className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === pi.id ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
                     >
-                        {formatTabLabel(pi.id)}
+                        {pi.tabLabel}
                     </button>
-                    {isTemplateMode && (
-                        <button 
-                            onClick={(e) => handleHideTab(pi.id, e)}
-                            className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold shadow-md z-10"
-                            title="Hide Tab"
-                        >
-                            ×
-                        </button>
+                    {canEditStructure && (
+                        <div className="flex items-center pr-2 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {index > 0 && (
+                                <button onClick={(e) => handleMoveTab(pi.id, 'left', e)} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-600">
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                                </button>
+                            )}
+                            {index < piData.length - 1 && (
+                                <button onClick={(e) => handleMoveTab(pi.id, 'right', e)} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-600">
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                </button>
+                            )}
+                            <button onClick={(e) => handleHideTab(pi.id, e)} className="p-1 hover:bg-rose-100 rounded text-rose-300 hover:text-rose-500">
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
                     )}
                 </div>
             ))}
@@ -1191,7 +1265,10 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" onClick={() => setEditingLabel(null)}>
             <div className="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-lg animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
                 <h3 className="text-lg font-black text-slate-900 mb-4">
-                    {editingLabel.field === 'title' ? 'Edit Section Title' : editingLabel.field === 'activity' ? 'Edit Activity Name' : 'Edit Indicator Description'}
+                    {editingLabel.field === 'title' ? 'Edit Section Title' : 
+                     editingLabel.field === 'activity' ? 'Edit Activity Name' : 
+                     editingLabel.field === 'tab_label' ? 'Edit Tab Name' :
+                     'Edit Indicator Description'}
                 </h3>
                 <textarea 
                     value={editValue} 
