@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from './types';
-import LoginForm from './components/LoginForm';
-import Dashboard from './components/Dashboard';
+import LoginForm from './LoginForm';
+import Dashboard from './Dashboard';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
