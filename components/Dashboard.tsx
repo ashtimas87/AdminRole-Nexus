@@ -695,10 +695,14 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
               onBack={() => { setView(canSeeOversight ? 'unit-oversight' : 'status-terminal'); setRefreshTrigger(t => t + 1); }} 
               currentUser={user} 
               subjectUser={selectedOverviewUser}
-              allUnits={usersList.filter(u => {
-                if (user.role === UserRole.CHQ) return u.role === UserRole.CHQ;
-                return u.role === UserRole.STATION || u.role === UserRole.CHQ;
-              })} 
+              allUnits={
+                (user.role === UserRole.SUPER_ADMIN && selectedOverviewUser.id === user.id)
+                  ? []
+                  : usersList.filter(u => {
+                      if (user.role === UserRole.CHQ) return u.role === UserRole.CHQ;
+                      return u.role === UserRole.STATION || u.role === UserRole.CHQ;
+                    })
+              } 
             />
           )}
           {view === 'target-outlook' && selectedOverviewUser && (
