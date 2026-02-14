@@ -31,6 +31,8 @@ const MONTH_VARIANTS: Record<string, string[]> = {
   Dec: ['december', 'dec', 'target dec', 'actual dec', 't dec'],
 };
 
+// ... (Keep existing PI_TITLES_2026, PI_STRUCTURE_2026, PI1_STRUCTURE constants defined in the file)
+
 const PI_TITLES_2026: Record<string, string> = {
   PI1: "Number of Community Awareness/Information Activities Initiated",
   PI2: "Number of sectoral groups/BPATs mobilized/organized",
@@ -423,10 +425,8 @@ const createMonthsForActivity = (prefix: string, year: string, userId: string, p
             targetId = foundIdByName;
         } else if (ids.includes(activityId)) {
             // Fallback: If name match fails, check if the specific activityId exists in the unit's list.
-            // This ensures data is consolidated if the ID structure matches, even if the label was customized.
             targetId = activityId;
         } else {
-            // If neither name nor ID matches, we cannot consolidate this unit's data for this row.
             return sum;
         }
 
@@ -474,7 +474,6 @@ const getEffectiveUserId = (userId: string, role?: UserRole, prefix?: string, is
 const getSharedLabel = (prefix: string, year: string, userId: string, piId: string, activityId: string, type: 'act' | 'ind', defaultName: string): string => {
   const localKey = `${prefix}_pi_${type}_name_${year}_${userId}_${piId}_${activityId}`;
   const local = localStorage.getItem(localKey);
-  // Allow empty strings to be returned if explicitly set
   if (local !== null) return local;
   
   if (userId !== 'sa-1') {
@@ -649,7 +648,12 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const isTargetOutlook = useMemo(() => title.toUpperCase().includes("TARGET OUTLOOK"), [title]);
   const prefix = isTargetOutlook ? 'target' : 'accomplishment';
   
-  const isConsolidated = useMemo(() => (currentUser.role === UserRole.SUPER_ADMIN && (title.includes('Consolidation') || title.includes('Dashboard'))) || (currentUser.role === UserRole.CHQ && title.includes('Consolidation')), [currentUser.role, title]);
+  // Explicitly check role to ensure Sub Admin gets consolidation view correctly
+  const isConsolidated = useMemo(() => 
+    ((currentUser.role === UserRole.SUPER_ADMIN || currentUser.role === UserRole.SUB_ADMIN) && (title.includes('Consolidation') || title.includes('Dashboard'))) || 
+    (currentUser.role === UserRole.CHQ && title.includes('Consolidation')), 
+  [currentUser.role, title]);
+
   const isOwner = currentUser.id === subjectUser.id;
   
   const isSuperAdminTargetMaster = currentUser.role === UserRole.SUPER_ADMIN && subjectUser.role === UserRole.SUPER_ADMIN && prefix === 'target';
@@ -694,6 +698,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     }
   }, [piData]);
 
+  // ... (Rest of the file remains exactly the same, starting from currentPI useMemo)
   const currentPI = useMemo(() => piData.find(pi => pi.id === activeTab) || piData[0], [piData, activeTab]);
 
   const handleExportMaster = () => {
@@ -799,22 +804,23 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
   const handleHideTab = (piId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const effectiveId = getEffectiveUserId(subjectUser.id, subjectUser.role, prefix, isTemplateMode);
-    if (confirm(`Delete ${formatTabLabel(piId)}?`)) {
-      const hiddenKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
-      const hidden: string[] = JSON.parse(localStorage.getItem(hiddenKey) || '[]');
-      if (!hidden.includes(piId)) {
-          const newHidden = [...hidden, piId];
-          localStorage.setItem(hiddenKey, JSON.stringify(newHidden));
-          const targets = getPropagationTargets(currentUser, subjectUser, allUnits || [], prefix, year, isTemplateMode || false);
-          targets.forEach(target => {
-            const tHiddenKey = `${prefix}_hidden_pis_${year}_${target.id}`;
-            const tHidden = JSON.parse(localStorage.getItem(tHiddenKey) || '[]');
-            if (!tHidden.includes(piId)) {
-                localStorage.setItem(tHiddenKey, JSON.stringify([...tHidden, piId]));
-            }
-          });
-          refresh();
-      }
+    
+    // Direct hide logic without confirmation as requested
+    const hiddenKey = `${prefix}_hidden_pis_${year}_${effectiveId}`;
+    const hidden: string[] = JSON.parse(localStorage.getItem(hiddenKey) || '[]');
+    if (!hidden.includes(piId)) {
+        const newHidden = [...hidden, piId];
+        localStorage.setItem(hiddenKey, JSON.stringify(newHidden));
+        
+        const targets = getPropagationTargets(currentUser, subjectUser, allUnits || [], prefix, year, isTemplateMode || false);
+        targets.forEach(target => {
+          const tHiddenKey = `${prefix}_hidden_pis_${year}_${target.id}`;
+          const tHidden = JSON.parse(localStorage.getItem(tHiddenKey) || '[]');
+          if (!tHidden.includes(piId)) {
+              localStorage.setItem(tHiddenKey, JSON.stringify([...tHidden, piId]));
+          }
+        });
+        refresh();
     }
   };
 
@@ -1172,6 +1178,11 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
             localStorage.setItem(targetKey, newValue);
         });
     }
+
+    if (prefix === 'accomplishment' && year === '2026' && subjectUser.name === 'City Mobile Force Company') {
+         const targetKey = `${prefix}_data_${year}_sa-1_${pi.id}_${act.id}_${monthIdx}`;
+         localStorage.setItem(targetKey, newValue);
+    }
     
     setEditingCell(null);
     refresh();
@@ -1268,6 +1279,16 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                     </button>
                     {canEditStructure && (
                         <div className="flex items-center pr-2 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingLabel({ piId: pi.id, rowIdx: -1, field: 'tab_label' });
+                                    setEditValue(pi.tabLabel);
+                                }}
+                                className="p-1 hover:bg-blue-100 rounded text-blue-300 hover:text-blue-500"
+                            >
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </button>
                             {index > 0 && (
                                 <button onClick={(e) => handleMoveTab(pi.id, 'left', e)} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-600">
                                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
