@@ -725,7 +725,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [prefix, year, subjectUser.id]);
 
-  // ... (Rest of the file remains exactly the same, starting from currentPI useMemo)
   const currentPI = useMemo(() => piData.find(pi => pi.id === activeTab) || piData[0], [piData, activeTab]);
 
   const handleExportMaster = () => {
@@ -1206,11 +1205,6 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
         });
     }
 
-    if (prefix === 'accomplishment' && year === '2026' && subjectUser.name === 'City Mobile Force Company') {
-         const targetKey = `${prefix}_data_${year}_sa-1_${pi.id}_${act.id}_${monthIdx}`;
-         localStorage.setItem(targetKey, newValue);
-    }
-    
     setEditingCell(null);
     refresh();
   };
