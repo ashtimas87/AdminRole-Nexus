@@ -696,9 +696,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
               currentUser={user} 
               subjectUser={selectedOverviewUser}
               allUnits={
-                (user.role === UserRole.SUPER_ADMIN && selectedOverviewUser.id === user.id)
-                  ? []
-                  : usersList.filter(u => {
+                 usersList.filter(u => {
                       if (user.role === UserRole.CHQ) return u.role === UserRole.CHQ;
                       return u.role === UserRole.STATION || u.role === UserRole.CHQ;
                     })
