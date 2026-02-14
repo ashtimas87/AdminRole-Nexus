@@ -49,6 +49,17 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
     localStorage.setItem('adminrole_users_list', JSON.stringify(usersList));
   }, [usersList]);
 
+  // Add storage listener for automatic updates
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key && (e.key.includes('accomplishment_data') || e.key.includes('target_data'))) {
+        setRefreshTrigger(prev => prev + 1);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const calculateUserTotal = (userId: string, year: string, prefix: 'target' | 'accomplishment') => {
     let total = 0;
     const matchPrefix = `${prefix}_data_${year}_${userId}_`;
