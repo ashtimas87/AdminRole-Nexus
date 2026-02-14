@@ -372,7 +372,7 @@ const PI1_STRUCTURE = [
   { id: 'pi1_a17', activity: "collaborative efforts with NGOs, CSOs, GAs and Non-GAs", indicator: "No. of collaborative efforts activities conducted" }
 ];
 
-// ... (Keep existing customPiSort, formatTabLabel, getEffectiveUserId, getSharedLabel, getSharedPITitle, getTabLabel, createMonthsForActivity, getPIDefinitions, getPropagationTargets)
+// ... (Keep existing customPiSort, formatTabLabel, getEffectiveUserId, createMonthsForActivity, getPIDefinitions, getPropagationTargets)
 
 // IMPORTANT: Including the modified createMonthsForActivity from previous updates to ensure context
 const createMonthsForActivity = (prefix: string, year: string, userId: string, piId: string, activityId: string, activityName: string, role: UserRole, isConsolidated: boolean, units: User[]): MonthData[] => {
@@ -464,11 +464,13 @@ const getEffectiveUserId = (userId: string, role?: UserRole, prefix?: string, is
 const getSharedLabel = (prefix: string, year: string, userId: string, piId: string, activityId: string, type: 'act' | 'ind', defaultName: string): string => {
   const localKey = `${prefix}_pi_${type}_name_${year}_${userId}_${piId}_${activityId}`;
   const local = localStorage.getItem(localKey);
-  if (local) return local;
+  // Allow empty strings to be returned if explicitly set
+  if (local !== null) return local;
   
   if (userId !== 'sa-1') {
     const templateKey = `${prefix}_pi_${type}_name_${year}_sa-1_${piId}_${activityId}`;
-    return localStorage.getItem(templateKey) || defaultName;
+    const templateVal = localStorage.getItem(templateKey);
+    if (templateVal !== null) return templateVal;
   }
   return defaultName;
 };
@@ -476,11 +478,12 @@ const getSharedLabel = (prefix: string, year: string, userId: string, piId: stri
 const getSharedPITitle = (prefix: string, year: string, userId: string, piId: string, defaultTitle: string): string => {
   const localKey = `${prefix}_pi_title_${year}_${userId}_${piId}`;
   const local = localStorage.getItem(localKey);
-  if (local) return local;
+  if (local !== null) return local;
   
   if (userId !== 'sa-1') {
     const templateKey = `${prefix}_pi_title_${year}_sa-1_${piId}`;
-    return localStorage.getItem(templateKey) || defaultTitle;
+    const templateVal = localStorage.getItem(templateKey);
+    if (templateVal !== null) return templateVal;
   }
   return defaultTitle;
 };
@@ -488,11 +491,12 @@ const getSharedPITitle = (prefix: string, year: string, userId: string, piId: st
 const getTabLabel = (prefix: string, year: string, userId: string, piId: string) => {
     const key = `${prefix}_tab_label_${year}_${userId}_${piId}`;
     const local = localStorage.getItem(key);
-    if (local) return local;
+    if (local !== null) return local;
     
     if (userId !== 'sa-1') {
          const templateKey = `${prefix}_tab_label_${year}_sa-1_${piId}`;
-         return localStorage.getItem(templateKey) || formatTabLabel(piId);
+         const templateVal = localStorage.getItem(templateKey);
+         if (templateVal !== null) return templateVal;
     }
     return formatTabLabel(piId);
 }
@@ -1318,14 +1322,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                                 <tr key={act.id} className="hover:bg-slate-50/50 group transition-colors">
                                     <td className="p-3 border-b border-slate-50">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-slate-700 leading-snug">{act.activity}</span>
+                                            <span className="text-xs font-bold text-slate-700 leading-snug whitespace-pre-wrap">{act.activity}</span>
                                             {canEditStructure && (
                                                 <button 
                                                     onClick={() => {
                                                         setEditingLabel({ piId: currentPI.id, rowIdx: idx, field: 'activity' });
                                                         setEditValue(act.activity);
                                                     }}
-                                                    className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-blue-600 transition"
+                                                    className="text-slate-300 hover:text-blue-600 transition"
                                                 >
                                                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                                 </button>
@@ -1334,14 +1338,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                                     </td>
                                     <td className="p-3 border-b border-slate-50">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-xs text-slate-500">{act.indicator}</span>
+                                            <span className="text-xs text-slate-500 whitespace-pre-wrap">{act.indicator}</span>
                                             {canEditStructure && (
                                                 <button 
                                                     onClick={() => {
                                                         setEditingLabel({ piId: currentPI.id, rowIdx: idx, field: 'indicator' });
                                                         setEditValue(act.indicator);
                                                     }}
-                                                    className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-blue-600 transition"
+                                                    className="text-slate-300 hover:text-blue-600 transition"
                                                 >
                                                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                                 </button>
@@ -1424,6 +1428,13 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                     onChange={e => setEditValue(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 outline-none focus:border-slate-900 font-medium text-sm mb-6 min-h-[100px]"
                     autoFocus
+                    onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            saveLabel();
+                        }
+                        if (e.key === 'Escape') setEditingLabel(null);
+                    }}
                 />
                 <div className="flex gap-2">
                     <button onClick={() => setEditingLabel(null)} className="flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest text-slate-400 hover:bg-slate-50">Cancel</button>
