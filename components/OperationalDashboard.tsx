@@ -698,6 +698,17 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
     }
   }, [piData]);
 
+  // Listener for cross-tab updates to ensure automatic reflection
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key && e.key.includes(`${prefix}_data_${year}_${subjectUser.id}`)) {
+        refresh();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [prefix, year, subjectUser.id]);
+
   // ... (Rest of the file remains exactly the same, starting from currentPI useMemo)
   const currentPI = useMemo(() => piData.find(pi => pi.id === activeTab) || piData[0], [piData, activeTab]);
 
