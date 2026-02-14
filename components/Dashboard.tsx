@@ -681,6 +681,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           
           {view === 'master-template' && user.role === UserRole.SUPER_ADMIN && (
             <OperationalDashboard 
+              key="master-template"
               title={`MASTER TEMPLATE SOURCE - ${selectedYear}`} 
               onBack={() => setView('accounts')}
               currentUser={user}
@@ -691,6 +692,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
 
           {view === 'operational-dashboard' && selectedOverviewUser && (
             <OperationalDashboard 
+              key={selectedOverviewUser.id}
               title={getDashboardTitle(selectedOverviewUser, selectedYear, false)} 
               onBack={() => { setView(canSeeOversight ? 'unit-oversight' : 'status-terminal'); setRefreshTrigger(t => t + 1); }} 
               currentUser={user} 
@@ -705,6 +707,7 @@ const Dashboard: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLog
           )}
           {view === 'target-outlook' && selectedOverviewUser && (
             <OperationalDashboard 
+              key={`target-${selectedOverviewUser.id}`}
               title={getDashboardTitle(selectedOverviewUser, selectedYear, true)} 
               onBack={() => { setView('target-outlook-landing'); setRefreshTrigger(t => t + 1); }} 
               currentUser={user} 

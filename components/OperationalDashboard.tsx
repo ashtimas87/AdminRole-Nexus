@@ -398,7 +398,8 @@ const createMonthsForActivity = (prefix: string, year: string, userId: string, p
              }
         }
 
-        const foundId = ids.find(id => {
+        // Try to match by Activity Name first (for flexibility if rows were reordered but named same)
+        const foundIdByName = ids.find(id => {
              const nameKey = `${prefix}_pi_act_name_${year}_${unit.id}_${piId}_${id}`;
              let name = localStorage.getItem(nameKey);
              if (!name) {
@@ -418,7 +419,16 @@ const createMonthsForActivity = (prefix: string, year: string, userId: string, p
              return name === activityName;
         });
 
-        if (foundId) targetId = foundId;
+        if (foundIdByName) {
+            targetId = foundIdByName;
+        } else if (ids.includes(activityId)) {
+            // Fallback: If name match fails, check if the specific activityId exists in the unit's list.
+            // This ensures data is consolidated if the ID structure matches, even if the label was customized.
+            targetId = activityId;
+        } else {
+            // If neither name nor ID matches, we cannot consolidate this unit's data for this row.
+            return sum;
+        }
 
         const unitKey = `${prefix}_data_${year}_${unit.id}_${piId}_${targetId}_${mIdx}`;
         const val = localStorage.getItem(unitKey);
@@ -660,11 +670,14 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
   const canModifyTemplate = useMemo(() => isTemplateMode && currentUser.role === UserRole.SUPER_ADMIN, [isTemplateMode, currentUser.role]);
 
-  const canEditStructure = useMemo(() => 
-    canModifyTemplate || 
-    (canModifyData && (isTargetOutlook || currentUser.role === UserRole.SUPER_ADMIN)), 
-    [canModifyTemplate, canModifyData, isTargetOutlook, currentUser.role]
-  );
+  const canEditStructure = useMemo(() => {
+    if (isConsolidated) return false;
+    if (isTemplateMode) return currentUser.role === UserRole.SUPER_ADMIN;
+    // Allow Super Admin to edit structure on any individual unit dashboard
+    if (currentUser.role === UserRole.SUPER_ADMIN) return true;
+    // Strict logic for others
+    return canModifyData && isTargetOutlook;
+  }, [isConsolidated, isTemplateMode, currentUser.role, canModifyData, isTargetOutlook]);
 
   const refresh = () => {
     const unitsToConsolidate = isConsolidated ? (allUnits || []) : [];
@@ -1329,7 +1342,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                                                         setEditingLabel({ piId: currentPI.id, rowIdx: idx, field: 'activity' });
                                                         setEditValue(act.activity);
                                                     }}
-                                                    className="text-slate-300 hover:text-blue-600 transition"
+                                                    className="text-slate-300 hover:text-blue-600 transition cursor-pointer"
                                                 >
                                                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                                 </button>
@@ -1345,7 +1358,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                                                         setEditingLabel({ piId: currentPI.id, rowIdx: idx, field: 'indicator' });
                                                         setEditValue(act.indicator);
                                                     }}
-                                                    className="text-slate-300 hover:text-blue-600 transition"
+                                                    className="text-slate-300 hover:text-blue-600 transition cursor-pointer"
                                                 >
                                                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                                 </button>
@@ -1374,7 +1387,7 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
                                         <td className="p-3 border-b border-slate-50 text-center">
                                             <button 
                                                 onClick={() => handleRemoveActivity(currentPI.id, act.id)}
-                                                className="text-slate-300 hover:text-rose-500 transition"
+                                                className="text-slate-300 hover:text-rose-500 transition cursor-pointer"
                                             >
                                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                             </button>
