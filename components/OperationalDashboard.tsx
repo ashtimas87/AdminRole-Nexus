@@ -664,12 +664,28 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ title, onBa
 
   const canModifyData = useMemo(() => {
     if (isConsolidated) return false;
+    
     if (isTargetOutlook) {
+      // Targets: Only Admins can edit
       if (currentUser.role === UserRole.CHQ || currentUser.role === UserRole.STATION) {
         return false;
       }
+      return true; // Super Admin & Sub Admin can edit targets
+    } else {
+      // Accomplishment:
+      // Super Admin cannot edit other's accomplishment (Read Only Mode for Oversight)
+      if (currentUser.role === UserRole.SUPER_ADMIN && !isOwner) {
+        return false;
+      }
+      
+      // Owner can edit
+      if (isOwner) return true;
+      
+      // Sub Admin can edit Station accomplishment
+      if (currentUser.role === UserRole.SUB_ADMIN && subjectUser.role === UserRole.STATION) return true;
+      
+      return false;
     }
-    return isOwner || currentUser.role === UserRole.SUPER_ADMIN || (currentUser.role === UserRole.SUB_ADMIN && subjectUser.role === UserRole.STATION);
   }, [isConsolidated, isOwner, currentUser.role, subjectUser.role, isTargetOutlook]);
 
   const canModifyTemplate = useMemo(() => isTemplateMode && currentUser.role === UserRole.SUPER_ADMIN, [isTemplateMode, currentUser.role]);
